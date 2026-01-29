@@ -14,19 +14,21 @@ When the developer runs the `config.py` script from the SAM Configuration reposi
 
 > By default, the SAM Configuration repository will list available templates from a public S3 bucket maintained by 63Klabs.
 
-When an organization is starting out, it is best to focus on the SAM Config repository first and use the templates provided by the 63klabs public S3 bucket (which is sourced from the [Atlantis CloudFormation Template repository on GitHub](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments)).
+When an organization is starting out with the Atlantis Templates and Scripts Platform, it is best to focus on the SAM Config repository first and use the templates provided by the 63klabs public S3 bucket (which is sourced from the [Atlantis CloudFormation Template repository on GitHub](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments)).
 
-If, as an organization, you wish to supply your own templates, you may copy this repository and self-host.
+If, as an organization, you wish to supply your own templates, you may copy this repository to your own organization git provider and S3 bucket available internally.
 
-The Atlantis SAM Configuration repository allows multiple S3 buckets to serve as template sources when running the config.py script. You could keep the default 63klabs bucket and add your own bucket to serve as a source for custom templates.
+The Atlantis SAM Configuration repository allows multiple S3 buckets to serve as template sources when running the `config.py` script. You could keep the default 63klabs bucket and add your own bucket to serve as a source for custom templates.
 
-## Developers can update existing stacks to use the new template
+## Developers can update existing stacks to use updated templates
 
 > By default, the SAM Configuration repository will list available templates from a public S3 bucket maintained by 63Klabs.
 
 Each time a developer runs the config.py script on an existing configuration, the script will check the S3 bucket for any template updates. If one exists it will prompt the user if they want to apply the updated template.
 
-A user can always re-apply a previous version of the template (but they would have to know the version ID which they can grab from another stack's template version id tag or refer to a previous SAM Config repo commit)
+A user can always re-apply a previous version of the template (but they would have to know the S3 version ID which they can grab from another stack's template version id tag or refer to a previous SAM Config repo commit).
+
+Care is taken to not introduce breaking changes and if a breaking change is introduced, the template will move to a new version file with migration options.
 
 ## Self-Hosting
 
