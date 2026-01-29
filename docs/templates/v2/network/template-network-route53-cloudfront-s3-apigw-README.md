@@ -3,7 +3,7 @@
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
 **Version:** v0.0.13/2025-01-29  
-**Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
+**Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
 

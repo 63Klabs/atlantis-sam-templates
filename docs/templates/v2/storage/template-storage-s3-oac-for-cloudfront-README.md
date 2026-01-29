@@ -3,7 +3,7 @@
 CloudFront distribution with S3 origin access control (OAC). Supports external invalidator services via S3 event notifications - Deployed using SAM
 
 **Version:** v0.1.0/2025-12-08  
-**Template:** [templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml](../../../templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml)
+**Template:** [templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml](../../../../templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml)
 
 ## Overview
 

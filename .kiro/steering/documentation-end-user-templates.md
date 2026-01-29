@@ -19,7 +19,9 @@ Each template documentation file should follow this structure:
 - Template title (level-1 `#`) matching the template filename
 - Brief description of what the template does (1-2 sentences)
 - Template version and last updated date
-- Link to the actual template file in the repository
+- Link to the actual template file in the repository using the correct relative path: `../../../../templates/v2/{category}/{template-name}.yml`
+  - From `docs/templates/v2/{category}/` you need 4 `../` to reach the repository root, then navigate to `templates/v2/{category}/`
+  - Example: `[templates/v2/storage/template-storage-s3-artifacts.yml](../../../../templates/v2/storage/template-storage-s3-artifacts.yml)`
 
 ### Overview Section (level-2 `##`)
 - Detailed description of the template's purpose

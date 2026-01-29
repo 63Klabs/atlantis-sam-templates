@@ -3,7 +3,7 @@
 S3 for storing s3 log files - Deployed using SAM
 
 **Version:** v0.0.1/2025-05-10  
-**Template:** [templates/v2/storage/template-storage-s3-access-logs.yml](../../../templates/v2/storage/template-storage-s3-access-logs.yml)
+**Template:** [templates/v2/storage/template-storage-s3-access-logs.yml](../../../../templates/v2/storage/template-storage-s3-access-logs.yml)
 
 ## Overview
 

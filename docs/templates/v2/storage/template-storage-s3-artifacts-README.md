@@ -3,7 +3,7 @@
 S3 for storing Artifacts for CodeBuild and CodeDeploy - Deployed using SAM
 
 **Version:** v0.0.1/2025-05-16  
-**Template:** [templates/v2/storage/template-storage-s3-artifacts.yml](../../../templates/v2/storage/template-storage-s3-artifacts.yml)
+**Template:** [templates/v2/storage/template-storage-s3-artifacts.yml](../../../../templates/v2/storage/template-storage-s3-artifacts.yml)
 
 ## Overview
 

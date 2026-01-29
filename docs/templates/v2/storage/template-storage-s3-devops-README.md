@@ -3,7 +3,7 @@
 S3 for storing shared and latest (non-versioned) DevOps files (buildspec, buildscripts, reusable Lambda src) - Deployed using SAM
 
 **Version:** v0.0.1/2025-05-10  
-**Template:** [templates/v2/storage/template-storage-s3-devops.yml](../../../templates/v2/storage/template-storage-s3-devops.yml)
+**Template:** [templates/v2/storage/template-storage-s3-devops.yml](../../../../templates/v2/storage/template-storage-s3-devops.yml)
 
 ## Overview
 

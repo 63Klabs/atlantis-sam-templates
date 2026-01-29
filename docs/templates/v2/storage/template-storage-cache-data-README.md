@@ -3,7 +3,7 @@
 Shared storage for Lambda applications utilizing Cache-Data (S3/DynamoDb) - Deployed using SAM
 
 **Version:** v0.0.14/2025-08-08  
-**Template:** [templates/v2/storage/template-storage-cache-data.yml](../../../templates/v2/storage/template-storage-cache-data.yml)
+**Template:** [templates/v2/storage/template-storage-cache-data.yml](../../../../templates/v2/storage/template-storage-cache-data.yml)
 
 ## Overview
 
