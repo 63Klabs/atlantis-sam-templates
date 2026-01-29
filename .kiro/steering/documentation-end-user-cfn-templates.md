@@ -7,7 +7,7 @@ inclusion: always
    Learn about inclusion modes: https://kiro.dev/docs/steering/#inclusion-modes
 -------------------------------------------------------------------------------------> 
 
-# Template Documentation for End-User 
+# CloudFormation Template Documentation for End-User 
 
 When templates are created, modified, or deleted, the `docs/templates/v2/` directory is automatically updated with the latest documentation based upon the template.
 
@@ -177,6 +177,47 @@ The main `docs/templates/v2/README.md` should:
 4. **When parameters change**: Update the Parameters section and any affected Examples
 5. **When resources change**: Update the Resources section and any affected architecture descriptions
 6. **When outputs change**: Update the Outputs section
+
+### Preserving Existing Content
+
+When updating existing template documentation:
+
+1. **Preserve Blockquotes**: Any existing blockquotes (`>`) in the documentation MUST be preserved in the updated version
+   - Blockquotes serve as important tips, reminders, and clarifications for both end users and AI
+   - They provide context, directives, and guidance that should not be lost during updates
+   - When updating a section that contains blockquotes, maintain them in the same context
+   - If the content around a blockquote changes significantly, adjust the blockquote placement to maintain its relevance
+
+2. **Read Before Writing**: Before updating any existing documentation file:
+   - Read the entire current documentation file first
+   - Identify all blockquotes and their context
+   - Note any custom sections or content not in the standard structure
+   - Preserve all custom content unless it's explicitly outdated or incorrect
+
+3. **Contextual Updates**: When updating documentation sections:
+   - Keep blockquotes in their original sections unless the section is removed
+   - If a section is restructured, move blockquotes to the most relevant new location
+   - Add new blockquotes when documenting important warnings, tips, or AI directives
+   - Use blockquotes for:
+     - Important warnings about breaking changes or destructive operations
+     - Tips for optimal parameter configurations
+     - Clarifications about complex behaviors
+     - Directives for AI documentation generation
+     - Reminders about prerequisites or dependencies
+
+4. **Blockquote Format**: When adding or preserving blockquotes:
+   ```markdown
+   > **Important:** This is an important note
+   > 
+   > Additional context can span multiple lines
+   ```
+
+5. **Custom Content**: Preserve any custom sections or content that doesn't fit the standard structure:
+   - Architecture diagrams or ASCII art
+   - Custom examples specific to the template
+   - Historical notes about template evolution
+   - Migration guides from previous versions
+   - Known issues or limitations sections
 
 ## Spec-Driven Development Integration
 
