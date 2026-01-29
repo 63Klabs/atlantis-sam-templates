@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.12/2024-10-22
+# Version: v0.0.13/2025-01-29
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -18,10 +18,8 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # existing S3 bucket with access policy and/or existing API Gateway.
 
 # USE WITH:
-# - Storage Infrastructure (S3 OAC for CloudFront)
-# - and/or Application Infrastructure (API Gateway)
-# - Pipeline Infrastructure for content/application 
-
+# - Storage Infrastructure: S3 OAC for CloudFront
+#   - storage/template-storage-oac-for-cloudfront.yml
 
 # =============================================================================
 # META DATA
@@ -41,7 +39,7 @@ Metadata:
           - StageId
 
       - Label:
-          default: Origins such as S3 and API Gateway
+          default: Origins for S3 and/or API Gateway
         Parameters:
           - S3OriginDomainName
           - ApiGatewayId
