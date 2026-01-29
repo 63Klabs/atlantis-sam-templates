@@ -23,9 +23,9 @@ outputs/*
 # Kiro - steering but not specs (unless you do want all)
 # Don't ignore .kiro (ignored by .* above), but ignore everything else within, except for steering
 !.kiro
-.kiro/*
-!.kiro/steering/
-!.kiro/steering/**/*
+# .kiro/*
+# !.kiro/steering/
+# !.kiro/steering/**/*
 
 # But keep these
 !.gitignore
