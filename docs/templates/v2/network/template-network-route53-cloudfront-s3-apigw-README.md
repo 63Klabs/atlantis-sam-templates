@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.0.13/2025-01-29  
+**Version:** v0.0.14/2026-02-01  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -24,6 +24,7 @@ This template creates a complete network infrastructure for serving static conte
 - Route53 hosted zone for your domain
 - ACM certificate in us-east-1 (for CloudFront) and/or regional certificate (for API Gateway)
 - CloudFormation Service Role with appropriate permissions
+- (Optional) S3 bucket for CloudFront access logs with appropriate bucket policy allowing CloudFront to write logs
 
 ### Important Notes
 
@@ -56,6 +57,12 @@ Settings that control deployment behavior and resource configurations based on e
 
 - [DeployEnvironment](#deployenvironment)
 - [CloudFrontPriceClass](#cloudfrontpriceclass)
+
+### Supporting Resources
+
+Optional references to external resources that support the infrastructure.
+
+- [S3LogBucketName](#s3logbucketname)
 
 ### Routing for CloudFront
 
@@ -167,6 +174,21 @@ Price class for CloudFront distribution. For more information, see https://aws.a
 | Constraint Description | Must specify a valid CloudFront price class. |
 
 **Cost Consideration:** PriceClass_100 uses only North America and Europe edge locations (lowest cost). PriceClass_200 adds Asia, Middle East, and Africa. PriceClass_All includes all global edge locations (highest cost).
+
+#### S3LogBucketName
+
+The name of the S3 bucket used for CloudFront logging. Leave empty to disable logging. Must be a valid S3 bucket name (without .s3.amazonaws.com suffix).
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$\|^$` |
+| Constraint Description | Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number. |
+
+> **Important:** The S3 log bucket must exist before deploying this template and must have a bucket policy that allows CloudFront to write logs. The bucket should be in a region that supports CloudFront logging. For more information, see [AWS CloudFront Logging Documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/AccessLogs.html).
+
+> **Cost Consideration:** Enabling CloudFront logging incurs S3 storage costs for the log files. Consider implementing lifecycle policies on the log bucket to manage costs.
 
 #### DomainForCloudFront
 
@@ -283,7 +305,7 @@ If you are placing an API Gateway behind CloudFront, you will need to specify th
 Type: AWS::CloudFront::Distribution  
 Condition: CreateDistribution
 
-Creates a CloudFront distribution that serves content from S3 and/or API Gateway origins. The distribution is configured with HTTPS redirection, IPv6 support, and HTTP/2. It includes custom error responses for single-page applications (403/404 redirect to index.html) when serving static content.
+Creates a CloudFront distribution that serves content from S3 and/or API Gateway origins. The distribution is configured with HTTPS redirection, IPv6 support, and HTTP/2. It includes custom error responses for single-page applications (403/404 redirect to index.html) when serving static content. Optional logging can be enabled by providing an S3 log bucket name.
 
 **Key Properties:**
 - Supports both S3 (with OAC) and API Gateway origins
@@ -292,6 +314,7 @@ Creates a CloudFront distribution that serves content from S3 and/or API Gateway
 - Compression enabled for all content
 - Environment-specific cache behaviors (longer TTLs in PROD)
 - Custom domain support with ACM certificates
+- Optional access logging to S3 bucket with organized prefix structure
 
 **Cost Consideration:** CloudFront distributions incur costs based on data transfer and requests. Price class affects the number of edge locations used.
 
@@ -475,6 +498,26 @@ Custom domain and path for API.
 
 **Usage:** The complete URL where the API is accessible. Use this as the base URL for API clients.
 
+### CloudFrontLogBucket
+
+Condition: HasLogBucket
+
+The S3 bucket name used for CloudFront logging.
+
+**Example Value:** `my-cloudfront-logs`
+
+**Usage:** Reference to the S3 bucket where CloudFront access logs are stored. Use this to locate and analyze access logs.
+
+### CloudFrontLogPrefix
+
+Condition: HasLogBucket
+
+The complete prefix used for CloudFront log files in the S3 bucket.
+
+**Example Value:** `cloudfront/myorg-webapp-prod`
+
+**Usage:** The prefix path where CloudFront logs are organized within the S3 bucket. Logs are organized by service type (cloudfront), application ownership (Prefix-ProjectId), and deployment stage (StageId) for easy filtering and analysis.
+
 ## Conditions
 
 The template uses several conditions to control resource creation:
@@ -492,6 +535,7 @@ The template uses several conditions to control resource creation:
 - **CreateDnsRecordForCloudFront**: True when all CloudFront domain parameters are provided
 - **CreateDnsRecordForApiGateway**: True when all API Gateway domain parameters are provided
 - **HasHeadersToForwardToApi**: True when headers list is not empty
+- **HasLogBucket**: True when S3LogBucketName is provided (non-empty)
 
 ## Examples
 
@@ -565,6 +609,49 @@ Parameters:
 ```
 
 Result: API accessible at `internal.apis.example.com`
+
+### Example 5: Static Website with CloudFront Logging Enabled
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: marketing-site
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-marketing-site-prod-static.s3.us-east-1.amazonaws.com
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: www
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontPriceClass: PriceClass_100
+  S3LogBucketName: myorg-cloudfront-logs
+```
+
+Result: 
+- Static website accessible at `www.example.com`
+- CloudFront access logs stored in `myorg-cloudfront-logs` bucket with prefix `cloudfront/myorg-marketing-site-prod`
+
+### Example 6: Combined Static and API with Logging Disabled
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: test
+  DeployEnvironment: TEST
+  S3OriginDomainName: myorg-webapp-test-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  HeadersToForwardToApi: Authorization,Content-Type
+  S3LogBucketName: ""
+```
+
+Result: 
+- Static content at `app-test.example.com`
+- API at `app-test.example.com/api`
+- No CloudFront logging (S3LogBucketName is empty)
 
 ## Troubleshooting
 

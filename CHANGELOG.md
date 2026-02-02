@@ -7,6 +7,9 @@ Released versions are available from the public S3 bucket `63klabs`
 ## v0.0.29 - unreleased
 
 ### Added
+- **CloudFront Logging Support** [Spec: 0-0-29-network-cloudfront-logging](../.kiro/specs/0-0-29-network-cloudfront-logging/)
+  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.14 - Added optional CloudFront logging with S3LogBucketName parameter
+  - Steering Document: template-parameter-standards.md - Standardized parameter naming and definitions across templates
 - **Comprehensive Documentation**: Full documentation of the repository structure, templates, and contribution guidelines
 - **AI Steering Documents**: Initial AI steering documents to guide the development and maintenance of AI-related components
 

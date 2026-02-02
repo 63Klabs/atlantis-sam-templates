@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.13/2025-01-29
+# Version: v0.0.14/2026-02-01
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -39,17 +39,22 @@ Metadata:
           - StageId
 
       - Label:
-          default: Origins for S3 and/or API Gateway
-        Parameters:
-          - S3OriginDomainName
-          - ApiGatewayId
-
-      - Label:
           default: Deployment Environment
         Parameters:
           - DeployEnvironment
           - CloudFrontPriceClass
           # - DnsRecordTTL
+
+      - Label:
+          default: Supporting Resources
+        Parameters:
+          - S3LogBucketName
+
+      - Label:
+          default: Origins for S3 and/or API Gateway
+        Parameters:
+          - S3OriginDomainName
+          - ApiGatewayId
 
       - Label:
           default: Routing for CloudFront
@@ -132,6 +137,16 @@ Parameters:
     MaxLength: 8
     ConstraintDescription: 2 to 8 characters. Lower case alphanumeric and dashes.
       Must start with a letter and end with a letter or number.
+
+  # ---------------------------------------------------------------------------
+  # Supporting Resources
+
+  S3LogBucketName:
+    Type: String
+    Description: The name of the S3 bucket used for CloudFront logging. Leave empty to disable logging. Must be a valid S3 bucket name (without .s3.amazonaws.com suffix).
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$|^$"
+    ConstraintDescription: Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number.
 
   # ---------------------------------------------------------------------------
   # Origins
@@ -301,6 +316,11 @@ Conditions:
     - !Ref StageId
     - "prod"
 
+  HasLogBucket: !Not
+    - !Equals
+      - !Ref S3LogBucketName
+      - ''
+
   HasStaticOrigin: !Not
     - !Equals
       - !Ref S3OriginDomainName
@@ -378,10 +398,12 @@ Resources:
         PriceClass: !If [ IsProduction, !Ref CloudFrontPriceClass, "PriceClass_100" ]
         DefaultRootObject: index.html
 
-        # Logging:
-        #   IncludeCookies: 'false'
-        #   Bucket: amzn-s3-demo-logging-bucket.s3.amazonaws.com
-        #   Prefix: myprefix
+        Logging: !If
+          - HasLogBucket
+          - IncludeCookies: 'false'
+            Bucket: !Sub "${S3LogBucketName}.s3.amazonaws.com"
+            Prefix: !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}"
+          - !Ref AWS::NoValue
 
         Origins:
           - !If
@@ -652,3 +674,13 @@ Outputs:
           - HasRouteForApi
           - !Sub "/${PathApi}"
           - ''
+
+  CloudFrontLogBucket:
+    Condition: HasLogBucket
+    Description: The S3 bucket name used for CloudFront access logs
+    Value: !Ref S3LogBucketName
+
+  CloudFrontLogPrefix:
+    Condition: HasLogBucket
+    Description: The prefix used for CloudFront log files in the S3 bucket
+    Value: !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}"
