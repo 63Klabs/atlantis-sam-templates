@@ -579,3 +579,997 @@ class TestExistingConditionsCompatibilityProperty:
         if isinstance(create_distribution, dict):
             or_key = '!Or' if '!Or' in create_distribution else 'Fn::Or'
             assert or_key in create_distribution, "CreateDistribution should use !Or"
+
+
+# =============================================================================
+# Origin Path Property-Based Tests
+# Feature: 0-0-29-network-add-origin-path-to-static-and-api
+# =============================================================================
+
+
+def valid_custom_path_strategy():
+    """Generate valid custom origin paths (not empty, not /)."""
+    # Start with /
+    # Middle can be letters, numbers, dashes, underscores, or slashes (1-50 chars)
+    middle = st.text(
+        alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_/',
+        min_size=1,
+        max_size=50
+    ).filter(lambda s: not s.endswith('/'))  # Must not end with /
+    
+    return st.builds(
+        lambda m: '/' + m,
+        middle
+    ).filter(lambda p: p != '/')  # Exclude single /
+
+
+class TestDefaultStaticOriginPathProperty:
+    """
+    Property 1: Default Static Origin Path
+    Validates: Requirements 1.2, 4.1
+    
+    For any valid StageId value, when StaticOriginPath is empty (default), 
+    the resulting CloudFront origin path should equal /${StageId}/public
+    """
+    
+    @given(stage_id=valid_stage_id_strategy())
+    @settings(max_examples=100)
+    def test_default_static_origin_path(self, stage_id):
+        """
+        Test that default static origin path equals /${StageId}/public.
+        **Validates: Requirements 1.2, 4.1**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the Origins list
+        origins = dist_config.get('Origins', [])
+        assert len(origins) > 0, "Origins list should not be empty"
+        
+        # The first origin is wrapped in !If [HasStaticOrigin, {...}, !Ref AWS::NoValue]
+        first_origin_conditional = origins[0]
+        assert isinstance(first_origin_conditional, dict), "First origin should be a conditional"
+        
+        if_key = '!If' if '!If' in first_origin_conditional else 'Fn::If'
+        assert if_key in first_origin_conditional, "First origin should use !If"
+        
+        if_list = first_origin_conditional[if_key]
+        assert len(if_list) == 3, "!If should have 3 elements"
+        assert if_list[0] == 'HasStaticOrigin', "Condition should be HasStaticOrigin"
+        
+        # Get the actual static origin configuration (second element when condition is true)
+        static_origin = if_list[1]
+        assert isinstance(static_origin, dict), "Static origin should be a dict"
+        assert static_origin.get('Id') == 'StaticS3Origin', "Origin ID should be StaticS3Origin"
+        
+        # Get the OriginPath property
+        origin_path = static_origin.get('OriginPath')
+        assert origin_path is not None, "OriginPath should exist for StaticS3Origin"
+        
+        # OriginPath should be a conditional: !If [UseDefaultStaticOriginPath, !Sub "/${StageId}/public", ...]
+        if isinstance(origin_path, dict):
+            path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+            assert path_if_key in origin_path, "OriginPath should use !If conditional"
+            
+            path_if_list = origin_path[path_if_key]
+            assert len(path_if_list) == 3, "!If should have 3 elements"
+            
+            # First element should be UseDefaultStaticOriginPath condition
+            condition_name = path_if_list[0]
+            assert condition_name == 'UseDefaultStaticOriginPath', \
+                "First condition should be UseDefaultStaticOriginPath"
+            
+            # Second element (when condition is true) should be !Sub "/${StageId}/public"
+            default_path = path_if_list[1]
+            if isinstance(default_path, dict):
+                sub_key = '!Sub' if '!Sub' in default_path else 'Fn::Sub'
+                assert sub_key in default_path, "Default path should use !Sub"
+                path_template = default_path[sub_key]
+                assert path_template == "/${StageId}/public", \
+                    f"Default static origin path should be '/${{StageId}}/public', got '{path_template}'"
+
+
+class TestDefaultApiOriginPathProperty:
+    """
+    Property 2: Default API Origin Path
+    Validates: Requirements 2.2, 4.4
+    
+    For any valid ProjectId and StageId values, when ApiOriginPath is empty (default), 
+    the resulting CloudFront origin path should equal /${ProjectId}-${StageId}
+    """
+    
+    @given(
+        project_id=valid_project_id_strategy(),
+        stage_id=valid_stage_id_strategy()
+    )
+    @settings(max_examples=100)
+    def test_default_api_origin_path(self, project_id, stage_id):
+        """
+        Test that default API origin path equals /${ProjectId}-${StageId}.
+        **Validates: Requirements 2.2, 4.4**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the Origins list
+        origins = dist_config.get('Origins', [])
+        assert len(origins) >= 2, "Origins list should have at least 2 elements"
+        
+        # The second origin is wrapped in !If [ApiIsBehindCloudFront, {...}, !Ref AWS::NoValue]
+        second_origin_conditional = origins[1]
+        assert isinstance(second_origin_conditional, dict), "Second origin should be a conditional"
+        
+        if_key = '!If' if '!If' in second_origin_conditional else 'Fn::If'
+        assert if_key in second_origin_conditional, "Second origin should use !If"
+        
+        if_list = second_origin_conditional[if_key]
+        assert len(if_list) == 3, "!If should have 3 elements"
+        assert if_list[0] == 'ApiIsBehindCloudFront', "Condition should be ApiIsBehindCloudFront"
+        
+        # Get the actual API origin configuration (second element when condition is true)
+        api_origin = if_list[1]
+        assert isinstance(api_origin, dict), "API origin should be a dict"
+        assert api_origin.get('Id') == 'ApiGatewayOrigin', "Origin ID should be ApiGatewayOrigin"
+        
+        # Get the OriginPath property
+        origin_path = api_origin.get('OriginPath')
+        assert origin_path is not None, "OriginPath should exist for ApiGatewayOrigin"
+        
+        # OriginPath should be a conditional: !If [UseDefaultApiOriginPath, !Sub "/${ProjectId}-${StageId}", ...]
+        if isinstance(origin_path, dict):
+            path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+            assert path_if_key in origin_path, "OriginPath should use !If conditional"
+            
+            path_if_list = origin_path[path_if_key]
+            assert len(path_if_list) == 3, "!If should have 3 elements"
+            
+            # First element should be UseDefaultApiOriginPath condition
+            condition_name = path_if_list[0]
+            assert condition_name == 'UseDefaultApiOriginPath', \
+                "First condition should be UseDefaultApiOriginPath"
+            
+            # Second element (when condition is true) should be !Sub "/${ProjectId}-${StageId}"
+            default_path = path_if_list[1]
+            if isinstance(default_path, dict):
+                sub_key = '!Sub' if '!Sub' in default_path else 'Fn::Sub'
+                assert sub_key in default_path, "Default path should use !Sub"
+                path_template = default_path[sub_key]
+                assert path_template == "/${ProjectId}-${StageId}", \
+                    f"Default API origin path should be '/${{ProjectId}}-${{StageId}}', got '{path_template}'"
+
+
+class TestCustomStaticOriginPathPassthroughProperty:
+    """
+    Property 3: Custom Static Origin Path Passthrough
+    Validates: Requirements 1.4, 4.3
+    
+    For any valid custom path (not empty, not /), when StaticOriginPath is set to that path, 
+    the resulting CloudFront origin path should equal the input path exactly
+    """
+    
+    @given(custom_path=valid_custom_path_strategy())
+    @settings(max_examples=100)
+    def test_custom_static_origin_path_passthrough(self, custom_path):
+        """
+        Test that custom static origin path is used as-is.
+        **Validates: Requirements 1.4, 4.3**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the Origins list
+        origins = dist_config.get('Origins', [])
+        assert len(origins) > 0, "Origins list should not be empty"
+        
+        # The first origin is wrapped in !If [HasStaticOrigin, {...}, !Ref AWS::NoValue]
+        first_origin_conditional = origins[0]
+        if_key = '!If' if '!If' in first_origin_conditional else 'Fn::If'
+        if_list = first_origin_conditional[if_key]
+        
+        # Get the actual static origin configuration
+        static_origin = if_list[1]
+        assert static_origin.get('Id') == 'StaticS3Origin', "Origin ID should be StaticS3Origin"
+        
+        # Get the OriginPath property
+        origin_path = static_origin.get('OriginPath')
+        assert origin_path is not None, "OriginPath should exist for StaticS3Origin"
+        
+        # OriginPath should be: !If [UseDefaultStaticOriginPath, default, !If [UseRootStaticOriginPath, "", !Ref StaticOriginPath]]
+        if isinstance(origin_path, dict):
+            path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+            assert path_if_key in origin_path, "OriginPath should use !If conditional"
+            
+            path_if_list = origin_path[path_if_key]
+            assert len(path_if_list) == 3, "!If should have 3 elements"
+            
+            # Third element (when not default) should be another !If for root vs custom
+            nested_if = path_if_list[2]
+            if isinstance(nested_if, dict):
+                nested_if_key = '!If' if '!If' in nested_if else 'Fn::If'
+                assert nested_if_key in nested_if, "Nested condition should use !If"
+                
+                nested_if_list = nested_if[nested_if_key]
+                assert len(nested_if_list) == 3, "Nested !If should have 3 elements"
+                
+                # First element should be UseRootStaticOriginPath
+                nested_condition = nested_if_list[0]
+                assert nested_condition == 'UseRootStaticOriginPath', \
+                    "Nested condition should be UseRootStaticOriginPath"
+                
+                # Second element (when root) should be empty string
+                root_value = nested_if_list[1]
+                assert root_value == "", "Root path should be empty string"
+                
+                # Third element (when custom) should be !Ref StaticOriginPath
+                custom_value = nested_if_list[2]
+                if isinstance(custom_value, dict):
+                    ref_key = '!Ref' if '!Ref' in custom_value else 'Ref'
+                    assert ref_key in custom_value, "Custom path should use !Ref"
+                    assert custom_value[ref_key] == 'StaticOriginPath', \
+                        "Custom path should reference StaticOriginPath parameter"
+
+
+class TestCustomApiOriginPathPassthroughProperty:
+    """
+    Property 4: Custom API Origin Path Passthrough
+    Validates: Requirements 2.4, 4.6
+    
+    For any valid custom path (not empty, not /), when ApiOriginPath is set to that path, 
+    the resulting CloudFront origin path should equal the input path exactly
+    """
+    
+    @given(custom_path=valid_custom_path_strategy())
+    @settings(max_examples=100)
+    def test_custom_api_origin_path_passthrough(self, custom_path):
+        """
+        Test that custom API origin path is used as-is.
+        **Validates: Requirements 2.4, 4.6**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the Origins list
+        origins = dist_config.get('Origins', [])
+        assert len(origins) >= 2, "Origins list should have at least 2 elements"
+        
+        # The second origin is wrapped in !If [ApiIsBehindCloudFront, {...}, !Ref AWS::NoValue]
+        second_origin_conditional = origins[1]
+        if_key = '!If' if '!If' in second_origin_conditional else 'Fn::If'
+        if_list = second_origin_conditional[if_key]
+        
+        # Get the actual API origin configuration
+        api_origin = if_list[1]
+        assert api_origin.get('Id') == 'ApiGatewayOrigin', "Origin ID should be ApiGatewayOrigin"
+        
+        # Get the OriginPath property
+        origin_path = api_origin.get('OriginPath')
+        assert origin_path is not None, "OriginPath should exist for ApiGatewayOrigin"
+        
+        # OriginPath should be: !If [UseDefaultApiOriginPath, default, !If [UseRootApiOriginPath, "", !Ref ApiOriginPath]]
+        if isinstance(origin_path, dict):
+            path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+            assert path_if_key in origin_path, "OriginPath should use !If conditional"
+            
+            path_if_list = origin_path[path_if_key]
+            assert len(path_if_list) == 3, "!If should have 3 elements"
+            
+            # Third element (when not default) should be another !If for root vs custom
+            nested_if = path_if_list[2]
+            if isinstance(nested_if, dict):
+                nested_if_key = '!If' if '!If' in nested_if else 'Fn::If'
+                assert nested_if_key in nested_if, "Nested condition should use !If"
+                
+                nested_if_list = nested_if[nested_if_key]
+                assert len(nested_if_list) == 3, "Nested !If should have 3 elements"
+                
+                # First element should be UseRootApiOriginPath
+                nested_condition = nested_if_list[0]
+                assert nested_condition == 'UseRootApiOriginPath', \
+                    "Nested condition should be UseRootApiOriginPath"
+                
+                # Second element (when root) should be empty string
+                root_value = nested_if_list[1]
+                assert root_value == "", "Root path should be empty string"
+                
+                # Third element (when custom) should be !Ref ApiOriginPath
+                custom_value = nested_if_list[2]
+                if isinstance(custom_value, dict):
+                    ref_key = '!Ref' if '!Ref' in custom_value else 'Ref'
+                    assert ref_key in custom_value, "Custom path should use !Ref"
+                    assert custom_value[ref_key] == 'ApiOriginPath', \
+                        "Custom path should reference ApiOriginPath parameter"
+
+
+class TestPathValidationRejectsInvalidFormatsProperty:
+    """
+    Property 5: Path Validation Rejects Invalid Formats
+    Validates: Requirements 1.5, 1.6, 1.7, 2.5, 2.6, 2.7, 3.2, 3.3, 3.4
+    
+    For any path that does not match the validation rules (doesn't start with /, 
+    ends with / except single /, or contains { or } characters), the template 
+    parameter validation should reject the value
+    """
+    
+    def invalid_path_strategy():
+        """Generate invalid origin paths."""
+        return st.one_of(
+            # Paths without leading /
+            st.text(
+                alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_',
+                min_size=1,
+                max_size=20
+            ).filter(lambda s: not s.startswith('/')),
+            
+            # Paths with trailing / (but not single /)
+            st.builds(
+                lambda s: '/' + s + '/',
+                st.text(
+                    alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_',
+                    min_size=1,
+                    max_size=20
+                )
+            )
+        )
+    
+    @given(invalid_path=invalid_path_strategy())
+    @settings(max_examples=100, deadline=None)
+    def test_path_validation_rejects_invalid_formats(self, invalid_path):
+        """
+        Test that invalid paths are rejected by AllowedPattern regex.
+        **Validates: Requirements 1.5, 1.6, 1.7, 2.5, 2.6, 2.7, 3.2, 3.3, 3.4**
+        """
+        import re
+        
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Get StaticOriginPath parameter
+        static_origin_path_param = parameters.get('StaticOriginPath')
+        assert static_origin_path_param is not None, "StaticOriginPath parameter should exist"
+        
+        # Get the AllowedPattern
+        allowed_pattern = static_origin_path_param.get('AllowedPattern')
+        assert allowed_pattern is not None, "StaticOriginPath should have AllowedPattern"
+        
+        # Test that the invalid path does NOT match the pattern
+        # The pattern should be: ^$|^\/$|^\/[a-zA-Z0-9\/_-]+[^\/]$
+        pattern_match = re.match(allowed_pattern, invalid_path)
+        
+        # Invalid paths should NOT match the pattern
+        assert pattern_match is None, \
+            f"Invalid path '{invalid_path}' should be rejected by AllowedPattern '{allowed_pattern}'"
+        
+        # Also test ApiOriginPath parameter
+        api_origin_path_param = parameters.get('ApiOriginPath')
+        assert api_origin_path_param is not None, "ApiOriginPath parameter should exist"
+        
+        api_allowed_pattern = api_origin_path_param.get('AllowedPattern')
+        assert api_allowed_pattern is not None, "ApiOriginPath should have AllowedPattern"
+        
+        # Test that the invalid path does NOT match the API pattern
+        api_pattern_match = re.match(api_allowed_pattern, invalid_path)
+        
+        assert api_pattern_match is None, \
+            f"Invalid path '{invalid_path}' should be rejected by ApiOriginPath AllowedPattern '{api_allowed_pattern}'"
+    
+    def test_path_validation_rejects_curly_braces(self):
+        """
+        Test that paths with curly braces are rejected.
+        **Validates: Requirements 1.7, 2.7, 3.4**
+        """
+        import re
+        
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Get StaticOriginPath parameter
+        static_origin_path_param = parameters.get('StaticOriginPath')
+        allowed_pattern = static_origin_path_param.get('AllowedPattern')
+        
+        # Test paths with curly braces
+        invalid_paths_with_braces = [
+            '/{StageId}',
+            '/path/{id}',
+            '/${StageId}/public',
+            '/api/{version}',
+            '/test/{param}/value'
+        ]
+        
+        for invalid_path in invalid_paths_with_braces:
+            pattern_match = re.match(allowed_pattern, invalid_path)
+            assert pattern_match is None, \
+                f"Path with curly braces '{invalid_path}' should be rejected by AllowedPattern"
+
+
+class TestBackwardCompatibilityProperty:
+    """
+    Property 6: Backward Compatibility
+    Validates: Requirements 5.1
+    
+    For any valid ProjectId and StageId values, when both StaticOriginPath and 
+    ApiOriginPath are empty (default), the resulting origin paths should match 
+    the previous template version's hardcoded values
+    """
+    
+    @given(
+        project_id=valid_project_id_strategy(),
+        stage_id=valid_stage_id_strategy()
+    )
+    @settings(max_examples=100)
+    def test_backward_compatibility(self, project_id, stage_id):
+        """
+        Test that empty origin paths produce the same result as previous version.
+        **Validates: Requirements 5.1**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the Origins list
+        origins = dist_config.get('Origins', [])
+        assert len(origins) >= 2, "Origins list should have at least 2 elements"
+        
+        # Test Static Origin backward compatibility
+        first_origin_conditional = origins[0]
+        if_key = '!If' if '!If' in first_origin_conditional else 'Fn::If'
+        if_list = first_origin_conditional[if_key]
+        static_origin = if_list[1]
+        
+        if static_origin:
+            origin_path = static_origin.get('OriginPath')
+            assert origin_path is not None, "OriginPath should exist for StaticS3Origin"
+            
+            # When StaticOriginPath is empty (default), should use /${StageId}/public
+            if isinstance(origin_path, dict):
+                path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+                path_if_list = origin_path[path_if_key]
+                
+                # The default path (second element) should be !Sub "/${StageId}/public"
+                default_path = path_if_list[1]
+                if isinstance(default_path, dict):
+                    sub_key = '!Sub' if '!Sub' in default_path else 'Fn::Sub'
+                    path_template = default_path[sub_key]
+                    assert path_template == "/${StageId}/public", \
+                        "Default static origin path should match previous version: /${StageId}/public"
+        
+        # Test API Origin backward compatibility
+        second_origin_conditional = origins[1]
+        api_if_key = '!If' if '!If' in second_origin_conditional else 'Fn::If'
+        api_if_list = second_origin_conditional[api_if_key]
+        api_origin = api_if_list[1]
+        
+        if api_origin:
+            origin_path = api_origin.get('OriginPath')
+            assert origin_path is not None, "OriginPath should exist for ApiGatewayOrigin"
+            
+            # When ApiOriginPath is empty (default), should use /${ProjectId}-${StageId}
+            if isinstance(origin_path, dict):
+                path_if_key = '!If' if '!If' in origin_path else 'Fn::If'
+                path_if_list = origin_path[path_if_key]
+                
+                # The default path (second element) should be !Sub "/${ProjectId}-${StageId}"
+                default_path = path_if_list[1]
+                if isinstance(default_path, dict):
+                    sub_key = '!Sub' if '!Sub' in default_path else 'Fn::Sub'
+                    path_template = default_path[sub_key]
+                    assert path_template == "/${ProjectId}-${StageId}", \
+                        "Default API origin path should match previous version: /${ProjectId}-${StageId}"
+
+
+# =============================================================================
+# Cache Policy Property-Based Tests
+# Feature: 0-0-29-network-add-managed-cache-policies
+# =============================================================================
+
+
+def valid_cache_policy_arn_strategy():
+    """Generate valid CloudFront cache policy ARNs."""
+    # ARN format: arn:aws:cloudfront::<account-id>:cache-policy/<policy-id>
+    account_id = st.text(alphabet='0123456789', min_size=12, max_size=12)
+    policy_id = st.text(
+        alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+        min_size=1,
+        max_size=50
+    )
+    
+    return st.builds(
+        lambda acc, pol: f"arn:aws:cloudfront::{acc}:cache-policy/{pol}",
+        account_id, policy_id
+    )
+
+
+def invalid_cache_policy_arn_strategy():
+    """Generate invalid CloudFront cache policy ARNs."""
+    return st.one_of(
+        # Missing arn: prefix
+        st.text(
+            alphabet='abcdefghijklmnopqrstuvwxyz0123456789-:/',
+            min_size=10,
+            max_size=50
+        ).filter(lambda s: not s.startswith('arn:aws:cloudfront::')),
+        
+        # Wrong service (not cloudfront)
+        st.builds(
+            lambda acc, pol: f"arn:aws:s3::{acc}:cache-policy/{pol}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-', min_size=1, max_size=20)
+        ),
+        
+        # Wrong resource type (not cache-policy)
+        st.builds(
+            lambda acc, pol: f"arn:aws:cloudfront::{acc}:distribution/{pol}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-', min_size=1, max_size=20)
+        ),
+        
+        # Invalid account ID (not 12 digits)
+        st.builds(
+            lambda acc, pol: f"arn:aws:cloudfront::{acc}:cache-policy/{pol}",
+            st.text(alphabet='0123456789', min_size=1, max_size=11),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-', min_size=1, max_size=20)
+        ),
+        
+        # Invalid policy ID (contains invalid characters)
+        st.builds(
+            lambda acc, pol: f"arn:aws:cloudfront::{acc}:cache-policy/{pol}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='!@#$%^&*()', min_size=1, max_size=10)
+        )
+    )
+
+
+class TestCustomARNValidationProperty:
+    """
+    Property 7: Custom ARN validation
+    Validates: Requirements 9.1, 9.2, 9.3, 9.4
+    
+    For any string value provided as CloudFrontStaticCustomCachePolicyArn or 
+    CloudFrontApiCustomCachePolicyArn, CloudFormation should accept it if and only if 
+    it matches the pattern ^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$ 
+    or is an empty string, and reject it with a constraint error message otherwise.
+    """
+    
+    @given(valid_arn=valid_cache_policy_arn_strategy())
+    @settings(max_examples=20)
+    def test_valid_cache_policy_arns_accepted(self, valid_arn):
+        """
+        Test that valid cache policy ARNs match the AllowedPattern.
+        **Validates: Requirements 9.1, 9.2, 9.3, 9.4**
+        """
+        import re
+        
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Test CloudFrontStaticCustomCachePolicyArn parameter
+        static_arn_param = parameters.get('CloudFrontStaticCustomCachePolicyArn')
+        assert static_arn_param is not None, "CloudFrontStaticCustomCachePolicyArn parameter should exist"
+        
+        static_pattern = static_arn_param.get('AllowedPattern')
+        assert static_pattern is not None, "CloudFrontStaticCustomCachePolicyArn should have AllowedPattern"
+        
+        # Valid ARN should match the pattern
+        static_match = re.match(static_pattern, valid_arn)
+        assert static_match is not None, \
+            f"Valid ARN '{valid_arn}' should be accepted by AllowedPattern '{static_pattern}'"
+        
+        # Test CloudFrontApiCustomCachePolicyArn parameter
+        api_arn_param = parameters.get('CloudFrontApiCustomCachePolicyArn')
+        assert api_arn_param is not None, "CloudFrontApiCustomCachePolicyArn parameter should exist"
+        
+        api_pattern = api_arn_param.get('AllowedPattern')
+        assert api_pattern is not None, "CloudFrontApiCustomCachePolicyArn should have AllowedPattern"
+        
+        # Valid ARN should match the pattern
+        api_match = re.match(api_pattern, valid_arn)
+        assert api_match is not None, \
+            f"Valid ARN '{valid_arn}' should be accepted by AllowedPattern '{api_pattern}'"
+    
+    @given(invalid_arn=invalid_cache_policy_arn_strategy())
+    @settings(max_examples=20)
+    def test_invalid_cache_policy_arns_rejected(self, invalid_arn):
+        """
+        Test that invalid cache policy ARNs do NOT match the AllowedPattern.
+        **Validates: Requirements 9.1, 9.2, 9.3, 9.4**
+        """
+        import re
+        
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Test CloudFrontStaticCustomCachePolicyArn parameter
+        static_arn_param = parameters.get('CloudFrontStaticCustomCachePolicyArn')
+        static_pattern = static_arn_param.get('AllowedPattern')
+        
+        # Invalid ARN should NOT match the pattern
+        static_match = re.match(static_pattern, invalid_arn)
+        assert static_match is None, \
+            f"Invalid ARN '{invalid_arn}' should be rejected by AllowedPattern '{static_pattern}'"
+        
+        # Test CloudFrontApiCustomCachePolicyArn parameter
+        api_arn_param = parameters.get('CloudFrontApiCustomCachePolicyArn')
+        api_pattern = api_arn_param.get('AllowedPattern')
+        
+        # Invalid ARN should NOT match the pattern
+        api_match = re.match(api_pattern, invalid_arn)
+        assert api_match is None, \
+            f"Invalid ARN '{invalid_arn}' should be rejected by AllowedPattern '{api_pattern}'"
+    
+    def test_empty_string_accepted(self):
+        """
+        Test that empty string is accepted by the AllowedPattern.
+        **Validates: Requirements 9.3**
+        """
+        import re
+        
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Test CloudFrontStaticCustomCachePolicyArn parameter
+        static_arn_param = parameters.get('CloudFrontStaticCustomCachePolicyArn')
+        static_pattern = static_arn_param.get('AllowedPattern')
+        
+        # Empty string should match the pattern
+        static_match = re.match(static_pattern, "")
+        assert static_match is not None, \
+            f"Empty string should be accepted by AllowedPattern '{static_pattern}'"
+        
+        # Test CloudFrontApiCustomCachePolicyArn parameter
+        api_arn_param = parameters.get('CloudFrontApiCustomCachePolicyArn')
+        api_pattern = api_arn_param.get('AllowedPattern')
+        
+        # Empty string should match the pattern
+        api_match = re.match(api_pattern, "")
+        assert api_match is not None, \
+            f"Empty string should be accepted by AllowedPattern '{api_pattern}'"
+    
+    def test_constraint_description_exists(self):
+        """
+        Test that ConstraintDescription exists for custom ARN parameters.
+        **Validates: Requirements 9.4**
+        """
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+        
+        # Test CloudFrontStaticCustomCachePolicyArn parameter
+        static_arn_param = parameters.get('CloudFrontStaticCustomCachePolicyArn')
+        assert 'ConstraintDescription' in static_arn_param, \
+            "CloudFrontStaticCustomCachePolicyArn should have ConstraintDescription"
+        
+        static_constraint = static_arn_param.get('ConstraintDescription')
+        assert static_constraint is not None and len(static_constraint) > 0, \
+            "CloudFrontStaticCustomCachePolicyArn ConstraintDescription should not be empty"
+        
+        # Test CloudFrontApiCustomCachePolicyArn parameter
+        api_arn_param = parameters.get('CloudFrontApiCustomCachePolicyArn')
+        assert 'ConstraintDescription' in api_arn_param, \
+            "CloudFrontApiCustomCachePolicyArn should have ConstraintDescription"
+        
+        api_constraint = api_arn_param.get('ConstraintDescription')
+        assert api_constraint is not None and len(api_constraint) > 0, \
+            "CloudFrontApiCustomCachePolicyArn ConstraintDescription should not be empty"
+
+
+class TestCachePolicyResolutionProperty:
+    """
+    Property 3: Static cache policy ARN resolution
+    Property 4: API cache policy ARN resolution
+    Property 6: Environment-based cache policy override
+    Validates: Requirements 5.1-5.12, 11.1, 11.2
+    
+    For any valid combination of DeployEnvironment and cache policy parameters, 
+    the resolved cache policy IDs should match expected values based on the 
+    environment and policy type selection.
+    """
+    
+    # Managed policy IDs from the design
+    MANAGED_POLICY_IDS = {
+        'CachingOptimized': '658327ea-f89d-4fab-a63d-7e88639e58f6',
+        'CachingDisabled': '4135ea2d-6df8-44a3-9df3-4b5a84be39ad',
+        'CachingOptimizedForUncompressedObjects': 'b2884449-e4de-46a7-ac36-70bc7f1ddd6d',
+        'Elemental-MediaPackage': '08627262-05a9-4f76-9ded-b50ca2e3a84f'
+    }
+    
+    @given(
+        deploy_env=st.sampled_from(['DEV', 'TEST', 'PROD']),
+        static_policy=st.sampled_from([
+            'CachingOptimized', 'CachingDisabled', 
+            'CachingOptimizedForUncompressedObjects', 'Elemental-MediaPackage'
+        ]),
+        api_policy=st.sampled_from([
+            'CachingOptimized', 'CachingDisabled', 
+            'CachingOptimizedForUncompressedObjects', 'Elemental-MediaPackage'
+        ])
+    )
+    @settings(max_examples=20)
+    def test_managed_policy_resolution(self, deploy_env, static_policy, api_policy):
+        """
+        Test that managed cache policies resolve to correct IDs via FindInMap.
+        **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.7, 5.8, 5.9, 5.10, 11.1, 11.2**
+        """
+        network_template = load_network_template()
+        
+        # Verify CachePolicyIds mapping exists
+        mappings = network_template.get('Mappings', {})
+        assert 'CachePolicyIds' in mappings, "CachePolicyIds mapping should exist"
+        
+        cache_policy_ids = mappings['CachePolicyIds']
+        
+        # Verify all managed policy IDs are in the mapping
+        for policy_name, policy_id in self.MANAGED_POLICY_IDS.items():
+            assert policy_name in cache_policy_ids, \
+                f"Managed policy '{policy_name}' should be in CachePolicyIds mapping"
+            assert cache_policy_ids[policy_name].get('Id') == policy_id, \
+                f"Managed policy '{policy_name}' should have ID '{policy_id}'"
+        
+        # Verify the static policy is in the mapping
+        assert static_policy in cache_policy_ids, \
+            f"Static policy '{static_policy}' should be in CachePolicyIds mapping"
+        assert cache_policy_ids[static_policy].get('Id') == self.MANAGED_POLICY_IDS[static_policy], \
+            f"Static policy '{static_policy}' should have correct ID"
+        
+        # Verify the API policy is in the mapping
+        assert api_policy in cache_policy_ids, \
+            f"API policy '{api_policy}' should be in CachePolicyIds mapping"
+        assert cache_policy_ids[api_policy].get('Id') == self.MANAGED_POLICY_IDS[api_policy], \
+            f"API policy '{api_policy}' should have correct ID"
+    
+    @given(
+        deploy_env=st.sampled_from(['DEV', 'TEST']),
+        static_policy=st.sampled_from([
+            'CachingOptimized', 'CachingDisabled', 
+            'CachingOptimizedForUncompressedObjects', 'Elemental-MediaPackage',
+            'CustomDefault', 'CustomArn'
+        ]),
+        api_policy=st.sampled_from([
+            'CachingOptimized', 'CachingDisabled', 
+            'CachingOptimizedForUncompressedObjects', 'Elemental-MediaPackage',
+            'CustomDefault', 'CustomArn'
+        ])
+    )
+    @settings(max_examples=20)
+    def test_environment_override_for_dev_test(self, deploy_env, static_policy, api_policy):
+        """
+        Test that DEV and TEST environments force CachingDisabled regardless of parameter values.
+        **Validates: Requirements 11.1, 11.2**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the DefaultCacheBehavior
+        default_cache_behavior = dist_config.get('DefaultCacheBehavior')
+        assert default_cache_behavior is not None, "DefaultCacheBehavior should exist"
+        
+        # Get the CachePolicyId property
+        cache_policy_id = default_cache_behavior.get('CachePolicyId')
+        assert cache_policy_id is not None, "CachePolicyId should exist in DefaultCacheBehavior"
+        
+        # CachePolicyId structure: !If [StaticOriginIsRoot, <static-logic>, <api-logic>]
+        # Each branch has: !If [IsProduction, <prod-logic>, !FindInMap [CachePolicyIds, CachingDisabled, Id]]
+        # For non-PROD (DEV/TEST), both branches should use CachingDisabled
+        if isinstance(cache_policy_id, dict):
+            if_key = '!If' if '!If' in cache_policy_id else 'Fn::If'
+            assert if_key in cache_policy_id, "CachePolicyId should use !If conditional"
+            
+            if_list = cache_policy_id[if_key]
+            assert len(if_list) == 3, "!If should have 3 elements"
+            
+            # First element should be StaticOriginIsRoot condition
+            condition_name = if_list[0]
+            assert condition_name == 'StaticOriginIsRoot', \
+                "First condition should be StaticOriginIsRoot to determine origin type"
+            
+            # Second element (static origin branch) should have IsProduction check
+            static_branch = if_list[1]
+            if isinstance(static_branch, dict):
+                static_if_key = '!If' if '!If' in static_branch else 'Fn::If'
+                assert static_if_key in static_branch, "Static branch should use !If"
+                
+                static_if_list = static_branch[static_if_key]
+                assert len(static_if_list) == 3, "Static !If should have 3 elements"
+                assert static_if_list[0] == 'IsProduction', \
+                    "Static branch should check IsProduction"
+                
+                # Third element (non-PROD) should be CachingDisabled
+                static_non_prod = static_if_list[2]
+                if isinstance(static_non_prod, dict):
+                    find_in_map_key = '!FindInMap' if '!FindInMap' in static_non_prod else 'Fn::FindInMap'
+                    assert find_in_map_key in static_non_prod, \
+                        "Non-PROD static cache policy should use !FindInMap"
+                    
+                    find_in_map_list = static_non_prod[find_in_map_key]
+                    assert find_in_map_list[0] == 'CachePolicyIds', \
+                        "Should lookup in CachePolicyIds mapping"
+                    assert find_in_map_list[1] == 'CachingDisabled', \
+                        "DEV/TEST should force CachingDisabled for static origin"
+                    assert find_in_map_list[2] == 'Id', \
+                        "Should get the Id attribute"
+            
+            # Third element (API origin branch) should also have IsProduction check
+            api_branch = if_list[2]
+            if isinstance(api_branch, dict):
+                api_if_key = '!If' if '!If' in api_branch else 'Fn::If'
+                assert api_if_key in api_branch, "API branch should use !If"
+                
+                api_if_list = api_branch[api_if_key]
+                assert len(api_if_list) == 3, "API !If should have 3 elements"
+                assert api_if_list[0] == 'IsProduction', \
+                    "API branch should check IsProduction"
+                
+                # Third element (non-PROD) should be CachingDisabled
+                api_non_prod = api_if_list[2]
+                if isinstance(api_non_prod, dict):
+                    find_in_map_key = '!FindInMap' if '!FindInMap' in api_non_prod else 'Fn::FindInMap'
+                    assert find_in_map_key in api_non_prod, \
+                        "Non-PROD API cache policy should use !FindInMap"
+                    
+                    find_in_map_list = api_non_prod[find_in_map_key]
+                    assert find_in_map_list[0] == 'CachePolicyIds', \
+                        "Should lookup in CachePolicyIds mapping"
+                    assert find_in_map_list[1] == 'CachingDisabled', \
+                        "DEV/TEST should force CachingDisabled for API origin"
+                    assert find_in_map_list[2] == 'Id', \
+                        "Should get the Id attribute"
+    
+    def test_custom_default_resolution(self):
+        """
+        Test that CustomDefault resolves to resource reference.
+        **Validates: Requirements 5.5, 5.11**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the DefaultCacheBehavior
+        default_cache_behavior = dist_config.get('DefaultCacheBehavior')
+        cache_policy_id = default_cache_behavior.get('CachePolicyId')
+        
+        # Navigate through the conditional structure to find CustomDefault handling
+        # Structure: !If [IsProduction, <prod-logic>, <non-prod-logic>]
+        # Prod logic: !If [StaticOriginIsRoot, <static-logic>, <api-logic>]
+        # Static logic: !If [StaticCachePolicyIsCustomDefault, !Ref CloudFrontCachePolicyStatic, ...]
+        
+        if isinstance(cache_policy_id, dict):
+            if_key = '!If' if '!If' in cache_policy_id else 'Fn::If'
+            if_list = cache_policy_id[if_key]
+            
+            # Get PROD branch (second element)
+            prod_branch = if_list[1]
+            
+            # This should be another !If for StaticOriginIsRoot
+            if isinstance(prod_branch, dict):
+                prod_if_key = '!If' if '!If' in prod_branch else 'Fn::If'
+                prod_if_list = prod_branch[prod_if_key]
+                
+                # Get static origin branch (second element)
+                static_branch = prod_if_list[1]
+                
+                # This should be another !If for StaticCachePolicyIsCustomDefault
+                if isinstance(static_branch, dict):
+                    static_if_key = '!If' if '!If' in static_branch else 'Fn::If'
+                    static_if_list = static_branch[static_if_key]
+                    
+                    # First element should be StaticCachePolicyIsCustomDefault
+                    assert static_if_list[0] == 'StaticCachePolicyIsCustomDefault', \
+                        "Should check StaticCachePolicyIsCustomDefault condition"
+                    
+                    # Second element (when CustomDefault) should be !Ref CloudFrontCachePolicyStatic
+                    custom_default_value = static_if_list[1]
+                    if isinstance(custom_default_value, dict):
+                        ref_key = '!Ref' if '!Ref' in custom_default_value else 'Ref'
+                        assert ref_key in custom_default_value, \
+                            "CustomDefault should use !Ref"
+                        assert custom_default_value[ref_key] == 'CloudFrontCachePolicyStatic', \
+                            "CustomDefault should reference CloudFrontCachePolicyStatic resource"
+    
+    def test_custom_arn_resolution(self):
+        """
+        Test that CustomArn resolves to parameter value.
+        **Validates: Requirements 5.6, 5.12**
+        """
+        network_template = load_network_template()
+        
+        # Get the CloudFrontDistribution resource
+        resources = network_template.get('Resources', {})
+        distribution = resources.get('CloudFrontDistribution', {})
+        dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+        
+        # Get the DefaultCacheBehavior
+        default_cache_behavior = dist_config.get('DefaultCacheBehavior')
+        cache_policy_id = default_cache_behavior.get('CachePolicyId')
+        
+        # Navigate through the conditional structure to find CustomArn handling
+        # Structure: !If [IsProduction, <prod-logic>, <non-prod-logic>]
+        # Prod logic: !If [StaticOriginIsRoot, <static-logic>, <api-logic>]
+        # Static logic: !If [StaticCachePolicyIsCustomDefault, ..., !If [StaticCachePolicyIsCustomArn, !Ref CloudFrontStaticCustomCachePolicyArn, ...]]
+        
+        if isinstance(cache_policy_id, dict):
+            if_key = '!If' if '!If' in cache_policy_id else 'Fn::If'
+            if_list = cache_policy_id[if_key]
+            
+            # Get PROD branch (second element)
+            prod_branch = if_list[1]
+            
+            # This should be another !If for StaticOriginIsRoot
+            if isinstance(prod_branch, dict):
+                prod_if_key = '!If' if '!If' in prod_branch else 'Fn::If'
+                prod_if_list = prod_branch[prod_if_key]
+                
+                # Get static origin branch (second element)
+                static_branch = prod_if_list[1]
+                
+                # This should be another !If for StaticCachePolicyIsCustomDefault
+                if isinstance(static_branch, dict):
+                    static_if_key = '!If' if '!If' in static_branch else 'Fn::If'
+                    static_if_list = static_branch[static_if_key]
+                    
+                    # Third element (when not CustomDefault) should be another !If for CustomArn
+                    not_custom_default_branch = static_if_list[2]
+                    if isinstance(not_custom_default_branch, dict):
+                        arn_if_key = '!If' if '!If' in not_custom_default_branch else 'Fn::If'
+                        arn_if_list = not_custom_default_branch[arn_if_key]
+                        
+                        # First element should be StaticCachePolicyIsCustomArn
+                        assert arn_if_list[0] == 'StaticCachePolicyIsCustomArn', \
+                            "Should check StaticCachePolicyIsCustomArn condition"
+                        
+                        # Second element (when CustomArn) should be !Ref CloudFrontStaticCustomCachePolicyArn
+                        custom_arn_value = arn_if_list[1]
+                        if isinstance(custom_arn_value, dict):
+                            ref_key = '!Ref' if '!Ref' in custom_arn_value else 'Ref'
+                            assert ref_key in custom_arn_value, \
+                                "CustomArn should use !Ref"
+                            assert custom_arn_value[ref_key] == 'CloudFrontStaticCustomCachePolicyArn', \
+                                "CustomArn should reference CloudFrontStaticCustomCachePolicyArn parameter"
+    
+    def test_conditions_exist_for_cache_policy_types(self):
+        """
+        Test that all required conditions exist for cache policy resolution.
+        **Validates: Requirements 5.5, 5.6, 5.11, 5.12**
+        """
+        network_template = load_network_template()
+        conditions = network_template.get('Conditions', {})
+        
+        # Verify static cache policy conditions
+        assert 'StaticCachePolicyIsCustomDefault' in conditions, \
+            "StaticCachePolicyIsCustomDefault condition should exist"
+        assert 'StaticCachePolicyIsCustomArn' in conditions, \
+            "StaticCachePolicyIsCustomArn condition should exist"
+        
+        # Verify API cache policy conditions
+        assert 'ApiCachePolicyIsCustomDefault' in conditions, \
+            "ApiCachePolicyIsCustomDefault condition should exist"
+        assert 'ApiCachePolicyIsCustomArn' in conditions, \
+            "ApiCachePolicyIsCustomArn condition should exist"
+        
+        # Verify custom resource creation conditions
+        assert 'CreateCustomStaticCachePolicy' in conditions, \
+            "CreateCustomStaticCachePolicy condition should exist"
+        assert 'CreateCustomApiCachePolicy' in conditions, \
+            "CreateCustomApiCachePolicy condition should exist"

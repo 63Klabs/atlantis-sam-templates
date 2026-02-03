@@ -4,7 +4,7 @@ Add option to attach managed cache policies
 
 [Issue #1](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/1)
 
-The template-network-route53-cloudfront-s3-apigw.yml template should support attaching managed cache policies to the distribution.
+The template-network-route53-cloudfront-s3-apigw.yml template should support attaching AWS managed cache policies to the distribution.
 
 Currently two custom cache policies are created:
 - CloudFrontCachePolicyStatic
@@ -22,7 +22,9 @@ Documentation for each of these polcies should be added. The Parameter descripti
 - CachingOptimizedForUncompressedObjects - For uncompressed content
 - Elemental-MediaPackage - For media content
 
-An appropriate section for comments linking to AWS documentation should be provided in the resource section when the template is determinging which policy to apply. This will ensure the comments are included in the template's generated README. If not, then we will need to devise a way (perhaps with > just like in readmes) to ensure AI applies comments and highlights the appropriate section in the accompanying template documentation readme file.
+An appropriate section for comments linking to AWS documentation should be provided in the resource section when the template is determinging which policy to apply. This will ensure the comments are included in the template's generated README. 
+
+We will need to use `>!` similar to what steering documents apply to README files to ensure AI applies comments and highlights the appropriate section in the accompanying template documentation readme file and does not delete the comment.
 
 For example: 
 
@@ -31,53 +33,13 @@ Resources:
   MyResource:
     Type: AWS::CloudFront::Distribution
     Properties:
-      # > This is an important comment that should also be in the documentation
+      # >! This is an important comment that should also be in the documentation
       SomeSetting: !Ref SomeParameter
 ```
 
-The existing distribution and policies.
+The existing policies.
 
 ```yaml
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
-    Condition: CreateDistribution
-    Properties:
-      DistributionConfig:
-        Comment: !Sub "${Prefix}-${ProjectId}-${StageId}"
-
-        DefaultCacheBehavior:
-          CachePolicyId: !If [ StaticOriginIsRoot, !Ref CloudFrontCachePolicyStatic, !Ref CloudFrontCachePolicyApi ]
-          TargetOriginId: !If [ StaticOriginIsRoot, "StaticS3Origin", "ApiGatewayOrigin" ]
-          ViewerProtocolPolicy: redirect-to-https
-          Compress: true
-          AllowedMethods: !If
-          - StaticOriginIsRoot
-          - [HEAD, GET, OPTIONS]
-          - [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-          CachedMethods: [HEAD, GET, OPTIONS]
-
-        CacheBehaviors:
-          - !If 
-            - HasRouteForStaticOrigin
-            - PathPattern: !Sub "/${PathStatic}/*"
-              AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-              CachePolicyId: !Ref CloudFrontCachePolicyStatic
-              TargetOriginId: StaticS3Origin
-              ViewerProtocolPolicy: redirect-to-https
-              Compress: true
-            - Ref: AWS::NoValue
-          - !If 
-            - HasRouteForApiInCloudFront
-            - PathPattern: !Sub "/${PathApi}/*"
-              AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-              CachePolicyId: !Ref CloudFrontCachePolicyApi
-              TargetOriginId: ApiGatewayOrigin
-              ViewerProtocolPolicy: redirect-to-https
-              Compress: true
-            - Ref: AWS::NoValue
 
   CloudFrontCachePolicyStatic:
     Type: AWS::CloudFront::CachePolicy
@@ -124,7 +86,7 @@ The existing distribution and policies.
 
 ```
 
-We will need to add parameters to configure what policy should be used. 
+We will need to add template parameters to configure what policy should be used. 
 
 API and Static will need their own parameters.
 - CloudFrontStaticCachePolicy

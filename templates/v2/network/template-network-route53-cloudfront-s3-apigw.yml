@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.14/2026-02-01
+# Version: v0.0.16/2026-02-02
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -46,6 +46,14 @@ Metadata:
           # - DnsRecordTTL
 
       - Label:
+          default: Cache Policies
+        Parameters:
+          - CloudFrontStaticCachePolicy
+          - CloudFrontStaticCustomCachePolicyArn
+          - CloudFrontApiCachePolicy
+          - CloudFrontApiCustomCachePolicyArn
+
+      - Label:
           default: Supporting Resources
         Parameters:
           - S3LogBucketName
@@ -54,7 +62,9 @@ Metadata:
           default: Origins for S3 and/or API Gateway
         Parameters:
           - S3OriginDomainName
+          - StaticOriginPath
           - ApiGatewayId
+          - ApiOriginPath
 
       - Label:
           default: Routing for CloudFront
@@ -77,6 +87,23 @@ Metadata:
         Parameters: 
           # - AllowedMethodsForApi
           - HeadersToForwardToApi
+
+# =============================================================================
+# MAPPINGS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+#
+
+Mappings:
+  CachePolicyIds:
+    CachingOptimized:
+      Id: 658327ea-f89d-4fab-a63d-7e88639e58f6
+    CachingDisabled:
+      Id: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+    CachingOptimizedForUncompressedObjects:
+      Id: b2884449-e4de-46a7-ac36-70bc7f1ddd6d
+    Elemental-MediaPackage:
+      Id: 08627262-05a9-4f76-9ded-b50ca2e3a84f
 
 # =============================================================================
 # PARAMETERS
@@ -149,6 +176,47 @@ Parameters:
     ConstraintDescription: Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number.
 
   # ---------------------------------------------------------------------------
+  # Cache Policies
+
+  CloudFrontStaticCachePolicy:
+    Type: String
+    Description: "Cache policy for static S3 origin. CachingOptimized: Recommended for most use cases. Caches based on query strings and headers. CachingDisabled: Disables caching. Recommended for dynamic content and APIs. CachingOptimizedForUncompressedObjects: Optimized for uncompressed content. Disables compression. Elemental-MediaPackage: Optimized for AWS Elemental MediaPackage origins. CustomDefault: Use the template's default custom cache policy. CustomArn: Use a custom cache policy ARN (requires CloudFrontStaticCustomCachePolicyArn parameter). Note: DEV and TEST environments always use CachingDisabled regardless of this setting."
+    Default: CachingOptimized
+    AllowedValues:
+      - CachingOptimized
+      - CachingDisabled
+      - CachingOptimizedForUncompressedObjects
+      - Elemental-MediaPackage
+      - CustomDefault
+      - CustomArn
+
+  CloudFrontStaticCustomCachePolicyArn:
+    Type: String
+    Description: "Custom cache policy ARN for static origin. Only used when CloudFrontStaticCachePolicy is set to CustomArn. Leave empty if not using custom ARN."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$|^$"
+    ConstraintDescription: "Must be a valid CloudFront cache policy ARN or empty."
+
+  CloudFrontApiCachePolicy:
+    Type: String
+    Description: "Cache policy for API Gateway origin. CachingOptimized: Recommended for most use cases. Caches based on query strings and headers. CachingDisabled: Disables caching (recommended for APIs). CachingOptimizedForUncompressedObjects: Optimized for uncompressed content. Disables compression. Elemental-MediaPackage: Optimized for AWS Elemental MediaPackage origins. CustomDefault: Use the template's default custom cache policy. CustomArn: Use a custom cache policy ARN (requires CloudFrontApiCustomCachePolicyArn parameter). Note: DEV and TEST environments always use CachingDisabled regardless of this setting."
+    Default: CachingDisabled
+    AllowedValues:
+      - CachingOptimized
+      - CachingDisabled
+      - CachingOptimizedForUncompressedObjects
+      - Elemental-MediaPackage
+      - CustomDefault
+      - CustomArn
+
+  CloudFrontApiCustomCachePolicyArn:
+    Type: String
+    Description: "Custom cache policy ARN for API origin. Only used when CloudFrontApiCachePolicy is set to CustomArn. Leave empty if not using custom ARN."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$|^$"
+    ConstraintDescription: "Must be a valid CloudFront cache policy ARN or empty."
+
+  # ---------------------------------------------------------------------------
   # Origins
 
   S3OriginDomainName:
@@ -162,6 +230,19 @@ Parameters:
     ConstraintDescription: Must be a valid Bucket Domain Name.
     Default: ""
 
+  StaticOriginPath:
+    Type: String
+    Description: Custom origin path for static S3 content. Leave empty to use default 
+      path with StageId and public folder. Use / for root path (no prefix). Use /custom/path for a 
+      custom path. Path must start with / and not end with / (except single /). 
+      Do not use placeholder syntax like {StageId}. Examples - /static, /v1/content, 
+      /app/public
+    Default: ""
+    AllowedPattern: "^$|^\/$|^\/[a-zA-Z0-9\/_-]+[^\/]$"
+    ConstraintDescription: Must be empty (default), / (root), or a path starting with / 
+      and not ending with /. Valid examples - /static, /v1/content, /app/public. 
+      Do not use placeholders like {StageId}.
+
   ApiGatewayId:
     Type: String
     Description: If deploying an API, an already existing API Gateway to deploy 
@@ -171,6 +252,18 @@ Parameters:
     AllowedPattern: "^[a-z0-9]{1,14}$|^$"
     ConstraintDescription: Must be a valid API Gateway ID. May only contain alphanumeric characters.
     Default: ""
+
+  ApiOriginPath:
+    Type: String
+    Description: Custom origin path for API Gateway. Leave empty to use default 
+      path with ProjectId and StageId. Use / for root path (no prefix). Use /custom/path 
+      for a custom path. Path must start with / and not end with / (except single /). 
+      Do not use placeholder syntax like {StageId}. Examples - /api, /v2/services, /prod
+    Default: ""
+    AllowedPattern: "^$|^\/$|^\/[a-zA-Z0-9\/_-]+[^\/]$"
+    ConstraintDescription: Must be empty (default), / (root), or a path starting with / 
+      and not ending with /. Valid examples - /api, /v2/services, /prod. 
+      Do not use placeholders like {StageId}.
 
   # ---------------------------------------------------------------------------
   # Deployment Environment
@@ -374,6 +467,46 @@ Conditions:
         - !Ref HeadersToForwardToApi
       - ''
 
+  # Static Origin Path Conditions
+  StaticOriginPathIsEmpty: !Equals [!Ref StaticOriginPath, ""]
+  StaticOriginPathIsRoot: !Equals [!Ref StaticOriginPath, "/"]
+  UseDefaultStaticOriginPath: !Condition StaticOriginPathIsEmpty
+  UseRootStaticOriginPath: !And
+    - !Not [!Condition StaticOriginPathIsEmpty]
+    - !Condition StaticOriginPathIsRoot
+  UseCustomStaticOriginPath: !And
+    - !Not [!Condition StaticOriginPathIsEmpty]
+    - !Not [!Condition StaticOriginPathIsRoot]
+
+  # API Origin Path Conditions
+  ApiOriginPathIsEmpty: !Equals [!Ref ApiOriginPath, ""]
+  ApiOriginPathIsRoot: !Equals [!Ref ApiOriginPath, "/"]
+  UseDefaultApiOriginPath: !Condition ApiOriginPathIsEmpty
+  UseRootApiOriginPath: !And
+    - !Not [!Condition ApiOriginPathIsEmpty]
+    - !Condition ApiOriginPathIsRoot
+  UseCustomApiOriginPath: !And
+    - !Not [!Condition ApiOriginPathIsEmpty]
+    - !Not [!Condition ApiOriginPathIsRoot]
+
+  # Static Cache Policy Type Conditions
+  StaticCachePolicyIsCustomDefault: !Equals [!Ref CloudFrontStaticCachePolicy, CustomDefault]
+  StaticCachePolicyIsCustomArn: !Equals [!Ref CloudFrontStaticCachePolicy, CustomArn]
+
+  # API Cache Policy Type Conditions
+  ApiCachePolicyIsCustomDefault: !Equals [!Ref CloudFrontApiCachePolicy, CustomDefault]
+  ApiCachePolicyIsCustomArn: !Equals [!Ref CloudFrontApiCachePolicy, CustomArn]
+
+  # Custom Resource Creation Conditions
+  CreateCustomStaticCachePolicy: !And
+    - !Condition HasStaticOrigin
+    - !Condition IsProduction
+    - !Condition StaticCachePolicyIsCustomDefault
+
+  CreateCustomApiCachePolicy: !And
+    - !Condition IsProduction
+    - !Condition ApiCachePolicyIsCustomDefault
+
 # =============================================================================
 # RESOURCES
 # -----------------------------------------------------------------------------
@@ -411,7 +544,13 @@ Resources:
             - DomainName: !Ref S3OriginDomainName
               Id: StaticS3Origin
               OriginAccessControlId: !Ref CloudFrontOriginAccessControl
-              OriginPath: !Sub "/${StageId}/public"
+              OriginPath: !If
+                - UseDefaultStaticOriginPath
+                - !Sub "/${StageId}/public"
+                - !If
+                  - UseRootStaticOriginPath
+                  - ""
+                  - !Ref StaticOriginPath
               S3OriginConfig:
                 OriginAccessIdentity: ''
             - !Ref AWS::NoValue
@@ -419,7 +558,13 @@ Resources:
             - ApiIsBehindCloudFront
             - DomainName: !Sub "${ApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com"
               Id: ApiGatewayOrigin
-              OriginPath: !Sub "/${ProjectId}-${StageId}"
+              OriginPath: !If
+                - UseDefaultApiOriginPath
+                - !Sub "/${ProjectId}-${StageId}"
+                - !If
+                  - UseRootApiOriginPath
+                  - ""
+                  - !Ref ApiOriginPath
               CustomOriginConfig:
                 HTTPSPort: 443
                 OriginProtocolPolicy: https-only
@@ -427,8 +572,36 @@ Resources:
                   - TLSv1.2
             - !Ref AWS::NoValue
 
+        # >! Cache Policy Selection
+        # >! This template supports AWS managed cache policies and custom policies.
+        # >! For more information, see: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
+        # >! Note: DEV and TEST environments always use CachingDisabled regardless of parameter settings.
+        
         DefaultCacheBehavior:
-          CachePolicyId: !If [ StaticOriginIsRoot, !Ref CloudFrontCachePolicyStatic, !Ref CloudFrontCachePolicyApi ]
+          CachePolicyId: !If
+            - StaticOriginIsRoot
+            # Static cache policy resolution
+            - !If
+              - IsProduction
+              - !If
+                - StaticCachePolicyIsCustomDefault
+                - !Ref CloudFrontCachePolicyStatic
+                - !If
+                  - StaticCachePolicyIsCustomArn
+                  - !Ref CloudFrontStaticCustomCachePolicyArn
+                  - !FindInMap [CachePolicyIds, !Ref CloudFrontStaticCachePolicy, Id]
+              - !FindInMap [CachePolicyIds, CachingDisabled, Id]
+            # API cache policy resolution
+            - !If
+              - IsProduction
+              - !If
+                - ApiCachePolicyIsCustomDefault
+                - !Ref CloudFrontCachePolicyApi
+                - !If
+                  - ApiCachePolicyIsCustomArn
+                  - !Ref CloudFrontApiCustomCachePolicyArn
+                  - !FindInMap [CachePolicyIds, !Ref CloudFrontApiCachePolicy, Id]
+              - !FindInMap [CachePolicyIds, CachingDisabled, Id]
           TargetOriginId: !If [ StaticOriginIsRoot, "StaticS3Origin", "ApiGatewayOrigin" ]
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
@@ -446,7 +619,16 @@ Resources:
               - GET
               - HEAD
               - OPTIONS
-              CachePolicyId: !Ref CloudFrontCachePolicyStatic
+              CachePolicyId: !If
+                - IsProduction
+                - !If
+                  - StaticCachePolicyIsCustomDefault
+                  - !Ref CloudFrontCachePolicyStatic
+                  - !If
+                    - StaticCachePolicyIsCustomArn
+                    - !Ref CloudFrontStaticCustomCachePolicyArn
+                    - !FindInMap [CachePolicyIds, !Ref CloudFrontStaticCachePolicy, Id]
+                - !FindInMap [CachePolicyIds, CachingDisabled, Id]
               TargetOriginId: StaticS3Origin
               ViewerProtocolPolicy: redirect-to-https
               Compress: true
@@ -455,7 +637,16 @@ Resources:
             - HasRouteForApiInCloudFront
             - PathPattern: !Sub "/${PathApi}/*"
               AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-              CachePolicyId: !Ref CloudFrontCachePolicyApi
+              CachePolicyId: !If
+                - IsProduction
+                - !If
+                  - ApiCachePolicyIsCustomDefault
+                  - !Ref CloudFrontCachePolicyApi
+                  - !If
+                    - ApiCachePolicyIsCustomArn
+                    - !Ref CloudFrontApiCustomCachePolicyArn
+                    - !FindInMap [CachePolicyIds, !Ref CloudFrontApiCachePolicy, Id]
+                - !FindInMap [CachePolicyIds, CachingDisabled, Id]
               TargetOriginId: ApiGatewayOrigin
               ViewerProtocolPolicy: redirect-to-https
               Compress: true
@@ -507,7 +698,7 @@ Resources:
 
   CloudFrontCachePolicyStatic:
     Type: AWS::CloudFront::CachePolicy
-    Condition: HasStaticOrigin
+    Condition: CreateCustomStaticCachePolicy
     Properties:
       CachePolicyConfig:
         Name: !Sub "${Prefix}-${ProjectId}-${StageId}-Static-CachePolicy"
@@ -527,7 +718,7 @@ Resources:
 
   CloudFrontCachePolicyApi:
     Type: AWS::CloudFront::CachePolicy
-    # Condition: ApiIsBehindCloudFront
+    Condition: CreateCustomApiCachePolicy
     Properties:
       CachePolicyConfig:
         Name: !Sub "${Prefix}-${ProjectId}-${StageId}-Api-CachePolicy"
@@ -626,13 +817,29 @@ Outputs:
 
   ApiGatewayOrigin:
     Condition: HasApiGatewayOrigin
-    Description: API Gateway Origin.
-    Value: !Sub "${ApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com/${ProjectId}-${StageId}"
+    Description: API Gateway Origin with path.
+    Value: !Sub
+      - "${ApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com${OriginPath}"
+      - OriginPath: !If
+          - UseDefaultApiOriginPath
+          - !Sub "/${ProjectId}-${StageId}"
+          - !If
+            - UseRootApiOriginPath
+            - ""
+            - !Ref ApiOriginPath
 
   S3Origin: 
     Condition: HasStaticOrigin
-    Description: S3 Origin.
-    Value: !Sub "${S3OriginDomainName}/${StageId}/public"
+    Description: S3 Origin with path.
+    Value: !Sub
+      - "${S3OriginDomainName}${OriginPath}"
+      - OriginPath: !If
+          - UseDefaultStaticOriginPath
+          - !Sub "/${StageId}/public"
+          - !If
+            - UseRootStaticOriginPath
+            - ""
+            - !Ref StaticOriginPath
 
   ApiGatewayDomainName:
     Condition: CreateDnsRecordForApiGateway

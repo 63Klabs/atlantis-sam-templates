@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.0.14/2026-02-01  
+**Version:** v0.0.16/2026-02-02  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -49,7 +49,9 @@ Parameters that define the naming convention for all resources created by this t
 Configure the origin sources for your CloudFront distribution or API Gateway.
 
 - [S3OriginDomainName](#s3origindomainname)
+- [StaticOriginPath](#staticoriginpath)
 - [ApiGatewayId](#apigatewayid)
+- [ApiOriginPath](#apioriginpath)
 
 ### Deployment Environment
 
@@ -57,6 +59,15 @@ Settings that control deployment behavior and resource configurations based on e
 
 - [DeployEnvironment](#deployenvironment)
 - [CloudFrontPriceClass](#cloudfrontpriceclass)
+
+### Cache Policies
+
+Configure cache policies for CloudFront distribution origins. Choose between AWS managed policies, custom default policies, or custom ARN-based policies.
+
+- [CloudFrontStaticCachePolicy](#cloudfrontstaticcachepolicy)
+- [CloudFrontStaticCustomCachePolicyArn](#cloudfrontstaticustomcachepolicyarn)
+- [CloudFrontApiCachePolicy](#cloudfrontapicachepolicy)
+- [CloudFrontApiCustomCachePolicyArn](#cloudfrontapicustomcachepolicyarn)
 
 ### Supporting Resources
 
@@ -140,6 +151,31 @@ If deploying static content to S3, an already existing S3 bucket to deploy stati
 | Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]\.s3\.(([a-z0-9-]+)\.)?amazonaws\.com$\|^$` |
 | Constraint Description | Must be a valid Bucket Domain Name. |
 
+#### StaticOriginPath
+
+Custom origin path for static S3 content. This parameter allows you to customize the path prefix that CloudFront uses when requesting content from the S3 origin. Leave empty to use the default path structure (`/${StageId}/public`). Use `/` for root path (no prefix). Use a custom path like `/static` or `/v1/content` to organize your S3 bucket structure according to your project needs.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty - uses default path) |
+| Allowed Pattern | `^$\|^\/$\|^\/[a-zA-Z0-9\/_-]+[^\/]$` |
+| Constraint Description | Must be empty (default), `/` (root), or a path starting with `/` and not ending with `/`. Valid examples: `/static`, `/v1/content`, `/app/public`. Do not use placeholders like `{StageId}`. |
+
+**Valid Path Formats:**
+- Empty string (default): Uses `/${StageId}/public` (e.g., `/prod/public`)
+- `/`: Uses root path (no prefix)
+- `/static`: Custom path for static content
+- `/v1/content`: Versioned content path
+- `/app/public`: Multi-level custom path
+
+**Invalid Path Formats:**
+- `static` - Missing leading `/`
+- `/static/` - Trailing `/` not allowed (except single `/`)
+- `/${StageId}/public` - Placeholder syntax not allowed
+
+> **Migration Note:** If you have existing deployments using the default path structure (`/${StageId}/public`), you can now customize this by setting `StaticOriginPath` to a different value. Leave the parameter empty to maintain backward compatibility with existing deployments.
+
 #### ApiGatewayId
 
 If deploying an API, an already existing API Gateway to deploy to. Leave blank if not deploying an API Gateway custom domain. This must be the API Gateway ID that is found in the API domain. For example, xyz123abc would be the ID from xyz123abc.execute-api.us-east-1.amazonaws.com.
@@ -150,6 +186,31 @@ If deploying an API, an already existing API Gateway to deploy to. Leave blank i
 | Default | "" (empty) |
 | Allowed Pattern | `^[a-z0-9]{1,14}$\|^$` |
 | Constraint Description | Must be a valid API Gateway ID. May only contain alphanumeric characters. |
+
+#### ApiOriginPath
+
+Custom origin path for API Gateway. This parameter allows you to customize the path prefix that CloudFront uses when requesting content from the API Gateway origin. Leave empty to use the default path structure (`/${ProjectId}-${StageId}`). Use `/` for root path (no prefix). Use a custom path like `/api` or `/v2/services` to match your API Gateway stage configuration or custom path structures.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty - uses default path) |
+| Allowed Pattern | `^$\|^\/$\|^\/[a-zA-Z0-9\/_-]+[^\/]$` |
+| Constraint Description | Must be empty (default), `/` (root), or a path starting with `/` and not ending with `/`. Valid examples: `/api`, `/v2/services`, `/prod`. Do not use placeholders like `{StageId}`. |
+
+**Valid Path Formats:**
+- Empty string (default): Uses `/${ProjectId}-${StageId}` (e.g., `/myapp-prod`)
+- `/`: Uses root path (no prefix)
+- `/api`: Custom path for API
+- `/v2/services`: Versioned API path
+- `/prod`: Stage-specific path
+
+**Invalid Path Formats:**
+- `api` - Missing leading `/`
+- `/api/` - Trailing `/` not allowed (except single `/`)
+- `/${ProjectId}-${StageId}` - Placeholder syntax not allowed
+
+> **Migration Note:** If you have existing deployments using the default path structure (`/${ProjectId}-${StageId}`), you can now customize this by setting `ApiOriginPath` to a different value. This is particularly useful when using custom stage names in API Gateway or when you want to use a simpler path structure. Leave the parameter empty to maintain backward compatibility with existing deployments.
 
 #### DeployEnvironment
 
@@ -174,6 +235,72 @@ Price class for CloudFront distribution. For more information, see https://aws.a
 | Constraint Description | Must specify a valid CloudFront price class. |
 
 **Cost Consideration:** PriceClass_100 uses only North America and Europe edge locations (lowest cost). PriceClass_200 adds Asia, Middle East, and Africa. PriceClass_All includes all global edge locations (highest cost).
+
+#### CloudFrontStaticCachePolicy
+
+Cache policy for static S3 origin. Choose between AWS managed policies optimized for different use cases, the template's custom default policy, or provide your own custom policy ARN. AWS managed policies are maintained by AWS and don't require creating custom resources. Note: DEV and TEST environments always use CachingDisabled regardless of this setting to ensure fresh content during development and testing.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | CachingOptimized |
+| Allowed Values | CachingOptimized, CachingDisabled, CachingOptimizedForUncompressedObjects, Elemental-MediaPackage, CustomDefault, CustomArn |
+
+**Allowed Values:**
+- **CachingOptimized**: Recommended for most use cases. Caches based on query strings and headers.
+- **CachingDisabled**: Disables caching. Recommended for dynamic content and APIs.
+- **CachingOptimizedForUncompressedObjects**: Optimized for uncompressed content. Disables compression.
+- **Elemental-MediaPackage**: Optimized for AWS Elemental MediaPackage origins.
+- **CustomDefault**: Use the template's default custom cache policy.
+- **CustomArn**: Use a custom cache policy ARN (requires CloudFrontStaticCustomCachePolicyArn parameter).
+
+> **Environment Override:** DEV and TEST environments automatically use CachingDisabled regardless of this parameter value. This ensures developers always see fresh content without manual cache invalidation. Only PROD environments use the selected cache policy.
+
+#### CloudFrontStaticCustomCachePolicyArn
+
+Custom cache policy ARN for static origin. Only used when CloudFrontStaticCachePolicy is set to CustomArn. Leave empty if not using a custom ARN. The ARN must reference an existing CloudFront cache policy in your AWS account.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$\|^$` |
+| Constraint Description | Must be a valid CloudFront cache policy ARN or empty. |
+
+**Example ARN:** `arn:aws:cloudfront::123456789012:cache-policy/abc123-def456-789`
+
+#### CloudFrontApiCachePolicy
+
+Cache policy for API Gateway origin. Choose between AWS managed policies optimized for different use cases, the template's custom default policy, or provide your own custom policy ARN. For APIs, CachingDisabled is typically recommended to ensure fresh responses. Note: DEV and TEST environments always use CachingDisabled regardless of this setting.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | CachingDisabled |
+| Allowed Values | CachingOptimized, CachingDisabled, CachingOptimizedForUncompressedObjects, Elemental-MediaPackage, CustomDefault, CustomArn |
+
+**Allowed Values:**
+- **CachingOptimized**: Recommended for most use cases. Caches based on query strings and headers.
+- **CachingDisabled**: Disables caching. Recommended for dynamic content and APIs (default).
+- **CachingOptimizedForUncompressedObjects**: Optimized for uncompressed content. Disables compression.
+- **Elemental-MediaPackage**: Optimized for AWS Elemental MediaPackage origins.
+- **CustomDefault**: Use the template's default custom cache policy.
+- **CustomArn**: Use a custom cache policy ARN (requires CloudFrontApiCustomCachePolicyArn parameter).
+
+> **Environment Override:** DEV and TEST environments automatically use CachingDisabled regardless of this parameter value. This ensures developers always see fresh API responses without manual cache invalidation. Only PROD environments use the selected cache policy.
+
+#### CloudFrontApiCustomCachePolicyArn
+
+Custom cache policy ARN for API origin. Only used when CloudFrontApiCachePolicy is set to CustomArn. Leave empty if not using a custom ARN. The ARN must reference an existing CloudFront cache policy in your AWS account.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$\|^$` |
+| Constraint Description | Must be a valid CloudFront cache policy ARN or empty. |
+
+**Example ARN:** `arn:aws:cloudfront::123456789012:cache-policy/xyz789-abc123-456`
 
 #### S3LogBucketName
 
@@ -293,8 +420,8 @@ If you are placing an API Gateway behind CloudFront, you will need to specify th
 
 - [CloudFrontDistribution](#cloudfrontdistribution) - AWS::CloudFront::Distribution (Conditional: CreateDistribution)
 - [CloudFrontOriginAccessControl](#cloudfrontoriginaccesscontrol) - AWS::CloudFront::OriginAccessControl (Conditional: HasStaticOrigin)
-- [CloudFrontCachePolicyStatic](#cloudfrontcachepolicystatic) - AWS::CloudFront::CachePolicy (Conditional: HasStaticOrigin)
-- [CloudFrontCachePolicyApi](#cloudfrontcachepolicyapi) - AWS::CloudFront::CachePolicy
+- [CloudFrontCachePolicyStatic](#cloudfrontcachepolicystatic) - AWS::CloudFront::CachePolicy (Conditional: CreateCustomStaticCachePolicy)
+- [CloudFrontCachePolicyApi](#cloudfrontcachepolicyapi) - AWS::CloudFront::CachePolicy (Conditional: CreateCustomApiCachePolicy)
 - [Route53RecordForCloudFront](#route53recordforcloudfront) - AWS::Route53::RecordSetGroup (Conditional: CreateDnsRecordForCloudFront)
 - [ApiGatewayV2DomainName](#apigatewayv2domainname) - AWS::ApiGatewayV2::DomainName (Conditional: CreateDnsRecordForApiGateway)
 - [ApiGatewayV2ApiMapping](#apigatewayv2apimapping) - AWS::ApiGatewayV2::ApiMapping (Conditional: CreateDnsRecordForApiGateway)
@@ -307,18 +434,31 @@ Condition: CreateDistribution
 
 Creates a CloudFront distribution that serves content from S3 and/or API Gateway origins. The distribution is configured with HTTPS redirection, IPv6 support, and HTTP/2. It includes custom error responses for single-page applications (403/404 redirect to index.html) when serving static content. Optional logging can be enabled by providing an S3 log bucket name.
 
+**Cache Policy Selection:**
+
+The distribution uses flexible cache policy configuration that supports AWS managed policies, custom default policies, or custom ARN-based policies. Cache policies are selected based on the `CloudFrontStaticCachePolicy` and `CloudFrontApiCachePolicy` parameters:
+
+- **AWS Managed Policies**: Use AWS-maintained policies (CachingOptimized, CachingDisabled, etc.) without creating custom resources
+- **CustomDefault**: Use the template's custom cache policy resources (created conditionally)
+- **CustomArn**: Reference an existing cache policy in your AWS account
+
+Environment-based override ensures DEV and TEST environments always use CachingDisabled regardless of parameter settings, providing fresh content during development and testing.
+
+For more information about AWS managed cache policies, see [AWS Managed Cache Policies](#aws-managed-cache-policies).
+
 **Key Properties:**
 - Supports both S3 (with OAC) and API Gateway origins
 - Configurable price class based on deployment environment
 - Path-based routing for multiple origins
 - Compression enabled for all content
-- Environment-specific cache behaviors (longer TTLs in PROD)
+- Environment-specific cache behaviors (longer TTLs in PROD, CachingDisabled in DEV/TEST)
 - Custom domain support with ACM certificates
 - Optional access logging to S3 bucket with organized prefix structure
+- Flexible cache policy selection (managed, custom default, or custom ARN)
 
 **Cost Consideration:** CloudFront distributions incur costs based on data transfer and requests. Price class affects the number of edge locations used.
 
-**Dependencies:** Requires CloudFrontOriginAccessControl (for S3), CloudFrontCachePolicyStatic and/or CloudFrontCachePolicyApi
+**Dependencies:** Requires CloudFrontOriginAccessControl (for S3), and optionally CloudFrontCachePolicyStatic and/or CloudFrontCachePolicyApi (when using CustomDefault)
 
 ### CloudFrontOriginAccessControl
 
@@ -337,31 +477,48 @@ Creates an Origin Access Control (OAC) for secure access to the S3 bucket. OAC i
 ### CloudFrontCachePolicyStatic
 
 Type: AWS::CloudFront::CachePolicy  
-Condition: HasStaticOrigin
+Condition: CreateCustomStaticCachePolicy
 
-Defines caching behavior for static content served from S3. Uses environment-specific TTL values to balance performance and freshness.
+Defines caching behavior for static content served from S3. This resource is only created when `CloudFrontStaticCachePolicy` is set to `CustomDefault` and the deployment environment is PROD. Uses environment-specific TTL values to balance performance and freshness.
+
+**Conditional Creation:**
+
+This resource is created only when:
+- `CloudFrontStaticCachePolicy` parameter is set to `CustomDefault`
+- `DeployEnvironment` is `PROD`
+- Static origin is configured (`S3OriginDomainName` is provided)
+
+When using AWS managed policies or custom ARNs, this resource is not created, reducing stack complexity and deployment time.
 
 **Key Properties:**
 - PROD: DefaultTTL 86400s (24h), MaxTTL 31536000s (1 year)
-- DEV/TEST: DefaultTTL 3s, MaxTTL 10s
 - No cookies, query strings, or headers included in cache key
 - Optimized for static content that doesn't change frequently
 
-**Operational Note:** Short TTLs in non-production environments ensure developers see changes quickly without manual cache invalidation.
+**Operational Note:** When using CustomDefault in PROD, this policy provides longer TTLs for better performance. In DEV/TEST environments, the distribution uses CachingDisabled managed policy instead, so this resource is not created.
 
 ### CloudFrontCachePolicyApi
 
-Type: AWS::CloudFront::CachePolicy
+Type: AWS::CloudFront::CachePolicy  
+Condition: CreateCustomApiCachePolicy
 
-Defines caching behavior for API Gateway origins. Configured with short TTLs and includes all cookies, query strings, and specified headers in the cache key.
+Defines caching behavior for API Gateway origins. This resource is only created when `CloudFrontApiCachePolicy` is set to `CustomDefault` and the deployment environment is PROD. Configured with short TTLs and includes all cookies, query strings, and specified headers in the cache key.
+
+**Conditional Creation:**
+
+This resource is created only when:
+- `CloudFrontApiCachePolicy` parameter is set to `CustomDefault`
+- `DeployEnvironment` is `PROD`
+
+When using AWS managed policies (like CachingDisabled, which is the default) or custom ARNs, this resource is not created, reducing stack complexity and deployment time.
 
 **Key Properties:**
-- DefaultTTL: 10s, MaxTTL: 30s (all environments)
+- DefaultTTL: 10s, MaxTTL: 30s
 - Includes all cookies and query strings in cache key
 - Forwards specified headers to origin (configurable via HeadersToForwardToApi)
 - Suitable for dynamic API responses
 
-**Operational Note:** Short TTLs prevent stale API responses while still providing some caching benefit for repeated requests.
+**Operational Note:** Short TTLs prevent stale API responses while still providing some caching benefit for repeated requests. In DEV/TEST environments, the distribution uses CachingDisabled managed policy instead, so this resource is not created.
 
 ### Route53RecordForCloudFront
 
@@ -442,21 +599,27 @@ ID of CloudFront distribution for static website.
 
 Condition: HasApiGatewayOrigin
 
-API Gateway Origin.
+API Gateway Origin with path.
 
-**Example Value:** `abc123xyz.execute-api.us-east-1.amazonaws.com/myapp-prod`
+**Example Value:** `abc123xyz.execute-api.us-east-1.amazonaws.com/myapp-prod` or `abc123xyz.execute-api.us-east-1.amazonaws.com/api` or `abc123xyz.execute-api.us-east-1.amazonaws.com`
 
-**Usage:** Shows the full API Gateway origin path used by CloudFront or for direct access.
+**Usage:** Shows the full API Gateway origin path used by CloudFront or for direct access. The path varies based on the `ApiOriginPath` parameter:
+- If `ApiOriginPath` is empty (default): Uses `/${ProjectId}-${StageId}`
+- If `ApiOriginPath` is `/`: Uses root path (no prefix)
+- If `ApiOriginPath` is custom: Uses the exact custom path provided
 
 ### S3Origin
 
 Condition: HasStaticOrigin
 
-S3 Origin.
+S3 Origin with path.
 
-**Example Value:** `my-bucket.s3.us-east-1.amazonaws.com/prod/public`
+**Example Value:** `my-bucket.s3.us-east-1.amazonaws.com/prod/public` or `my-bucket.s3.us-east-1.amazonaws.com/static` or `my-bucket.s3.us-east-1.amazonaws.com`
 
-**Usage:** Shows the S3 origin path used by CloudFront, including the stage-specific prefix.
+**Usage:** Shows the S3 origin path used by CloudFront. The path varies based on the `StaticOriginPath` parameter:
+- If `StaticOriginPath` is empty (default): Uses `/${StageId}/public`
+- If `StaticOriginPath` is `/`: Uses root path (no prefix)
+- If `StaticOriginPath` is custom: Uses the exact custom path provided
 
 ### ApiGatewayDomainName
 
@@ -536,6 +699,106 @@ The template uses several conditions to control resource creation:
 - **CreateDnsRecordForApiGateway**: True when all API Gateway domain parameters are provided
 - **HasHeadersToForwardToApi**: True when headers list is not empty
 - **HasLogBucket**: True when S3LogBucketName is provided (non-empty)
+- **CreateCustomStaticCachePolicy**: True when static origin exists, environment is PROD, and CloudFrontStaticCachePolicy is CustomDefault
+- **CreateCustomApiCachePolicy**: True when environment is PROD and CloudFrontApiCachePolicy is CustomDefault
+
+## AWS Managed Cache Policies
+
+AWS provides managed cache policies that are optimized for common use cases. These policies are maintained by AWS and don't require creating custom CloudFormation resources, simplifying your stack and reducing deployment time.
+
+### Benefits of AWS Managed Policies
+
+- **No Custom Resources**: Managed policies don't create CloudFormation resources, reducing stack complexity
+- **AWS Maintained**: Policies are updated and optimized by AWS
+- **Industry Standard**: Based on best practices for common use cases
+- **Faster Deployment**: No need to wait for custom policy resource creation
+- **Reduced Costs**: Fewer resources to manage and maintain
+
+### Available Managed Policies
+
+#### CachingOptimized
+
+**Policy ID:** `658327ea-f89d-4fab-a63d-7e88639e58f6`
+
+Recommended for most static content use cases. This policy caches content based on query strings and headers, providing a good balance between cache hit ratio and content freshness.
+
+**Best For:**
+- Static websites
+- Image and asset delivery
+- Content that changes infrequently
+
+**Cache Key Includes:**
+- Query strings (all)
+- Headers (selected common headers)
+- Compression support enabled
+
+#### CachingDisabled
+
+**Policy ID:** `4135ea2d-6df8-44a3-9df3-4b5a84be39ad`
+
+Disables caching entirely. Every request is forwarded to the origin. Recommended for dynamic content and APIs where freshness is critical.
+
+**Best For:**
+- API Gateway endpoints
+- Dynamic content that changes frequently
+- Development and testing environments (automatically used in DEV/TEST)
+- Content that must always be fresh
+
+**Cache Key Includes:**
+- No caching (all requests forwarded to origin)
+
+#### CachingOptimizedForUncompressedObjects
+
+**Policy ID:** `b2884449-e4de-46a7-ac36-70bc7f1ddd6d`
+
+Optimized for content that should not be compressed. Disables automatic compression while still providing caching benefits.
+
+**Best For:**
+- Pre-compressed content (gzip, brotli)
+- Binary files that don't benefit from compression
+- Content where compression overhead outweighs benefits
+
+**Cache Key Includes:**
+- Query strings (all)
+- Headers (selected common headers)
+- Compression disabled
+
+#### Elemental-MediaPackage
+
+**Policy ID:** `08627262-05a9-4f76-9ded-b50ca2e3a84f`
+
+Specifically optimized for AWS Elemental MediaPackage origins. Includes headers and query strings required for media streaming.
+
+**Best For:**
+- AWS Elemental MediaPackage origins
+- Live and on-demand video streaming
+- Media delivery workflows
+
+**Cache Key Includes:**
+- MediaPackage-specific headers
+- Query strings for media segments
+- Optimized TTLs for streaming content
+
+### Choosing the Right Policy
+
+| Use Case | Recommended Policy | Reason |
+|----------|-------------------|--------|
+| Static website | CachingOptimized | Good cache hit ratio, supports compression |
+| API Gateway | CachingDisabled | Always fresh responses, no stale data |
+| Pre-compressed assets | CachingOptimizedForUncompressedObjects | Avoids double compression |
+| Video streaming | Elemental-MediaPackage | Optimized for media delivery |
+| Development/Testing | CachingDisabled | Automatic in DEV/TEST environments |
+| Custom requirements | CustomDefault or CustomArn | Full control over cache behavior |
+
+### When to Use Custom Policies
+
+Consider using `CustomDefault` or `CustomArn` when:
+- You need specific TTL values not provided by managed policies
+- You require custom header/cookie/query string handling
+- You have compliance requirements for cache behavior
+- You need to match existing custom policy configurations
+
+For more information about AWS managed cache policies, see the [AWS CloudFront Documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html).
 
 ## Examples
 
@@ -594,7 +857,32 @@ Result:
 - Static content at `app.example.com`
 - API at `app.example.com/api`
 
-### Example 4: Standalone API Gateway (No CloudFront)
+### Example 4: Custom Origin Paths for S3 and API
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-webapp-prod-static.s3.us-east-1.amazonaws.com
+  StaticOriginPath: /v2/assets
+  ApiGatewayId: abc123xyz
+  ApiOriginPath: /production
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result: 
+- Static content at `app.example.com` served from S3 path `/v2/assets`
+- API at `app.example.com/api` using API Gateway stage path `/production`
+
+> **Use Case:** This configuration is useful when you have a custom S3 bucket structure (e.g., versioned assets in `/v2/assets`) or when your API Gateway uses a custom stage name that doesn't match the default `${ProjectId}-${StageId}` pattern.
+
+### Example 5: Standalone API Gateway (No CloudFront)
 
 ```yaml
 Parameters:
@@ -610,7 +898,7 @@ Parameters:
 
 Result: API accessible at `internal.apis.example.com`
 
-### Example 5: Static Website with CloudFront Logging Enabled
+### Example 6: Static Website with CloudFront Logging Enabled
 
 ```yaml
 Parameters:
@@ -630,7 +918,7 @@ Result:
 - Static website accessible at `www.example.com`
 - CloudFront access logs stored in `myorg-cloudfront-logs` bucket with prefix `cloudfront/myorg-marketing-site-prod`
 
-### Example 6: Combined Static and API with Logging Disabled
+### Example 7: Combined Static and API with Logging Disabled
 
 ```yaml
 Parameters:
@@ -652,6 +940,130 @@ Result:
 - Static content at `app-test.example.com`
 - API at `app-test.example.com/api`
 - No CloudFront logging (S3LogBucketName is empty)
+
+### Example 8: Using AWS Managed Cache Policies
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-webapp-prod-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontStaticCachePolicy: CachingOptimized
+  CloudFrontApiCachePolicy: CachingDisabled
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result:
+- Static content at `app.example.com` using AWS managed CachingOptimized policy
+- API at `app.example.com/api` using AWS managed CachingDisabled policy
+- No custom cache policy resources created (faster deployment)
+
+### Example 9: Using Custom Default Cache Policies
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-webapp-prod-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontStaticCachePolicy: CustomDefault
+  CloudFrontApiCachePolicy: CustomDefault
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result:
+- Static content at `app.example.com` using template's custom cache policy (24h TTL)
+- API at `app.example.com/api` using template's custom cache policy (10s TTL)
+- Custom cache policy resources created in CloudFormation stack
+
+### Example 10: Using Custom ARN Cache Policies
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-webapp-prod-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontStaticCachePolicy: CustomArn
+  CloudFrontStaticCustomCachePolicyArn: arn:aws:cloudfront::123456789012:cache-policy/my-static-policy
+  CloudFrontApiCachePolicy: CustomArn
+  CloudFrontApiCustomCachePolicyArn: arn:aws:cloudfront::123456789012:cache-policy/my-api-policy
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result:
+- Static content at `app.example.com` using existing custom cache policy from ARN
+- API at `app.example.com/api` using existing custom cache policy from ARN
+- No custom cache policy resources created (references existing policies)
+
+### Example 11: Mixed Cache Policy Types
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: prod
+  DeployEnvironment: PROD
+  S3OriginDomainName: myorg-webapp-prod-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontStaticCachePolicy: CachingOptimized
+  CloudFrontApiCachePolicy: CustomArn
+  CloudFrontApiCustomCachePolicyArn: arn:aws:cloudfront::123456789012:cache-policy/my-api-policy
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result:
+- Static content at `app.example.com` using AWS managed CachingOptimized policy
+- API at `app.example.com/api` using existing custom cache policy from ARN
+- Only one custom cache policy resource created (for static origin)
+
+### Example 12: Environment-Based Cache Policy Override
+
+```yaml
+Parameters:
+  Prefix: myorg
+  ProjectId: webapp
+  StageId: test
+  DeployEnvironment: TEST
+  S3OriginDomainName: myorg-webapp-test-static.s3.us-east-1.amazonaws.com
+  ApiGatewayId: abc123xyz
+  DomainForCloudFront: example.com
+  CustomSubdomainCloudFront: app
+  PathApi: api
+  AcmCertificateArnForCloudFront: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+  CloudFrontStaticCachePolicy: CachingOptimized
+  CloudFrontApiCachePolicy: CustomDefault
+  HeadersToForwardToApi: Authorization,Content-Type
+```
+
+Result:
+- Static content at `app-test.example.com` using CachingDisabled (overridden from CachingOptimized)
+- API at `app-test.example.com/api` using CachingDisabled (overridden from CustomDefault)
+- No custom cache policy resources created (TEST environment uses managed CachingDisabled)
+- Ensures fresh content during testing regardless of parameter settings
 
 ## Troubleshooting
 
@@ -678,6 +1090,23 @@ Check that the S3 bucket policy grants access to the CloudFront Origin Access Co
 ### Stage Name Appended Unexpectedly
 
 Non-production stages (StageId != "prod") automatically append the stage ID to subdomain names. This is by design to prevent conflicts between environments.
+
+### Cache Policy Issues
+
+**Custom ARN Not Found:**
+- Verify the cache policy ARN exists in your AWS account
+- Ensure the ARN format is correct: `arn:aws:cloudfront::123456789012:cache-policy/policy-id`
+- Check that you have permissions to reference the cache policy
+
+**Unexpected Caching Behavior in DEV/TEST:**
+- DEV and TEST environments automatically use CachingDisabled regardless of parameter settings
+- This is by design to ensure fresh content during development and testing
+- To test specific cache policies, deploy to a PROD environment
+
+**Custom Cache Policy Not Created:**
+- Custom cache policies are only created when `CloudFrontStaticCachePolicy` or `CloudFrontApiCachePolicy` is set to `CustomDefault`
+- Custom cache policies are not created in DEV/TEST environments (CachingDisabled is used instead)
+- Verify the `DeployEnvironment` parameter is set to `PROD` if you expect custom policies to be created
 
 ## Related Templates
 

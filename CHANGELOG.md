@@ -7,11 +7,14 @@ Released versions are available from the public S3 bucket `63klabs`
 ## v0.0.29 - unreleased
 
 ### Added
-- **CloudFront Logging Support** [Spec: 0-0-29-network-cloudfront-logging](../.kiro/specs/0-0-29-network-cloudfront-logging/)
-  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.14 - Added optional CloudFront logging with S3LogBucketName parameter
-  - Steering Document: template-parameter-standards.md - Standardized parameter naming and definitions across templates
 - **Comprehensive Documentation**: Full documentation of the repository structure, templates, and contribution guidelines
+- **Template Standards**: template-standard.md - Standardized template structure,naming conventions, and best practices
 - **AI Steering Documents**: Initial AI steering documents to guide the development and maintenance of AI-related components
+
+### Changed
+- **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.14** - Added optional CloudFront logging with S3LogBucketName parameter [Spec: 0-0-29-network-cloudfront-logging](../.kiro/specs/0-0-29-network-cloudfront-logging/)
+- **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.15** - Added StaticOriginPath and ApiOriginPath parameters for customizable CloudFront origin paths [Spec: 0-0-29-network-add-origin-path-to-static-and-api](../.kiro/specs/0-0-29-network-add-origin-path-to-static-and-api/)
+- **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.16** - Added support for AWS managed cache policies with environment-based overrides [Spec: 0-0-29-network-add-managed-cache-policies](../.kiro/specs/0-0-29-network-add-managed-cache-policies/)
 
 ## v0.0.28 - 2026-01-08
 

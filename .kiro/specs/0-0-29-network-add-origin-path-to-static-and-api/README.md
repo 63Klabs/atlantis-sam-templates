@@ -1,42 +1,72 @@
-# Initial Spec Prompt
+# Spec: Add Origin Path Parameters to CloudFront Network Template
 
-Add Origin Path Parameters to Static and Api
+## Overview
 
-Two parameters should be added
-- StaticOriginPath
-- ApiOriginPath
+This spec adds two new optional parameters (`StaticOriginPath` and `ApiOriginPath`) to the CloudFront network template (`template-network-route53-cloudfront-s3-apigw.yml`), allowing users to customize the origin paths used by CloudFront when fetching content from S3 and API Gateway origins.
 
-The parameters should default to empty string
+## Feature Name
 
-If the parameters are provided they should be used instead
-of the hardcoded values in the template.
+`0-0-29-network-add-origin-path-to-static-and-api`
 
-The parameters should receive a proper description, validation, and constraint description.
+## Status
 
-The parameters must start with a `/`
-The parmeters must not end with a `/`
-However, a single `/` is valid
+**Planning Complete** - Ready for implementation
 
-Example valid values: `/foo`, `/foo/bar`, `/foo-bar/baz_qux`
+## Documents
 
-Example invalid values: `foo`, `foo/bar`, `/foo/`
+- [Requirements](./requirements.md) - User stories and acceptance criteria
+- [Design](./design.md) - Technical design and correctness properties
+- [Tasks](./tasks.md) - Implementation task list
 
-Placeholders such as {StageId} cannot be used. This should be explicily listed in the parameters description since they are allowed in other situations. Since this template is not variable a specific path can be entered.
+## Key Changes
 
-The description should state that if left blank, the default value of xxxx will be used. (List the default in the proper description keeping the {StageId} and {ProjectId} placeholders)
+### New Parameters
 
-If empty the default values should be used.
-Conditionals should be implemented to use the parameters instead of defaults
-Special care should be taken with how CloudFront uses the origin path for root.
-We need to include a `/` in the template parameter so we can use conditionals.
-However, when CloudFront uses the origin path for root it needs to be blank. A special condition needs to be implemented for this.
+1. **StaticOriginPath** - Customizes the origin path for S3 static content
+   - Default: Empty string (uses `/${StageId}/public`)
+   - Accepts: `/` (root), or custom paths like `/static`, `/v1/content`
 
-Static current and should be default if StaticOriginPath is empty:
-```yaml
-OriginPath: !Sub "/${StageId}/public"
-```
+2. **ApiOriginPath** - Customizes the origin path for API Gateway
+   - Default: Empty string (uses `/${ProjectId}-${StageId}`)
+   - Accepts: `/` (root), or custom paths like `/api`, `/v2/services`
 
-Api current and should be default if ApiOriginPath is empty:
-```yaml
-OriginPath: !Sub "/${ProjectId}-${StageId}"
-```
+### Behavior
+
+- **Empty (default):** Uses current hardcoded paths with variable substitution
+- **Single `/`:** Uses empty string for CloudFront (root path, no prefix)
+- **Custom path:** Uses the provided path as-is (e.g., `/custom/path`)
+
+### Validation
+
+- Paths must start with `/` if not empty
+- Paths must not end with `/` unless exactly `/`
+- Placeholder syntax like `{StageId}` or `${StageId}` is rejected
+
+## Backward Compatibility
+
+Fully backward compatible. When both parameters are left at their default empty values, the template behaves identically to the previous version.
+
+## Template Version
+
+- **Current:** v0.0.14
+- **After Implementation:** v0.0.15 (PATCH increment - non-breaking change)
+
+## Testing Strategy
+
+- **Unit Tests:** Verify parameter structure, edge cases, and validation
+- **Property-Based Tests:** Verify universal properties across 100+ iterations per test
+- **6 Correctness Properties:** Cover default behavior, custom paths, validation, and backward compatibility
+
+## Implementation Notes
+
+- Follows template-parameter-standards.md for parameter definitions
+- Follows template-version-control.md for version management
+- Follows documentation-end-user-cfn-templates.md for documentation updates
+- Follows changelog.md for CHANGELOG updates
+
+## Next Steps
+
+To begin implementation:
+1. Open `tasks.md`
+2. Click "Start task" next to task 1 to begin with version increment
+3. Follow the task list sequentially through implementation, testing, and documentation
