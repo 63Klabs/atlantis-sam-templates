@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
-## v0.0.29 - unreleased
+## v0.0.30 - unreleased
+
+- TODO
+
+## v0.0.29 - 2026-02-18
 
 ### Added
 - **Comprehensive Documentation**: Full documentation of the repository structure, templates, and contribution guidelines
