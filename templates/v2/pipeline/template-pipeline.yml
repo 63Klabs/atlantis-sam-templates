@@ -762,11 +762,9 @@ Resources:
           # However, Since API Gateway is common, it is included as well
           - Sid: "ReadStackDetailsAfterDeployment"
             Action:
-            - cloudformation:DescribeStacks
-            - cloudformation:DescribeStackResources
-            - cloudformation:GetTemplate
-            - cloudformation:GetTemplateSummary
-            - cloudformation:ListStackResources
+            - cloudformation:Describe*
+            - cloudformation:Get*
+            - cloudformation:List*
             Effect: Allow
             Resource: 
             - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*"
