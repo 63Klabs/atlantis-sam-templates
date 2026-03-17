@@ -1,8 +1,9 @@
 # Ignore the git and zip files we use
 .*
 *.zip
-cfn-lint-env
-venv
+.venv/
+cfn-lint-env/
+venv/
 
 # Ignore program and OS files
 .vscode

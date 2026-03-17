@@ -1,3 +1,8 @@
+---
+inclusion: fileMatch
+fileMatchPattern: '**/{template,cfn}*.{yml,yaml}'
+---
+
 # CloudFormation Template Parameter Standards
 
 ## Overview

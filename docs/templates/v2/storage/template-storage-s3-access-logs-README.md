@@ -2,16 +2,19 @@
 
 S3 for storing s3 log files - Deployed using SAM
 
-**Version:** v0.0.1/2025-05-10  
+**Version:** v0.0.2/2026-03-17  
 **Template:** [templates/v2/storage/template-storage-s3-access-logs.yml](../../../../templates/v2/storage/template-storage-s3-access-logs.yml)
 
 ## Overview
 
 This template creates an S3 bucket specifically designed for storing S3 access logs from other buckets. The bucket is configured with encryption, lifecycle policies for automatic log deletion, and appropriate bucket policies to allow S3 log delivery service access.
 
+Optionally, the bucket can be configured to support CloudFront standard (legacy) logging by enabling ACL-based write access, setting `ObjectOwnership: BucketOwnerPreferred`, and adding a bucket policy statement for the CloudFront log delivery service (`delivery.logs.amazonaws.com`).
+
 ### Use Cases
 
 - Centralized logging bucket for S3 access logs across multiple buckets
+- Destination bucket for CloudFront standard (legacy) logging when `AllowLegacyCloudFrontLogs` is enabled
 - Compliance and audit trail for S3 bucket access
 - Security monitoring and analysis of S3 access patterns
 - Automatic log retention management with configurable expiration
@@ -20,14 +23,16 @@ This template creates an S3 bucket specifically designed for storing S3 access l
 
 - CloudFormation Service Role with appropriate permissions
 - Understanding of S3 server access logging requirements
+- For CloudFront legacy logging: understanding of ACL-based log delivery requirements
 
 ### Important Notes
 
 - The bucket is retained on stack deletion to preserve log history
 - Logs are automatically deleted after the specified retention period
 - The bucket policy allows S3 logging service to write logs
-- All public access is blocked for security
+- All public access is blocked by default for security
 - Versioning is suspended to reduce storage costs for logs
+- When `AllowLegacyCloudFrontLogs` is enabled, `BlockPublicAcls` is set to `false` and `ObjectOwnership` is set to `BucketOwnerPreferred` to allow CloudFront ACL-based log delivery
 
 ## Parameters
 
@@ -44,6 +49,12 @@ Parameters that define the naming convention for all resources created by this t
 Configuration for log retention and management.
 
 - [LogExpirationInDays](#logexpirationindays)
+
+### CloudFront Legacy Logging
+
+Optional support for CloudFront standard (legacy) logging.
+
+- [AllowLegacyCloudFrontLogs](#allowlegacycloudfrontinlogs)
 
 ---
 
@@ -98,6 +109,34 @@ The number of days to keep logs in the logging bucket. Default is 90 days.
 
 **Cost Consideration:** Longer retention periods increase storage costs. Set based on your compliance and audit requirements.
 
+#### AllowLegacyCloudFrontLogs
+
+Set to `true` to enable legacy CloudFront standard logging support. When enabled, `BlockPublicAcls` is set to `false`, `ObjectOwnership` is set to `BucketOwnerPreferred`, and a bucket policy statement is added for the CloudFront log delivery service (`delivery.logs.amazonaws.com`). Default is `false` to maintain the current secure configuration.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | false |
+| Allowed Values | `true`, `false` |
+
+> **Important:** Enabling this parameter relaxes `BlockPublicAcls` to allow ACL grants required by CloudFront standard logging. Only enable this if you need CloudFront legacy logging support. When set to `false` (the default), the bucket retains its fully locked-down public access configuration.
+
+## Conditions
+
+### UseS3BucketNameOrgPrefix
+
+Evaluates to `true` when `S3BucketNameOrgPrefix` is not empty. Controls whether the bucket name uses the organization prefix format or the default region/account format.
+
+### EnableLegacyCloudFrontLogs
+
+Evaluates to `true` when `AllowLegacyCloudFrontLogs` equals `"true"`. Controls the following conditional behaviors:
+
+- `BlockPublicAcls` is set to `false` (instead of `true`)
+- `OwnershipControls` with `ObjectOwnership: BucketOwnerPreferred` is added to the bucket
+- A bucket policy statement allowing `delivery.logs.amazonaws.com` to perform `s3:PutObject` is added
+
+When the condition is `false`, none of these changes are applied and the bucket behaves identically to the pre-v0.0.2 configuration.
+
 ## Resources
 
 - [Bucket](#bucket) - AWS::S3::Bucket
@@ -113,12 +152,13 @@ Creates an S3 bucket for storing access logs with encryption, lifecycle policies
 - Bucket name: `{Prefix}-{ProjectId}-{Region}-{AccountId}` or `{OrgPrefix}-{Prefix}-{ProjectId}-{Region}-{AccountId}`
 - Versioning: Suspended (reduces costs for log storage)
 - Encryption: AES256 with bucket key enabled
-- Public access: Completely blocked
+- Public access: Completely blocked by default; `BlockPublicAcls` conditionally set to `false` when `EnableLegacyCloudFrontLogs` is true
 - Lifecycle rule: Automatically deletes logs after specified days
 - Deletion policy: Retain (preserves logs even if stack is deleted)
 - Update replace policy: Retain (prevents accidental deletion during updates)
+- OwnershipControls: Conditionally set to `BucketOwnerPreferred` when `EnableLegacyCloudFrontLogs` is true (absent otherwise)
 
-**Security Note:** All public access is blocked. Only the S3 logging service can write to this bucket.
+**Security Note:** All public access is blocked by default. `BlockPublicPolicy`, `IgnorePublicAcls`, and `RestrictPublicBuckets` remain `true` regardless of the `AllowLegacyCloudFrontLogs` setting. Only `BlockPublicAcls` is conditionally relaxed.
 
 **Cost Consideration:** Bucket key encryption reduces encryption costs. Lifecycle policy automatically deletes old logs to minimize storage costs.
 
@@ -130,12 +170,13 @@ Type: AWS::S3::BucketPolicy
 
 Defines access policies for the logging bucket, allowing S3 log delivery service to write logs while enforcing secure transport.
 
-**Key Properties:**
-- Denies all non-HTTPS access
-- Allows S3 logging service to write logs (PutObject)
-- Restricts log delivery to the same AWS account
+**Policy Statements:**
 
-**Security Note:** The policy enforces HTTPS-only access and restricts log delivery to the account that owns the bucket, preventing unauthorized log injection.
+- **DenyNonSecureTransportAccess** - Denies all non-HTTPS access to the bucket
+- **AllowS3LogDelivery** - Allows the S3 logging service (`logging.s3.amazonaws.com`) to write logs, restricted to the same AWS account
+- **AllowCloudFrontLogDelivery** (Conditional: `EnableLegacyCloudFrontLogs`) - Allows the CloudFront log delivery service (`delivery.logs.amazonaws.com`) to perform `s3:PutObject` with the condition that `s3:x-amz-acl` equals `bucket-owner-full-control`. This statement is only present when `AllowLegacyCloudFrontLogs` is `true`.
+
+**Security Note:** The policy enforces HTTPS-only access and restricts log delivery to the account that owns the bucket, preventing unauthorized log injection. The CloudFront log delivery statement is only added when explicitly opted in.
 
 ## Outputs
 
@@ -170,7 +211,7 @@ Parameters:
   LogExpirationInDays: 90
 ```
 
-Result: Creates a logging bucket that retains logs for 90 days.
+Result: Creates a logging bucket that retains logs for 90 days. CloudFront legacy logging is disabled (default).
 
 ### Example 2: Short-Term Logging
 
@@ -194,6 +235,18 @@ Parameters:
 ```
 
 Result: Creates a logging bucket with 1-year retention for compliance purposes.
+
+### Example 4: CloudFront Legacy Logging Enabled
+
+```yaml
+Parameters:
+  Prefix: prod
+  ProjectId: cf-logs
+  LogExpirationInDays: 90
+  AllowLegacyCloudFrontLogs: "true"
+```
+
+Result: Creates a logging bucket configured for both S3 access logs and CloudFront standard (legacy) logging. `BlockPublicAcls` is set to `false`, `ObjectOwnership` is `BucketOwnerPreferred`, and the CloudFront log delivery policy statement is added.
 
 ## Troubleshooting
 
@@ -223,6 +276,13 @@ Result: Creates a logging bucket with 1-year retention for compliance purposes.
 - Verify the source bucket is in the same AWS account
 - Check that you have permissions to configure logging on the source bucket
 
+### CloudFront Logging Fails with ACL Error
+
+- Verify `AllowLegacyCloudFrontLogs` is set to `true`
+- Confirm the stack has been updated after changing the parameter
+- Check that the CloudFront distribution is configured to use this bucket as the logging destination
+- Note that CloudFront standard logging requires ACL-based access; this is different from CloudFront real-time logging
+
 ## Related Templates
 
 This template is designed to work with:
@@ -239,3 +299,4 @@ This template is designed to work with:
 - [S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html)
 - [S3 Lifecycle Configuration](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html)
 - [S3 Bucket Policies](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-policies.html)
+- [CloudFront Standard Logging](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/AccessLogs.html)

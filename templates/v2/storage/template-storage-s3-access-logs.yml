@@ -5,7 +5,7 @@ Description: "S3 for storing s3 log files - Deployed using SAM"
 # Atlantis for AWS SAM Deployments
 # Storage Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.1/2025-05-10
+# Version: v0.0.2/2026-03-17
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -38,6 +38,11 @@ Metadata:
           default: "Log Settings"
         Parameters:
           - LogExpirationInDays
+      -
+        Label:
+          default: "CloudFront Legacy Logging"
+        Parameters:
+          - AllowLegacyCloudFrontLogs
 
 # =============================================================================
 # PARAMETERS
@@ -85,6 +90,17 @@ Parameters:
     MaxValue: 365
     ConstraintDescription: "Must be between 1 and 365 days."
 
+  # ---------------------------------------------------------------------------
+  # CloudFront Legacy Logging
+
+  AllowLegacyCloudFrontLogs:
+    Type: String
+    Description: "Set to 'true' to enable legacy CloudFront standard logging support. When enabled, BlockPublicAcls is set to false, ObjectOwnership is set to BucketOwnerPreferred, and a bucket policy statement is added for the CloudFront log delivery service (delivery.logs.amazonaws.com). Default is 'false' to maintain the current secure configuration."
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -93,6 +109,7 @@ Parameters:
 
 Conditions:
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
+  EnableLegacyCloudFrontLogs: !Equals [!Ref AllowLegacyCloudFrontLogs, "true"]
 
 # =============================================================================
 # RESOURCES
@@ -122,7 +139,7 @@ Resources:
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
+        BlockPublicAcls: !If [EnableLegacyCloudFrontLogs, false, true]
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
@@ -131,6 +148,11 @@ Resources:
           - Id: DeleteOldLogs
             Status: Enabled
             ExpirationInDays: !Ref LogExpirationInDays
+      OwnershipControls: !If
+        - EnableLegacyCloudFrontLogs
+        - Rules:
+            - ObjectOwnership: BucketOwnerPreferred
+        - !Ref "AWS::NoValue"
 
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -159,6 +181,18 @@ Resources:
             Condition:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
+          - !If
+            - EnableLegacyCloudFrontLogs
+            - Sid: "AllowCloudFrontLogDelivery"
+              Effect: Allow
+              Principal:
+                Service: delivery.logs.amazonaws.com
+              Action: "s3:PutObject"
+              Resource: !Sub "${Bucket.Arn}/*"
+              Condition:
+                StringEquals:
+                  "s3:x-amz-acl": "bucket-owner-full-control"
+            - !Ref "AWS::NoValue"
 
 
 # =============================================================================
