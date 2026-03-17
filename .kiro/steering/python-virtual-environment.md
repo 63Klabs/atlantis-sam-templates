@@ -1,5 +1,6 @@
 ---
 inclusion: auto
+description: Rules for using the Python virtual environment (.venv) in this repository
 ---
 
 # Python Virtual Environment
