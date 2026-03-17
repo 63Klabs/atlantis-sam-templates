@@ -1993,3 +1993,500 @@ class TestCachePolicyEnvironmentOverride:
                                                 assert find_in_map_list[1] == 'CachingDisabled', \
                                                     "Cache behavior paths should use CachingDisabled in non-PROD"
                                         break
+
+
+# =============================================================================
+# CloudFront Function Associations Tests
+# Spec: cloudfront-function-associations
+# =============================================================================
+
+# All 8 CloudFront Function parameters
+STATIC_FUNCTION_PARAMS = [
+    'CloudFrontStaticFunctionViewerRequest',
+    'CloudFrontStaticFunctionViewerResponse',
+    'CloudFrontStaticFunctionOriginRequest',
+    'CloudFrontStaticFunctionOriginResponse',
+]
+
+API_FUNCTION_PARAMS = [
+    'CloudFrontApiFunctionViewerRequest',
+    'CloudFrontApiFunctionViewerResponse',
+    'CloudFrontApiFunctionOriginRequest',
+    'CloudFrontApiFunctionOriginResponse',
+]
+
+ALL_FUNCTION_PARAMS = STATIC_FUNCTION_PARAMS + API_FUNCTION_PARAMS
+
+STATIC_CONDITIONS = [
+    'HasStaticFunctionViewerRequest',
+    'HasStaticFunctionViewerResponse',
+    'HasStaticFunctionOriginRequest',
+    'HasStaticFunctionOriginResponse',
+]
+
+API_CONDITIONS = [
+    'HasApiFunctionViewerRequest',
+    'HasApiFunctionViewerResponse',
+    'HasApiFunctionOriginRequest',
+    'HasApiFunctionOriginResponse',
+]
+
+ALL_CONDITIONS = STATIC_CONDITIONS + API_CONDITIONS
+
+# Mapping from condition to its parameter
+CONDITION_TO_PARAM = dict(zip(ALL_CONDITIONS, ALL_FUNCTION_PARAMS))
+
+# Event types in order
+EVENT_TYPES = ['viewer-request', 'viewer-response', 'origin-request', 'origin-response']
+
+EXPECTED_ARN_PATTERN = "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+
+
+class TestCloudFrontFunctionParameters:
+    """Tests for CloudFront Function ARN parameter definitions.
+    Requirements: 1.1-1.7, 2.1-2.7"""
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_exists(self, network_template, param_name):
+        params = network_template.get('Parameters', {})
+        assert param_name in params, f"Parameter {param_name} should exist"
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_type_is_string(self, network_template, param_name):
+        param = network_template['Parameters'][param_name]
+        assert param['Type'] == 'String'
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_default_is_empty_string(self, network_template, param_name):
+        param = network_template['Parameters'][param_name]
+        assert param['Default'] == '', f"{param_name} default should be empty string"
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_allowed_pattern(self, network_template, param_name):
+        param = network_template['Parameters'][param_name]
+        assert param['AllowedPattern'] == EXPECTED_ARN_PATTERN
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_constraint_description(self, network_template, param_name):
+        param = network_template['Parameters'][param_name]
+        assert 'ConstraintDescription' in param
+        assert len(param['ConstraintDescription']) > 0
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_parameter_description_exists(self, network_template, param_name):
+        param = network_template['Parameters'][param_name]
+        assert 'Description' in param
+        assert len(param['Description']) > 0
+
+    def test_arn_regex_accepts_valid_arns(self, network_template):
+        """Test ARN regex with concrete valid examples."""
+        pattern = network_template['Parameters']['CloudFrontStaticFunctionViewerRequest']['AllowedPattern']
+        valid_arns = [
+            '',  # empty string is valid
+            'arn:aws:cloudfront::123456789012:function/my-function',
+            'arn:aws:cloudfront::000000000000:function/a',
+            'arn:aws:cloudfront::999999999999:function/My_Function-123',
+            'arn:aws:cloudfront::123456789012:function/' + 'a' * 64,
+        ]
+        result = validate_regex_pattern(pattern, valid_arns)
+        for arn in valid_arns:
+            assert result['matches'][arn] is True, f"Valid ARN should match: {arn!r}"
+
+    def test_arn_regex_rejects_invalid_arns(self, network_template):
+        """Test ARN regex with concrete invalid examples."""
+        pattern = network_template['Parameters']['CloudFrontStaticFunctionViewerRequest']['AllowedPattern']
+        invalid_arns = [
+            'not-an-arn',
+            'arn:aws:cloudfront::12345:function/my-func',  # account too short
+            'arn:aws:cloudfront::1234567890123:function/my-func',  # account too long
+            'arn:aws:cloudfront::123456789012:function/',  # no function name
+            'arn:aws:cloudfront::123456789012:function/' + 'a' * 65,  # name too long
+            'arn:aws:lambda::123456789012:function/my-func',  # wrong service
+            'arn:aws:cloudfront::123456789012:distribution/my-func',  # wrong resource type
+            'arn:aws:cloudfront::123456789012:function/my func',  # space in name
+        ]
+        result = validate_regex_pattern(pattern, invalid_arns)
+        for arn in invalid_arns:
+            assert result['matches'][arn] is False, f"Invalid ARN should not match: {arn!r}"
+
+    @pytest.mark.parametrize("param_name", STATIC_FUNCTION_PARAMS)
+    def test_static_param_description_mentions_static(self, network_template, param_name):
+        desc = network_template['Parameters'][param_name]['Description']
+        assert 'static' in desc.lower()
+
+    @pytest.mark.parametrize("param_name", API_FUNCTION_PARAMS)
+    def test_api_param_description_mentions_api(self, network_template, param_name):
+        desc = network_template['Parameters'][param_name]['Description']
+        assert 'api' in desc.lower()
+
+
+class TestCloudFrontFunctionMetadataGroups:
+    """Tests for CloudFront Function parameter metadata groups.
+    Requirements: 3.1-3.6"""
+
+    def _get_parameter_groups(self, template):
+        metadata = template.get('Metadata', {})
+        interface = metadata.get('AWS::CloudFormation::Interface', {})
+        return interface.get('ParameterGroups', [])
+
+    def _find_group_by_label(self, groups, label):
+        for group in groups:
+            if group.get('Label', {}).get('default') == label:
+                return group
+        return None
+
+    def test_static_function_group_exists(self, network_template):
+        groups = self._get_parameter_groups(network_template)
+        group = self._find_group_by_label(groups, 'Static CloudFront Function Associations')
+        assert group is not None, "Static CloudFront Function Associations group should exist"
+
+    def test_api_function_group_exists(self, network_template):
+        groups = self._get_parameter_groups(network_template)
+        group = self._find_group_by_label(groups, 'API CloudFront Function Associations')
+        assert group is not None, "API CloudFront Function Associations group should exist"
+
+    def test_static_group_has_correct_parameters(self, network_template):
+        groups = self._get_parameter_groups(network_template)
+        group = self._find_group_by_label(groups, 'Static CloudFront Function Associations')
+        assert group['Parameters'] == STATIC_FUNCTION_PARAMS
+
+    def test_api_group_has_correct_parameters(self, network_template):
+        groups = self._get_parameter_groups(network_template)
+        group = self._find_group_by_label(groups, 'API CloudFront Function Associations')
+        assert group['Parameters'] == API_FUNCTION_PARAMS
+
+    def test_static_group_after_cache_policies(self, network_template):
+        """Static group should appear after Cache Policies group."""
+        groups = self._get_parameter_groups(network_template)
+        labels = [g.get('Label', {}).get('default') for g in groups]
+        cache_idx = labels.index('Cache Policies')
+        static_idx = labels.index('Static CloudFront Function Associations')
+        assert static_idx == cache_idx + 1, \
+            "Static CloudFront Function Associations should be immediately after Cache Policies"
+
+    def test_api_group_after_static_group(self, network_template):
+        """API group should appear after Static group."""
+        groups = self._get_parameter_groups(network_template)
+        labels = [g.get('Label', {}).get('default') for g in groups]
+        static_idx = labels.index('Static CloudFront Function Associations')
+        api_idx = labels.index('API CloudFront Function Associations')
+        assert api_idx == static_idx + 1, \
+            "API CloudFront Function Associations should be immediately after Static"
+
+
+class TestCloudFrontFunctionConditions:
+    """Tests for CloudFront Function Has* conditions.
+    Requirements: 4.1, 4.2"""
+
+    @pytest.mark.parametrize("condition_name", ALL_CONDITIONS)
+    def test_condition_exists(self, network_template, condition_name):
+        conditions = network_template.get('Conditions', {})
+        assert condition_name in conditions, f"Condition {condition_name} should exist"
+
+    @pytest.mark.parametrize("condition_name", ALL_CONDITIONS)
+    def test_condition_uses_not_equals_empty_pattern(self, network_template, condition_name):
+        """Each condition should use !Not [!Equals [!Ref <param>, '']] pattern."""
+        condition = network_template['Conditions'][condition_name]
+        param_name = CONDITION_TO_PARAM[condition_name]
+
+        # Structure: {'!Not': [{'!Equals': [{'!Ref': param}, '']}]}
+        not_key = '!Not' if '!Not' in condition else 'Fn::Not'
+        assert not_key in condition, f"{condition_name} should use !Not"
+
+        not_list = condition[not_key]
+        assert isinstance(not_list, list) and len(not_list) == 1
+
+        equals_item = not_list[0]
+        equals_key = '!Equals' if '!Equals' in equals_item else 'Fn::Equals'
+        assert equals_key in equals_item, f"{condition_name} should use !Equals inside !Not"
+
+        equals_list = equals_item[equals_key]
+        assert len(equals_list) == 2
+
+        # First element should be !Ref to the parameter
+        ref_item = equals_list[0]
+        ref_key = '!Ref' if '!Ref' in ref_item else 'Ref'
+        assert ref_item[ref_key] == param_name, \
+            f"{condition_name} should reference {param_name}"
+
+        # Second element should be empty string
+        assert equals_list[1] == '', \
+            f"{condition_name} should compare against empty string"
+
+
+def _get_default_cache_behavior(template):
+    """Helper to extract DefaultCacheBehavior from the distribution."""
+    resources = template.get('Resources', {})
+    distribution = resources.get('CloudFrontDistribution', {})
+    dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+    return dist_config.get('DefaultCacheBehavior', {})
+
+
+def _extract_function_associations_from_if_branch(branch):
+    """Extract function association items from a branch of an !If.
+    Each item is an !If with [condition, {EventType, FunctionARN}, AWS::NoValue]."""
+    items = []
+    for item in branch:
+        if isinstance(item, dict):
+            if_key = '!If' if '!If' in item else 'Fn::If'
+            if if_key in item:
+                if_list = item[if_key]
+                condition = if_list[0]
+                assoc = if_list[1] if len(if_list) > 1 else None
+                event_type = assoc.get('EventType') if isinstance(assoc, dict) else None
+                func_arn = assoc.get('FunctionARN', {}) if isinstance(assoc, dict) else {}
+                ref_key = '!Ref' if '!Ref' in func_arn else 'Ref'
+                param_ref = func_arn.get(ref_key) if isinstance(func_arn, dict) else None
+                items.append({
+                    'condition': condition,
+                    'event_type': event_type,
+                    'param_ref': param_ref,
+                })
+    return items
+
+
+class TestDefaultCacheBehaviorFunctionAssociations:
+    """Tests for DefaultCacheBehavior FunctionAssociations.
+    Requirements: 5.1, 5.2, 5.3, 7.1, 7.2, 7.3, 9.2, 9.4"""
+
+    def test_function_associations_property_exists(self, network_template):
+        dcb = _get_default_cache_behavior(network_template)
+        assert 'FunctionAssociations' in dcb, \
+            "DefaultCacheBehavior should have FunctionAssociations"
+
+    def test_top_level_if_static_origin_is_root(self, network_template):
+        """FunctionAssociations should branch on StaticOriginIsRoot."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        assert if_key in fa, "FunctionAssociations should use !If"
+        assert fa[if_key][0] == 'StaticOriginIsRoot', \
+            "Top-level condition should be StaticOriginIsRoot"
+
+    def test_static_branch_has_4_items(self, network_template):
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        static_branch = fa[if_key][1]  # true branch = static
+        assert isinstance(static_branch, list)
+        assert len(static_branch) == 4, "Static branch should have 4 function association items"
+
+    def test_api_branch_has_4_items(self, network_template):
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        api_branch = fa[if_key][2]  # false branch = API
+        assert isinstance(api_branch, list)
+        assert len(api_branch) == 4, "API branch should have 4 function association items"
+
+    def test_static_branch_event_types(self, network_template):
+        """Static branch should have all 4 event types in order."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        static_branch = fa[if_key][1]
+        items = _extract_function_associations_from_if_branch(static_branch)
+        actual_event_types = [i['event_type'] for i in items]
+        assert actual_event_types == EVENT_TYPES
+
+    def test_api_branch_event_types(self, network_template):
+        """API branch should have all 4 event types in order."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        api_branch = fa[if_key][2]
+        items = _extract_function_associations_from_if_branch(api_branch)
+        actual_event_types = [i['event_type'] for i in items]
+        assert actual_event_types == EVENT_TYPES
+
+    def test_static_branch_references_static_params(self, network_template):
+        """Static branch should reference static function parameters."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        static_branch = fa[if_key][1]
+        items = _extract_function_associations_from_if_branch(static_branch)
+        param_refs = [i['param_ref'] for i in items]
+        assert param_refs == STATIC_FUNCTION_PARAMS
+
+    def test_api_branch_references_api_params(self, network_template):
+        """API branch should reference API function parameters."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        api_branch = fa[if_key][2]
+        items = _extract_function_associations_from_if_branch(api_branch)
+        param_refs = [i['param_ref'] for i in items]
+        assert param_refs == API_FUNCTION_PARAMS
+
+    def test_static_branch_uses_static_conditions(self, network_template):
+        """Static branch items should use static Has* conditions."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        static_branch = fa[if_key][1]
+        items = _extract_function_associations_from_if_branch(static_branch)
+        conditions = [i['condition'] for i in items]
+        assert conditions == STATIC_CONDITIONS
+
+    def test_api_branch_uses_api_conditions(self, network_template):
+        """API branch items should use API Has* conditions."""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        api_branch = fa[if_key][2]
+        items = _extract_function_associations_from_if_branch(api_branch)
+        conditions = [i['condition'] for i in items]
+        assert conditions == API_CONDITIONS
+
+    def test_no_api_refs_in_static_branch(self, network_template):
+        """Isolation: static branch should not reference API params. Req 9.4"""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        static_branch = fa[if_key][1]
+        items = _extract_function_associations_from_if_branch(static_branch)
+        for item in items:
+            assert item['param_ref'] not in API_FUNCTION_PARAMS, \
+                f"Static branch should not reference API param {item['param_ref']}"
+
+    def test_no_static_refs_in_api_branch(self, network_template):
+        """Isolation: API branch should not reference static params. Req 9.2"""
+        dcb = _get_default_cache_behavior(network_template)
+        fa = dcb['FunctionAssociations']
+        if_key = '!If' if '!If' in fa else 'Fn::If'
+        api_branch = fa[if_key][2]
+        items = _extract_function_associations_from_if_branch(api_branch)
+        for item in items:
+            assert item['param_ref'] not in STATIC_FUNCTION_PARAMS, \
+                f"API branch should not reference static param {item['param_ref']}"
+
+
+def _get_cache_behaviors(template):
+    """Helper to extract CacheBehaviors list from the distribution."""
+    resources = template.get('Resources', {})
+    distribution = resources.get('CloudFrontDistribution', {})
+    dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
+    return dist_config.get('CacheBehaviors', [])
+
+
+def _find_path_behavior(cache_behaviors, condition_name):
+    """Find a path-based cache behavior by its top-level !If condition name.
+    Returns the behavior definition dict (the true branch of the !If)."""
+    for behavior in cache_behaviors:
+        if isinstance(behavior, dict):
+            if_key = '!If' if '!If' in behavior else 'Fn::If'
+            if if_key in behavior:
+                if_list = behavior[if_key]
+                if if_list[0] == condition_name:
+                    return if_list[1]
+    return None
+
+
+class TestPathBasedCacheBehaviorFunctionAssociations:
+    """Tests for path-based cache behavior FunctionAssociations.
+    Requirements: 6.1-6.3, 8.1-8.3, 9.1, 9.3"""
+
+    def test_static_path_behavior_has_function_associations(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        assert static_behavior is not None, "Static path behavior should exist"
+        assert 'FunctionAssociations' in static_behavior, \
+            "Static path behavior should have FunctionAssociations"
+
+    def test_api_path_behavior_has_function_associations(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        assert api_behavior is not None, "API path behavior should exist"
+        assert 'FunctionAssociations' in api_behavior, \
+            "API path behavior should have FunctionAssociations"
+
+    def test_static_path_has_4_items(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        fa = static_behavior['FunctionAssociations']
+        assert isinstance(fa, list) and len(fa) == 4
+
+    def test_api_path_has_4_items(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        fa = api_behavior['FunctionAssociations']
+        assert isinstance(fa, list) and len(fa) == 4
+
+    def test_static_path_event_types(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
+        actual = [i['event_type'] for i in items]
+        assert actual == EVENT_TYPES
+
+    def test_api_path_event_types(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
+        actual = [i['event_type'] for i in items]
+        assert actual == EVENT_TYPES
+
+    def test_static_path_references_static_params(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
+        param_refs = [i['param_ref'] for i in items]
+        assert param_refs == STATIC_FUNCTION_PARAMS
+
+    def test_api_path_references_api_params(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
+        param_refs = [i['param_ref'] for i in items]
+        assert param_refs == API_FUNCTION_PARAMS
+
+    def test_static_path_uses_static_conditions(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
+        conditions = [i['condition'] for i in items]
+        assert conditions == STATIC_CONDITIONS
+
+    def test_api_path_uses_api_conditions(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
+        conditions = [i['condition'] for i in items]
+        assert conditions == API_CONDITIONS
+
+    def test_no_api_refs_in_static_path(self, network_template):
+        """Isolation: static path should not reference API params. Req 9.1"""
+        behaviors = _get_cache_behaviors(network_template)
+        static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
+        items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
+        for item in items:
+            assert item['param_ref'] not in API_FUNCTION_PARAMS
+
+    def test_no_static_refs_in_api_path(self, network_template):
+        """Isolation: API path should not reference static params. Req 9.3"""
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
+        for item in items:
+            assert item['param_ref'] not in STATIC_FUNCTION_PARAMS
+
+
+class TestCloudFrontFunctionBackwardCompatibility:
+    """Tests for backward compatibility.
+    Requirements: 10.1, 10.2, 10.3, 11.1"""
+
+    def test_template_version_remains_v0_0_16(self, network_template):
+        """Template version should remain v0.0.16 (PATCH=0, development mode). Req 11.1"""
+        # Read the raw file to check the version comment
+        template_path = Path(__file__).parent.parent / "templates" / "v2" / "network" / "template-network-route53-cloudfront-s3-apigw.yml"
+        content = template_path.read_text()
+        assert '# Version: v0.0.16/' in content, \
+            "Template version should remain v0.0.16"
+
+    @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
+    def test_all_params_default_to_empty_string(self, network_template, param_name):
+        """Property 1: All function parameters default to empty string. Req 10.1"""
+        param = network_template['Parameters'][param_name]
+        assert param['Default'] == '', \
+            f"{param_name} must default to empty string for backward compatibility"

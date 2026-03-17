@@ -69,6 +69,24 @@ Configure cache policies for CloudFront distribution origins. Choose between AWS
 - [CloudFrontApiCachePolicy](#cloudfrontapicachepolicy)
 - [CloudFrontApiCustomCachePolicyArn](#cloudfrontapicustomcachepolicyarn)
 
+### Static CloudFront Function Associations
+
+Associate existing CloudFront Functions with static content cache behaviors. CloudFront Functions are lightweight JavaScript functions that run at edge locations for request/response manipulation. The functions must be created separately; these parameters associate them with the static content behaviors.
+
+- [CloudFrontStaticFunctionViewerRequest](#cloudfrontstaticfunctionviewerrequest)
+- [CloudFrontStaticFunctionViewerResponse](#cloudfrontstaticfunctionviewerresponse)
+- [CloudFrontStaticFunctionOriginRequest](#cloudfrontstaticfunctionoriginrequest)
+- [CloudFrontStaticFunctionOriginResponse](#cloudfrontstaticfunctionoriginresponse)
+
+### API CloudFront Function Associations
+
+Associate existing CloudFront Functions with API origin cache behaviors. CloudFront Functions are lightweight JavaScript functions that run at edge locations for request/response manipulation. The functions must be created separately; these parameters associate them with the API origin behaviors.
+
+- [CloudFrontApiFunctionViewerRequest](#cloudfrontapifunctionviewerrequest)
+- [CloudFrontApiFunctionViewerResponse](#cloudfrontapifunctionviewerresponse)
+- [CloudFrontApiFunctionOriginRequest](#cloudfrontapifunctionoriginrequest)
+- [CloudFrontApiFunctionOriginResponse](#cloudfrontapifunctionoriginresponse)
+
 ### Supporting Resources
 
 Optional references to external resources that support the infrastructure.
@@ -301,6 +319,100 @@ Custom cache policy ARN for API origin. Only used when CloudFrontApiCachePolicy 
 | Constraint Description | Must be a valid CloudFront cache policy ARN or empty. |
 
 **Example ARN:** `arn:aws:cloudfront::123456789012:cache-policy/xyz789-abc123-456`
+
+#### CloudFrontStaticFunctionViewerRequest
+
+CloudFront Function ARN for viewer-request event on static behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+**Example ARN:** `arn:aws:cloudfront::123456789012:function/my-viewer-request-function`
+
+#### CloudFrontStaticFunctionViewerResponse
+
+CloudFront Function ARN for viewer-response event on static behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+#### CloudFrontStaticFunctionOriginRequest
+
+CloudFront Function ARN for origin-request event on static behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+#### CloudFrontStaticFunctionOriginResponse
+
+CloudFront Function ARN for origin-response event on static behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+#### CloudFrontApiFunctionViewerRequest
+
+CloudFront Function ARN for viewer-request event on API behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+**Example ARN:** `arn:aws:cloudfront::123456789012:function/my-api-auth-function`
+
+#### CloudFrontApiFunctionViewerResponse
+
+CloudFront Function ARN for viewer-response event on API behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+#### CloudFrontApiFunctionOriginRequest
+
+CloudFront Function ARN for origin-request event on API behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+#### CloudFrontApiFunctionOriginResponse
+
+CloudFront Function ARN for origin-response event on API behaviors. Leave empty to not associate a function.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$\|^$` |
+| Constraint Description | Must be a valid CloudFront Function ARN (arn:aws:cloudfront::\<account-id\>:function/\<function-name\>) or empty. |
+
+> **Note:** CloudFront Functions are lightweight JavaScript functions that run at CloudFront edge locations. They are created as separate resources outside this template. Use these parameters to associate existing functions with cache behaviors for tasks such as URL rewriting, header manipulation, and request/response transformations. This does not cover Lambda@Edge associations.
 
 #### S3LogBucketName
 
@@ -701,6 +813,14 @@ The template uses several conditions to control resource creation:
 - **HasLogBucket**: True when S3LogBucketName is provided (non-empty)
 - **CreateCustomStaticCachePolicy**: True when static origin exists, environment is PROD, and CloudFrontStaticCachePolicy is CustomDefault
 - **CreateCustomApiCachePolicy**: True when environment is PROD and CloudFrontApiCachePolicy is CustomDefault
+- **HasStaticFunctionViewerRequest**: True when CloudFrontStaticFunctionViewerRequest is provided (non-empty)
+- **HasStaticFunctionViewerResponse**: True when CloudFrontStaticFunctionViewerResponse is provided (non-empty)
+- **HasStaticFunctionOriginRequest**: True when CloudFrontStaticFunctionOriginRequest is provided (non-empty)
+- **HasStaticFunctionOriginResponse**: True when CloudFrontStaticFunctionOriginResponse is provided (non-empty)
+- **HasApiFunctionViewerRequest**: True when CloudFrontApiFunctionViewerRequest is provided (non-empty)
+- **HasApiFunctionViewerResponse**: True when CloudFrontApiFunctionViewerResponse is provided (non-empty)
+- **HasApiFunctionOriginRequest**: True when CloudFrontApiFunctionOriginRequest is provided (non-empty)
+- **HasApiFunctionOriginResponse**: True when CloudFrontApiFunctionOriginResponse is provided (non-empty)
 
 ## AWS Managed Cache Policies
 

@@ -1573,3 +1573,159 @@ class TestCachePolicyResolutionProperty:
             "CreateCustomStaticCachePolicy condition should exist"
         assert 'CreateCustomApiCachePolicy' in conditions, \
             "CreateCustomApiCachePolicy condition should exist"
+
+
+# =============================================================================
+# Feature: cloudfront-function-associations
+# Property 2: ARN validation regex accepts valid CloudFront Function ARNs
+#             and rejects invalid strings
+# =============================================================================
+
+# All 8 CloudFront Function parameters share the same AllowedPattern
+CLOUDFRONT_FUNCTION_PARAMS = [
+    'CloudFrontStaticFunctionViewerRequest',
+    'CloudFrontStaticFunctionViewerResponse',
+    'CloudFrontStaticFunctionOriginRequest',
+    'CloudFrontStaticFunctionOriginResponse',
+    'CloudFrontApiFunctionViewerRequest',
+    'CloudFrontApiFunctionViewerResponse',
+    'CloudFrontApiFunctionOriginRequest',
+    'CloudFrontApiFunctionOriginResponse',
+]
+
+
+def valid_cloudfront_function_arn_strategy():
+    """Generate valid CloudFront Function ARNs.
+    Format: arn:aws:cloudfront::<12-digit-account>:function/<name>
+    Name: 1-64 chars, alphanumeric, hyphens, underscores.
+    """
+    account_id = st.text(alphabet='0123456789', min_size=12, max_size=12)
+    function_name = st.text(
+        alphabet='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
+        min_size=1,
+        max_size=64
+    )
+    return st.builds(
+        lambda acc, name: f"arn:aws:cloudfront::{acc}:function/{name}",
+        account_id, function_name
+    )
+
+
+def invalid_cloudfront_function_arn_strategy():
+    """Generate invalid CloudFront Function ARNs."""
+    return st.one_of(
+        # Wrong service
+        st.builds(
+            lambda acc, name: f"arn:aws:lambda::{acc}:function/{name}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_', min_size=1, max_size=20)
+        ),
+        # Wrong resource type
+        st.builds(
+            lambda acc, name: f"arn:aws:cloudfront::{acc}:distribution/{name}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_', min_size=1, max_size=20)
+        ),
+        # Account ID too short
+        st.builds(
+            lambda acc, name: f"arn:aws:cloudfront::{acc}:function/{name}",
+            st.text(alphabet='0123456789', min_size=1, max_size=11),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_', min_size=1, max_size=20)
+        ),
+        # Account ID too long
+        st.builds(
+            lambda acc, name: f"arn:aws:cloudfront::{acc}:function/{name}",
+            st.text(alphabet='0123456789', min_size=13, max_size=20),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz0123456789-_', min_size=1, max_size=20)
+        ),
+        # Function name with invalid characters
+        st.builds(
+            lambda acc, name: f"arn:aws:cloudfront::{acc}:function/{name}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='!@#$%^&*()+= ', min_size=1, max_size=10)
+        ),
+        # Function name too long (>64 chars)
+        st.builds(
+            lambda acc, name: f"arn:aws:cloudfront::{acc}:function/{name}",
+            st.text(alphabet='0123456789', min_size=12, max_size=12),
+            st.text(alphabet='abcdefghijklmnopqrstuvwxyz', min_size=65, max_size=80)
+        ),
+    )
+
+
+class TestCloudFrontFunctionARNValidationProperty:
+    """
+    Feature: cloudfront-function-associations
+    Property 2: ARN validation regex accepts valid CloudFront Function ARNs
+                and rejects invalid strings
+
+    For any string, the AllowedPattern regex on each of the 8 CloudFront Function
+    parameters must accept the string if and only if it is either empty or matches
+    the CloudFront Function ARN format arn:aws:cloudfront::<12-digit-account>:function/<valid-name>.
+
+    Validates: Requirements 1.6, 2.6
+    """
+
+    @given(valid_arn=valid_cloudfront_function_arn_strategy())
+    @settings(max_examples=20)
+    def test_valid_cloudfront_function_arns_accepted(self, valid_arn):
+        """
+        Property 2: Valid CloudFront Function ARNs match the AllowedPattern.
+        Tag: Feature: cloudfront-function-associations, Property 2
+        **Validates: Requirements 1.6, 2.6**
+        """
+        import re
+
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+
+        for param_name in CLOUDFRONT_FUNCTION_PARAMS:
+            param = parameters.get(param_name)
+            assert param is not None, f"{param_name} parameter should exist"
+
+            pattern = param.get('AllowedPattern')
+            assert pattern is not None, f"{param_name} should have AllowedPattern"
+
+            match = re.match(pattern, valid_arn)
+            assert match is not None, \
+                f"Valid ARN '{valid_arn}' should be accepted by {param_name} AllowedPattern '{pattern}'"
+
+    @given(invalid_arn=invalid_cloudfront_function_arn_strategy())
+    @settings(max_examples=20)
+    def test_invalid_cloudfront_function_arns_rejected(self, invalid_arn):
+        """
+        Property 2: Invalid strings do NOT match the AllowedPattern.
+        Tag: Feature: cloudfront-function-associations, Property 2
+        **Validates: Requirements 1.6, 2.6**
+        """
+        import re
+
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+
+        for param_name in CLOUDFRONT_FUNCTION_PARAMS:
+            param = parameters.get(param_name)
+            pattern = param.get('AllowedPattern')
+
+            match = re.match(pattern, invalid_arn)
+            assert match is None, \
+                f"Invalid ARN '{invalid_arn}' should be rejected by {param_name} AllowedPattern '{pattern}'"
+
+    def test_empty_string_accepted_by_all_function_params(self):
+        """
+        Property 2: Empty string is accepted by all CloudFront Function AllowedPatterns.
+        Tag: Feature: cloudfront-function-associations, Property 2
+        **Validates: Requirements 1.6, 2.6**
+        """
+        import re
+
+        network_template = load_network_template()
+        parameters = network_template.get('Parameters', {})
+
+        for param_name in CLOUDFRONT_FUNCTION_PARAMS:
+            param = parameters.get(param_name)
+            pattern = param.get('AllowedPattern')
+
+            match = re.match(pattern, "")
+            assert match is not None, \
+                f"Empty string should be accepted by {param_name} AllowedPattern '{pattern}'"

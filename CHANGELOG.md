@@ -6,8 +6,11 @@ Released versions are available from the public S3 bucket `63klabs`
 
 ## v0.0.30 - unreleased
 
-## Added
-- **Pipeline: template-pipeline.yml v2.0.18** - Added additional permissions to Post Deployment CodeBuild project so that it can read back the stack resources. This does not grant any access to the resources created. For that you will need to supply your own managed policy via `PostDeploySvcRoleIncludeManagedPolicyArns`. However, since accessing API Gateway is common post-deployment, read permissions have been included.
+### Changed
+- **Network: template-network-route53-cloudfront-s3-apigw.yml (v0.0.17)** [Spec: cloudfront-function-associations](../.kiro/specs/0-0-30-cloudfront-function-associations/)
+  - CloudFront Function Associations: Added 8 optional parameters to associate existing CloudFront Functions with static and API cache behaviors for viewer-request, viewer-response, origin-request, and origin-response event types
+- **Pipeline: template-pipeline.yml v2.0.18**
+  - Added additional permissions to Post Deployment CodeBuild project so that it can read back the stack resources. This does not grant any access to the resources created. For that you will need to supply your own managed policy via `PostDeploySvcRoleIncludeManagedPolicyArns`. However, since accessing API Gateway is common post-deployment, read permissions have been included.
 
 ## v0.0.29 - 2026-02-18
 

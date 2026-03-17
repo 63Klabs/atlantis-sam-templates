@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.16/2026-02-02
+# Version: v0.0.17/2026-03-17
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -52,6 +52,22 @@ Metadata:
           - CloudFrontStaticCustomCachePolicyArn
           - CloudFrontApiCachePolicy
           - CloudFrontApiCustomCachePolicyArn
+
+      - Label:
+          default: Static CloudFront Function Associations
+        Parameters:
+          - CloudFrontStaticFunctionViewerRequest
+          - CloudFrontStaticFunctionViewerResponse
+          - CloudFrontStaticFunctionOriginRequest
+          - CloudFrontStaticFunctionOriginResponse
+
+      - Label:
+          default: API CloudFront Function Associations
+        Parameters:
+          - CloudFrontApiFunctionViewerRequest
+          - CloudFrontApiFunctionViewerResponse
+          - CloudFrontApiFunctionOriginRequest
+          - CloudFrontApiFunctionOriginResponse
 
       - Label:
           default: Supporting Resources
@@ -215,6 +231,68 @@ Parameters:
     Default: ""
     AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:cache-policy/[a-zA-Z0-9-]+$|^$"
     ConstraintDescription: "Must be a valid CloudFront cache policy ARN or empty."
+
+  # ---------------------------------------------------------------------------
+  # Static CloudFront Function Associations
+
+  CloudFrontStaticFunctionViewerRequest:
+    Type: String
+    Description: "CloudFront Function ARN for viewer-request event on static behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontStaticFunctionViewerResponse:
+    Type: String
+    Description: "CloudFront Function ARN for viewer-response event on static behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontStaticFunctionOriginRequest:
+    Type: String
+    Description: "CloudFront Function ARN for origin-request event on static behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontStaticFunctionOriginResponse:
+    Type: String
+    Description: "CloudFront Function ARN for origin-response event on static behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  # ---------------------------------------------------------------------------
+  # API CloudFront Function Associations
+
+  CloudFrontApiFunctionViewerRequest:
+    Type: String
+    Description: "CloudFront Function ARN for viewer-request event on API behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontApiFunctionViewerResponse:
+    Type: String
+    Description: "CloudFront Function ARN for viewer-response event on API behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontApiFunctionOriginRequest:
+    Type: String
+    Description: "CloudFront Function ARN for origin-request event on API behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
+
+  CloudFrontApiFunctionOriginResponse:
+    Type: String
+    Description: "CloudFront Function ARN for origin-response event on API behaviors. Leave empty to not associate a function."
+    Default: ""
+    AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
+    ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
 
   # ---------------------------------------------------------------------------
   # Origins
@@ -507,6 +585,18 @@ Conditions:
     - !Condition IsProduction
     - !Condition ApiCachePolicyIsCustomDefault
 
+  # Static CloudFront Function Conditions
+  HasStaticFunctionViewerRequest: !Not [!Equals [!Ref CloudFrontStaticFunctionViewerRequest, '']]
+  HasStaticFunctionViewerResponse: !Not [!Equals [!Ref CloudFrontStaticFunctionViewerResponse, '']]
+  HasStaticFunctionOriginRequest: !Not [!Equals [!Ref CloudFrontStaticFunctionOriginRequest, '']]
+  HasStaticFunctionOriginResponse: !Not [!Equals [!Ref CloudFrontStaticFunctionOriginResponse, '']]
+
+  # API CloudFront Function Conditions
+  HasApiFunctionViewerRequest: !Not [!Equals [!Ref CloudFrontApiFunctionViewerRequest, '']]
+  HasApiFunctionViewerResponse: !Not [!Equals [!Ref CloudFrontApiFunctionViewerResponse, '']]
+  HasApiFunctionOriginRequest: !Not [!Equals [!Ref CloudFrontApiFunctionOriginRequest, '']]
+  HasApiFunctionOriginResponse: !Not [!Equals [!Ref CloudFrontApiFunctionOriginResponse, '']]
+
 # =============================================================================
 # RESOURCES
 # -----------------------------------------------------------------------------
@@ -610,6 +700,51 @@ Resources:
           - [HEAD, GET, OPTIONS]
           - [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
           CachedMethods: [HEAD, GET, OPTIONS]
+          FunctionAssociations:
+            !If
+              - StaticOriginIsRoot
+              # Static function associations
+              - - !If
+                  - HasStaticFunctionViewerRequest
+                  - EventType: viewer-request
+                    FunctionARN: !Ref CloudFrontStaticFunctionViewerRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionViewerResponse
+                  - EventType: viewer-response
+                    FunctionARN: !Ref CloudFrontStaticFunctionViewerResponse
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionOriginRequest
+                  - EventType: origin-request
+                    FunctionARN: !Ref CloudFrontStaticFunctionOriginRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionOriginResponse
+                  - EventType: origin-response
+                    FunctionARN: !Ref CloudFrontStaticFunctionOriginResponse
+                  - !Ref AWS::NoValue
+              # API function associations
+              - - !If
+                  - HasApiFunctionViewerRequest
+                  - EventType: viewer-request
+                    FunctionARN: !Ref CloudFrontApiFunctionViewerRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionViewerResponse
+                  - EventType: viewer-response
+                    FunctionARN: !Ref CloudFrontApiFunctionViewerResponse
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionOriginRequest
+                  - EventType: origin-request
+                    FunctionARN: !Ref CloudFrontApiFunctionOriginRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionOriginResponse
+                  - EventType: origin-response
+                    FunctionARN: !Ref CloudFrontApiFunctionOriginResponse
+                  - !Ref AWS::NoValue
 
         CacheBehaviors:
           - !If 
@@ -632,6 +767,27 @@ Resources:
               TargetOriginId: StaticS3Origin
               ViewerProtocolPolicy: redirect-to-https
               Compress: true
+              FunctionAssociations:
+                - !If
+                  - HasStaticFunctionViewerRequest
+                  - EventType: viewer-request
+                    FunctionARN: !Ref CloudFrontStaticFunctionViewerRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionViewerResponse
+                  - EventType: viewer-response
+                    FunctionARN: !Ref CloudFrontStaticFunctionViewerResponse
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionOriginRequest
+                  - EventType: origin-request
+                    FunctionARN: !Ref CloudFrontStaticFunctionOriginRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasStaticFunctionOriginResponse
+                  - EventType: origin-response
+                    FunctionARN: !Ref CloudFrontStaticFunctionOriginResponse
+                  - !Ref AWS::NoValue
             - Ref: AWS::NoValue
           - !If 
             - HasRouteForApiInCloudFront
@@ -650,6 +806,27 @@ Resources:
               TargetOriginId: ApiGatewayOrigin
               ViewerProtocolPolicy: redirect-to-https
               Compress: true
+              FunctionAssociations:
+                - !If
+                  - HasApiFunctionViewerRequest
+                  - EventType: viewer-request
+                    FunctionARN: !Ref CloudFrontApiFunctionViewerRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionViewerResponse
+                  - EventType: viewer-response
+                    FunctionARN: !Ref CloudFrontApiFunctionViewerResponse
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionOriginRequest
+                  - EventType: origin-request
+                    FunctionARN: !Ref CloudFrontApiFunctionOriginRequest
+                  - !Ref AWS::NoValue
+                - !If
+                  - HasApiFunctionOriginResponse
+                  - EventType: origin-response
+                    FunctionARN: !Ref CloudFrontApiFunctionOriginResponse
+                  - !Ref AWS::NoValue
             - Ref: AWS::NoValue
 
         CustomErrorResponses: 
