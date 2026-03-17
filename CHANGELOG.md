@@ -6,7 +6,8 @@ Released versions are available from the public S3 bucket `63klabs`
 
 ## v0.0.30 - unreleased
 
-- TODO
+## Added
+- **Pipeline: template-pipeline.yml v2.0.18** - Added additional permissions to Post Deployment CodeBuild project so that it can read back the stack resources. This does not grant any access to the resources created. For that you will need to supply your own managed policy via `PostDeploySvcRoleIncludeManagedPolicyArns`. However, since accessing API Gateway is common post-deployment, read permissions have been included.
 
 ## v0.0.29 - 2026-02-18
 

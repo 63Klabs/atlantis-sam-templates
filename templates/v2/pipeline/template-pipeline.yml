@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from repository - Deployed 
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.17/2025-12-16
+# Version: v2.0.18/2026-03-17
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -754,8 +754,36 @@ Resources:
                   - ""
                   - - "arn:aws:s3:::"
                     - !Select [1, !Split ["s3://", !Ref PostDeployBuildSpec]]
-
             - !Ref 'AWS::NoValue'
+
+          # Read stack information - common after deployment to get resource identifiers and outputs
+          # This does not grant any access to the resources created.
+          # For that you will need to supply your own managed policy via PostDeploySvcRoleIncludeManagedPolicyArns
+          # However, Since API Gateway is common, it is included as well
+          - Sid: "ReadStackDetailsAfterDeployment"
+            Action:
+            - cloudformation:DescribeStacks
+            - cloudformation:DescribeStackResources
+            - cloudformation:GetTemplate
+            - cloudformation:GetTemplateSummary
+            - cloudformation:ListStackResources
+            Effect: Allow
+            Resource: 
+            - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*"
+
+          # Read Access to API Gateway to export API specs
+          - Sid: "ReadApiGatewayInfoForExport"
+            Action:
+            - apigateway:Get*
+            - apigateway:List*
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*"
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*/stages/*"
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*/deployments/*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId": !Sub "${Prefix}-${ProjectId}-${StageId}"
 
   # -- CodeDeploy Service Role --
 
