@@ -1,12 +1,12 @@
 # Atlantis CloudFormation Template Repository for Serverless Deployments using AWS SAM and CloudFormation
 
-> This repository contains a collection of AWS CloudFormation templates designed for serverless deployments using AWS SAM (Simple Application Model). It is based on the Atlantis Template and Scripts Platform for managing Serverless Deployments using AWS SAM and CloudFormation. Templates in this repository are used by the Atlantis SAM Configuration scripts.
+This repository contains a collection of AWS CloudFormation templates designed for serverless deployments using AWS SAM (Simple Application Model). It is based on the Atlantis Template and Scripts Platform for managing Serverless Deployments using AWS SAM and CloudFormation. Templates in this repository are used by the Atlantis SAM Configuration scripts.
 
-> By default, the SAM Configuration repository `config.py` script will list available templates from a public S3 bucket maintained by 63Klabs.
+> This repository is meant to be maintained by Platform Engineers and consumed by the scripts in the Atlantis SAM Configuration repository. The Atlantis SAM Config `config.py` script will list available templates from a public S3 bucket maintained by 63Klabs.
 
-Feel free to browse the documentation and templates in this repository to understand how they are used. They are available for use in the Atlantis SAM Configuration scripts through the public `S3://63klabs` bucket.
+Feel free to browse the documentation and templates in this repository to understand how they are used. 
 
-> Utilize the default 63klabs bucket as a template source FOR BEGINNING, EXPERIMENTAL, EDUCATIONAL, and TRAINING PURPOSES. It will get you started quicker and does not require advanced knowledge of everything covered in the deployment documentation. Just go build!
+> You do not need to deploy this repository to your own organization. By default, the `s3://63klabs` bucket is public and available as a template source FOR BEGINNING, EXPERIMENTAL, EDUCATIONAL, and TRAINING PURPOSES. It will get you started quicker and does not require advanced knowledge of everything covered in the deployment documentation. Just go build!
 
 If you are an organization looking to use these templates in production, please consider deploying your own copy to your own S3 bucket for security and control. See [Technical Documentation](./docs/technical/README.md).
 
