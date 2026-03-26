@@ -2,8 +2,8 @@
 
 Full-featured AWS CodePipeline for automated SAM deployments from AWS CodeCommit with optional PostDeploy stage.
 
-**Version:** v2.0.17  
-**Last Updated:** 2025-12-16  
+**Version:** v2.0.20  
+**Last Updated:** 2026-03-26  
 **Template:** [templates/v2/pipeline/template-pipeline.yml](../../../../templates/v2/pipeline/template-pipeline.yml)
 
 ## Overview
@@ -493,11 +493,16 @@ Service role for CloudFormation to create and manage application infrastructure 
 - **Lambda**: Full CRUD for functions, layers, and event source mappings
 - **DynamoDB**: Full CRUD for tables
 - **CloudWatch**: Limited CRUD for dashboards, alarms, and log groups
-- **SSM**: Read-only access to Parameter Store
+- **SSM**: Read-only access to Parameter Store (application-specific and public AWS parameters)
 - **Lambda Layers**: Access to AWS-provided Lambda Insights and Parameters/Secrets extensions
 
+**SSM Parameter Access:**
+The role includes two separate SSM policy statements:
+- `SSMParameterStoreReadThisDeploymentOnly`: Read access to application-specific parameters under the `ParameterStoreHierarchy` path (includes `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath`, `ssm:ListTagsForResource`)
+- `SSMPublicParameterReadOnly`: Read-only access to AWS-published public SSM parameters under `/aws/service/*` (includes `ssm:GetParameter` and `ssm:GetParameters` only). This enables the use of `{{resolve:ssm:/aws/service/...}}` dynamic references in application CloudFormation templates to resolve AWS-managed values such as Lambda layer ARNs, AMI IDs, and extension versions at deploy time.
+
 **Resource Scoping:**
-All permissions are scoped to resources tagged or named with `${Prefix}-${ProjectId}-${StageId}` pattern, following least-privilege principles.
+All permissions are scoped to resources tagged or named with `${Prefix}-${ProjectId}-${StageId}` pattern, following least-privilege principles. The public SSM parameter access is scoped to `arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*`.
 
 ### SourceEvent
 
@@ -635,7 +640,11 @@ EventBridge rule that sends notification when pipeline execution starts.
 - Monitors CodePipeline Pipeline Execution State Change events
 - Filters for STARTED state
 - Scoped to specific pipeline
-- Sends formatted message to PipelineNotificationTopic
+- Sends human-readable formatted message to PipelineNotificationTopic
+
+**Notification Format:**
+- Subject: `Pipeline <pipeline-name> Started`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
 
 ### PipelineSucceededRule
 
@@ -647,7 +656,11 @@ EventBridge rule that sends notification when pipeline execution succeeds.
 - Monitors CodePipeline Pipeline Execution State Change events
 - Filters for SUCCEEDED state
 - Scoped to specific pipeline
-- Sends formatted message to PipelineNotificationTopic
+- Sends human-readable formatted message to PipelineNotificationTopic
+
+**Notification Format:**
+- Subject: `Pipeline <pipeline-name> Succeeded`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
 
 ### PipelineFailedRule
 
@@ -660,6 +673,11 @@ EventBridge rule that sends notification when pipeline execution fails.
 - Filters for FAILED state
 - Scoped to specific pipeline
 - Sends ALERT message to PipelineNotificationTopic
+
+**Notification Format:**
+- Subject: `ALERT: Pipeline <pipeline-name> Failed`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
+- Includes call-to-action: "Please check the pipeline for errors."
 
 ### PipelineNotificationTopicPolicy
 

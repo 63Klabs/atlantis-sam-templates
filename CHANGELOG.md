@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
+## v0.0.31 - unreleased
+
+### Added
+- **Pipeline: template-pipeline*.yml** - Added `SSMPublicParameterReadOnly` IAM policy statement to CloudFormationSvcRole, CodeBuildSvcRole, and PostDeploySvcRole on all 3 existing pipeline templates granting `ssm:GetParameter` and `ssm:GetParameters` on `/aws/service/*` public AWS SSM parameters, enabling `{{resolve:ssm:/aws/service/...}}` dynamic references in application templates [Spec: pipeline-ssm-parameter-access](../.kiro/specs/0-0-31-pipeline-ssm-parameter-access/)
+
+### Changed
+- **Pipeline Notification Formatting** [Spec: pipeline-notification-formatting](../.kiro/specs/0-0-31-pipeline-notification-formatting/)
+  - Pipeline: template-pipeline.yml v2.0.20 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
+  - Pipeline: template-pipeline-github.yml v2.0.3 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
+  - Pipeline: template-pipeline-build-only.yml v2.0.5 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
+
 ## v0.0.30 - 2026-03-17
 
 ### Changed

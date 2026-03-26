@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from GitHub repository - De
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.1/2025-05-16
+# Version: v2.0.3/2026-03-26
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -44,14 +44,21 @@ Metadata:
           - S3ArtifactsBucket
           - S3StaticHostBucket
           - BuildSpec
+      - 
+        Label:
+          default: "Post Deploy Environment Information"
+        Parameters:
+          - PostDeployStageEnabled
+          - PostDeployS3StaticHostBucket
+          - PostDeployBuildSpec
       -
         Label:
           default: "External Resources"
         Parameters:
           - ParameterStoreHierarchy
           - AlarmNotificationEmail
-          - CloudFormationSvcRoleIncludeManagedPolicyArns
           - CodeBuildSvcRoleIncludeManagedPolicyArns
+          - CloudFormationSvcRoleIncludeManagedPolicyArns
       -
         Label:
           default: "Code Repository"
@@ -157,6 +164,30 @@ Parameters:
     ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec.yml'. For example, 'buildspec.yml', 'application-infrastructure/buildspec.yml' or 's3://mybucket/buildspec.yml'. May not be empty."
 
   # ---------------------------------------------------------------------------
+  # Post Deployment Environment
+
+  PostDeployStageEnabled:
+    Type: String
+    Description: "Controls whether the PostDeploy stage is created and included in the pipeline. When enabled, creates a final stage to run integration tests, configuration checks, or export configurations (such as export OpenAPI specifications from API Gateway to an external bucket for static documentation generation). This should only be used for tasks that require a deployment first. Pre-deploy tasks should be done in the Build stage. Setting to 'true' creates PostDeployServiceRole, PostDeployProject, PostDeployLogGroup, and adds the PostDeploy stage to the pipeline."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  PostDeployS3StaticHostBucket:
+    Type: String
+    Description: "An already existing S3 bucket name the PostDeploy stage will copy files to. Passed as POST_DEPLOY_S3_STATIC_HOST_BUCKET environment variable to the PostDeploy CodeBuild project. Can be left blank if CodeBuild will programmatically construct the bucket name, or doesn't need this environment variable. Used primarily to store artifacts that will be picked up by another process such as static API specification documentation or exported configuration files."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^$"
+    ConstraintDescription: "May only contain alphanumeric characters, dashes, and must begin and end with a letter or number."
+
+  PostDeployBuildSpec:
+    Type: String
+    Description: "The local or S3 URI of the buildspec file for the PostDeploy stage. For example, 'application-infrastructure/buildspec-postdeploy.yml', 'buildspec-postdeploy.yml' or 's3://mybucket/buildspec-postdeploy.yml'. Best practice is to have a single file for all instances of an application. This option exists if you cannot store your buildspec-postdeploy file with your source code OR wish to use a central buildspec-postdeploy for a group of deployments. Default is 'application-infrastructure/buildspec-postdeploy.yml', and leaving blank will use the SAM default buildspec-postdeploy.yml in the root of the repository. For S3 use an S3 URL (S3://) rather than an ARN."
+    Default: "application-infrastructure/buildspec-postdeploy.yml"
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec-postdeploy\\.yml)$|^$"
+    ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec-postdeploy.yml'. For example, 'buildspec-postdeploy.yml', 'application-infrastructure/buildspec-postdeploy.yml' or 's3://mybucket/buildspec-postdeploy.yml'. May not be empty."
+
+  # ---------------------------------------------------------------------------
   # External Resources and Alarm Notifications
 
   ParameterStoreHierarchy:
@@ -255,13 +286,29 @@ Conditions:
   # IsDevelopment: !Equals [!Ref DeployEnvironment, "DEV"] # currently unused - uncomment if you have a use for it
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
+  
   HasS3StaticHostBucket: !Not [!Equals [!Ref S3StaticHostBucket, ""]]
   HasS3BuildSpecLocation: !And 
     - !Not [!Equals [!Ref BuildSpec, ""]]
     - !Equals [!Select [0, !Split [":", !Ref BuildSpec]], "s3"]
   UseDefaultBuildSpecLocation: !Equals [!Ref BuildSpec, ""]
-  HasManagedPoliciesForCloudFormationSvcRole: !Not [!Equals [!Join [",", !Ref CloudFormationSvcRoleIncludeManagedPolicyArns], ""]]
   HasManagedPoliciesForCodeBuildSvcRole: !Not [!Equals [!Join [",", !Ref CodeBuildSvcRoleIncludeManagedPolicyArns], ""]]
+
+  # PostDeploy Conditional Logic
+  # These conditions control when PostDeploy resources are created and the stage is included in the pipeline
+  IsPostDeployEnabled: !Equals [!Ref PostDeployStageEnabled, "true"]
+  HasPostDeployS3StaticHostBucket: !Not [!Equals [!Ref PostDeployS3StaticHostBucket, ""]]
+  HasPostDeployBuildSpecS3Location: !And 
+    - !Condition IsPostDeployEnabled
+    - !Not [!Equals [!Ref PostDeployBuildSpec, ""]]
+    - !Equals [!Select [0, !Split [":", !Ref PostDeployBuildSpec]], "s3"]
+  UseDefaultPostDeployBuildSpecLocation: !Equals [!Ref PostDeployBuildSpec, ""]
+  HasManagedPoliciesForPostDeploySvcRole: !Not [!Equals [!Join [",", !Ref PostDeploySvcRoleIncludeManagedPolicyArns], ""]]
+
+  HasManagedPoliciesForCloudFormationSvcRole: !Not [!Equals [!Join [",", !Ref CloudFormationSvcRoleIncludeManagedPolicyArns], ""]]
+
+  # Combined conditions for resource creation
+  IsPostDeployEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPostDeployEnabled]
 
 # =============================================================================
 # RESOURCES
@@ -340,6 +387,7 @@ Resources:
             Effect: Allow
             Resource: 
             - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-Build"
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-PostDeploy"
 
           - Sid: CodeBuildReportGroup
             Action:
@@ -435,6 +483,15 @@ Resources:
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
           - Sid: "AllowListBuckets"
@@ -465,11 +522,9 @@ Resources:
             - s3:List*
             - s3:DeleteObject
             Effect: Allow
-            Resource: !Join
-            - ""
-            - - "arn:aws:s3:::"
-              - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", "" ]
-              - !Sub "${Prefix}-${ProjectId}-*/${StageId}/*"
+            Resource: !Sub 
+              - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-*/${StageId}/*"
+              - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
 
           # A bucket devoted to the specific application deployment
           - Sid: CopyAssetsToS3DuringBuildByBucketApplicationDeploymentTag
@@ -479,11 +534,9 @@ Resources:
             - s3:List*
             - s3:DeleteObject
             Effect: Allow
-            Resource: !Join
-            - ""
-            - - "arn:aws:s3:::"
-              - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", "" ]
-              - !Sub "${Prefix}-${ProjectId}-${StageId}-*/*"
+            Resource: !Sub 
+              - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*"
+              - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
 
           # A S3StaticHostBucket if HasS3StaticHostBucket condition is met
           # create a policy statement if HasS3StaticHostBucket condition is met
@@ -521,7 +574,188 @@ Resources:
                     - !Select [1, !Split ["s3://", !Ref BuildSpec]]
 
             - !Ref 'AWS::NoValue'
-            
+
+  # -- PostDeploy Service Role --
+  # 
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true"
+  # This IAM role provides the PostDeploy CodeBuild project with permissions to:
+  # - Manage its CloudWatch logs
+  # - Access S3 artifacts bucket for input/output artifacts
+  # - Access SSM Parameter Store for application configuration
+  # - Copy assets to various S3 buckets (similar to Build stage permissions)
+  # - Access S3 buildspec file when using remote buildspec location
+  #
+  # The permissions mirror the CodeBuildServiceRole to ensure consistent capabilities
+  # between Build and PostDeploy stages.
+
+  PostDeployServiceRole:
+    Type: AWS::IAM::Role
+    Condition: IsPostDeployEnabledAndNotDev
+    Properties:
+      Path: !Ref RolePath
+      RoleName: !Sub "${Prefix}-Worker-${ProjectId}-${StageId}-PostDeployServiceRole"
+      Description: "Service Role to access resources during the application infrastructure PostDeploy phase of AWS CodePipeline. Only created when PostDeployStageEnabled is true. Provides similar permissions to CodeBuildServiceRole for consistent execution environment."
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue' ]
+      ManagedPolicyArns: !If [HasManagedPoliciesForPostDeploySvcRole, !Ref PostDeploySvcRoleIncludeManagedPolicyArns, !Ref 'AWS::NoValue' ]
+      AssumeRolePolicyDocument:
+        Statement:
+        - Sid: "PostDeployTrustPolicy"
+          Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: codebuild.amazonaws.com
+      Policies:
+      - PolicyName: !Sub "${Prefix}-Worker-${ProjectId}-${StageId}-PostDeployServicePolicy"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+
+          - Sid: "AllowPostDeployToManageItsLogs"
+            Effect: Allow
+            Action:
+            - logs:*
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-PostDeploy:*"
+
+          - Sid: "AllowPostDeployToManageItsArtifacts"
+            Effect: Allow
+            Action:
+            - s3:Get*
+            - s3:List*
+            - s3:PutObject
+            Resource:
+            - !Sub "arn:aws:s3:::${S3ArtifactsBucket}"
+            - !Sub "arn:aws:s3:::${S3ArtifactsBucket}/*"
+
+          - Sid: "SsmAccessDuringPostDeploy"
+            Action:
+            - ssm:PutParameter # for generating tokens and keys
+            - ssm:AddTagsToResource
+            - ssm:GetParameters
+            - ssm:GetParameter
+            - ssm:GetParametersByPath
+            - ssm:ListTagsForResource
+            Effect: Allow
+            Resource: 
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+
+          # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
+
+          - Sid: "AllowListBuckets"
+            Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource:
+            - "arn:aws:s3:::*"
+
+          # General buckets for many application projects with paths devoted to applications
+          - Sid: CopyAssetsToS3DuringPostDeployByPath
+            Action:
+            - s3:PutObject
+            - s3:Get*
+            - s3:List*
+            - s3:DeleteObject
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:s3:::*/${Prefix}-${ProjectId}/${StageId}/*"
+            - !Sub "arn:aws:s3:::*/${Prefix}-${ProjectId}-${StageId}/*"
+            - !Sub "arn:aws:s3:::*/${Prefix}/${ProjectId}/${StageId}/*"
+
+          # A bucket devoted to the application project shared among all deployments of the application
+          - Sid: CopyAssetsToS3DuringPostDeployByBucketApplicationTag
+            Action:
+            - s3:PutObject
+            - s3:Get*
+            - s3:List*
+            - s3:DeleteObject
+            Effect: Allow
+            Resource: !Sub 
+              - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-*/${StageId}/*"
+              - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+
+          # A bucket devoted to the specific application deployment
+          - Sid: CopyAssetsToS3DuringPostDeployByBucketApplicationDeploymentTag
+            Action:
+            - s3:PutObject
+            - s3:Get*
+            - s3:List*
+            - s3:DeleteObject
+            Effect: Allow
+            Resource: !Sub 
+              - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*"
+              - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+
+          # A S3StaticHostBucket if HasS3StaticHostBucket condition is met
+          # create a policy statement if HasS3StaticHostBucket condition is met
+          - !If
+            - HasPostDeployS3StaticHostBucket
+            - Sid: CopyAssetsToS3HostBucketDuringPostDeploy
+              Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+              Effect: Allow
+              Resource: 
+                - !Sub "arn:aws:s3:::${PostDeployS3StaticHostBucket}"
+                - !Sub "arn:aws:s3:::${PostDeployS3StaticHostBucket}/*"
+            - !Ref 'AWS::NoValue'
+
+          # Copy and read from a remote bucket containing the buildspec.yml file
+          - !If 
+            - HasPostDeployBuildSpecS3Location
+            - Sid: CopyPostDeploySpecFromS3ForBuild
+              Action:
+              - s3:Get*
+              - s3:List*
+              Effect: Allow
+              Resource: 
+                - !Join
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - !Select [0, !Split ["/", !Select [1, !Split ["s3://", !Ref PostDeployBuildSpec]]]]
+                # Specific file permission - exact path to the buildspec file
+                - !Join
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - !Select [1, !Split ["s3://", !Ref PostDeployBuildSpec]]
+            - !Ref 'AWS::NoValue'
+
+          # Read stack information - common after deployment to get resource identifiers and outputs
+          # This does not grant any access to the resources created.
+          # For that you will need to supply your own managed policy via PostDeploySvcRoleIncludeManagedPolicyArns
+          # However, Since API Gateway is common, it is included as well
+          - Sid: "ReadStackDetailsAfterDeployment"
+            Action:
+            - cloudformation:Describe*
+            - cloudformation:Get*
+            - cloudformation:List*
+            Effect: Allow
+            Resource: 
+            - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*"
+
+          # Read Access to API Gateway to export API specs
+          - Sid: "ReadApiGatewayInfoForExport"
+            Action:
+            - apigateway:Get*
+            - apigateway:List*
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*"
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*/stages/*"
+            - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*/deployments/*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId": !Sub "${Prefix}-${ProjectId}-${StageId}"
+
   # -- CodeDeploy Service Role --
 
   CodeDeployServiceRole:
@@ -548,7 +782,7 @@ Resources:
   # As you add functionality and resource types (such as DynamoDb, Event Bridge, Step Functions, etc) you will need to add additional permissions.
   # This portion along with the parameters in the pipeline deploy process and environment variables in the build process will differ the most between your applications.
   # --
-  
+
   CloudFormationSvcRole:
     Type: AWS::IAM::Role
     Properties:
@@ -739,22 +973,16 @@ Resources:
             Action:
             - s3:*
             Effect: Allow
-            Resource:
-            - !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}" ]
-                - !Sub "-${ProjectId}-${StageId}/*"
-            - !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}" ]
-                - !Sub "-${ProjectId}-${StageId}-*/*"
-            - !Join
-              - ""
-              - - "arn:aws:s3:::"
-                - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}" ]
-                - !Sub "-${ProjectId}-${StageId}-*"
+            Resource: 
+              - !Sub 
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}/*"
+                - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+              - !Sub 
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}-*/*"
+                - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+              - !Sub 
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}-*"
+                - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
 
           # == Lambda Function ==
           - Sid: "LambdaCRUDThisDeploymentOnly"
@@ -845,6 +1073,15 @@ Resources:
             Effect: Allow
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
 
           # == Lambda Insights == for tracing and troubleshooting
           - Sid: "LambdaLayersGetLayerForLambdaInsightsFromAWS"
@@ -975,6 +1212,119 @@ Resources:
       LogGroupName: !Sub "/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Build"
       RetentionInDays: 90 # Set to your own retention policy - how long do you want to keep build logs?
 
+
+  # -- PostDeploy CodeBuild Project --
+  #
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true"
+  # This CodeBuild project runs post-deployment tasks such as:
+  # - Integration tests against the deployed application
+  # - Configuration validation and health checks  
+  # - Exporting configurations (e.g., OpenAPI specs from API Gateway)
+  # - Post-deployment data migration or setup tasks
+  #
+  # CONFIGURATION CONSISTENCY:
+  # - Uses same compute environment as Build stage (BUILD_GENERAL1_SMALL, LINUX_CONTAINER)
+  # - Uses same container image as Build stage for consistency
+  # - Receives same core environment variables as Build stage
+  # - Additional POST_DEPLOY_S3_STATIC_HOST_BUCKET environment variable for PostDeploy-specific tasks
+  #
+  # BUILDSPEC HANDLING:
+  # - Supports local buildspec files (default: buildspec-postdeploy.yml)
+  # - Supports S3-hosted buildspec files with automatic IAM permissions
+  # - Uses conditional logic to determine buildspec source and format
+
+  PostDeployProject:
+    Type: AWS::CodeBuild::Project
+    # DependsOn:
+    # - PostDeployServiceRole
+    Condition: IsPostDeployEnabledAndNotDev
+    Properties:
+      Name: !Sub '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
+      Description: !Sub "PostDeploy CodeBuild Project for ${Prefix}-${ProjectId}-${StageId}. Runs post-deployment tasks such as integration tests, configuration validation, and artifact export. Only created when PostDeployStageEnabled is true."
+      ServiceRole: !GetAtt 'PostDeployServiceRole.Arn'
+      Artifacts:
+        Packaging: ZIP
+        Type: CODEPIPELINE
+      Cache:
+        Type: LOCAL
+        Modes:
+          - LOCAL_CUSTOM_CACHE
+      Environment:
+        # ComputeType, Type, Image and the Build Runtime versions all rely on each other
+        # ComputeType and Environment Type: https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html
+        # Build runtime versions: https://docs.aws.amazon.com/codebuild/latest/userguide/runtime-versions.html
+        #                         https://docs.aws.amazon.com/codebuild/latest/userguide/ec2-compute-images.html
+        #                         https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/amazonlinux-x86_64-standard:5.0 # Node 22 / Python 3.13 / Java corretto21
+
+        # BUILD ENVIRONMENT VARIABLES : You can specify any other environment variables your buildspec.yml is looking for.
+        EnvironmentVariables:
+        - Name: AWS_PARTITION
+          Value: !Ref 'AWS::Partition'
+        - Name: AWS_REGION
+          Value: !Ref 'AWS::Region'
+        - Name: AWS_ACCOUNT
+          Value: !Ref 'AWS::AccountId'
+        - Name: S3_ARTIFACTS_BUCKET # informs AWS CodeBuild where it can retrieve your code artifact.
+          Value: !Ref S3ArtifactsBucket
+        - Name: PREFIX
+          Value: !Ref 'Prefix'
+        - Name: PROJECT_ID
+          Value: !Ref 'ProjectId'
+        - Name: STAGE_ID
+          Value: !Ref 'StageId'
+        - Name: S3_BUCKET_NAME_ORG_PREFIX
+          Value: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", "" ]
+        - Name: REPOSITORY
+          Value: !Ref 'Repository'
+        - Name: REPOSITORY_BRANCH
+          Value: !Ref 'RepositoryBranch'
+        - Name: PARAM_STORE_HIERARCHY
+          Value: !Sub '${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/'
+        - Name: DEPLOY_ENVIRONMENT
+          Value: !Ref 'DeployEnvironment'
+        - Name: ALARM_NOTIFICATION_EMAIL
+          Value: !Ref 'AlarmNotificationEmail'
+        - Name: S3_STATIC_HOST_BUCKET
+          Value: !Ref 'PostDeployS3StaticHostBucket'
+        - Name: ROLE_PATH
+          Value: !Ref 'RolePath'
+        - Name: PERMISSIONS_BOUNDARY_ARN
+          Value: !Ref 'PermissionsBoundaryArn'
+        - Name: NODE_ENV
+          Value: "production" # We do not need dev dependencies deployed to Lambda as they are for local development. IF you needed to run tests during build, then temporarily set in buildspec but be sure final deploy is based on production dependencies. (Build twice)  
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !If 
+          - HasPostDeployBuildSpecS3Location
+          - !Join
+            - ""
+            - - "arn:aws:s3:::"
+              - !Select [1, !Split ["s3://", !Ref PostDeployBuildSpec]]
+          - !If 
+            - UseDefaultPostDeployBuildSpecLocation
+            - "buildspec-postdeploy.yml"
+            - !Ref PostDeployBuildSpec
+
+  # ---------------------------------------------------------------------------
+  # -- PostDeploy Log Group --
+  # 
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true"
+  # Creates a dedicated CloudWatch log group for PostDeploy CodeBuild project logs.
+  # Provides log retention policy to manage storage costs and compliance requirements.
+  # Matches the retention policy of the main Build stage for consistency.
+
+  PostDeployLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsPostDeployEnabledAndNotDev
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-PostDeploy"
+      RetentionInDays: 90 # Matches Build stage retention policy - adjust based on your log retention requirements
+
   # ---------------------------------------------------------------------------
   # -- ProjectPipeline --
   # Using the resources defined above, the pipeline and it's parts is what 
@@ -1085,6 +1435,25 @@ Resources:
           InputArtifacts: []
           OutputArtifacts: []
           RunOrder: 2
+        - !If
+          - IsPostDeployEnabled
+          - Name: PostDeploy
+            Actions:
+            - Name: PackageExport
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Sub '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
+              InputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+              OutputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-PostDeployArtifact"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+
 
   # ---------------------------------------------------------------------------
   # -- Pipeline Notifications --
@@ -1125,10 +1494,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Started",
-                "Message": "Pipeline <pipeline> has STARTED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - STARTED\n\nStatus: STARTED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Succeeded events
@@ -1157,10 +1526,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Succeeded",
-                "Message": "Pipeline <pipeline> has SUCCEEDED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - SUCCEEDED\n\nStatus: SUCCEEDED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Failed events
@@ -1189,10 +1558,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "ALERT: Pipeline <pipeline> Failed",
-                "Message": "Pipeline <pipeline> has FAILED.\nExecution ID: <executionId>\nTime: <time>\nPlease check the pipeline for errors: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - FAILED\n\nStatus: FAILED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nPlease check the pipeline for errors.\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # Add required SNS topic policy to allow EventBridge to publish

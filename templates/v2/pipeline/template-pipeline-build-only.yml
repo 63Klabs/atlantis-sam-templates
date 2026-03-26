@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from repository using only 
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.3/2025-05-12
+# Version: v2.0.5/2026-03-26
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -384,6 +384,15 @@ Resources:
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
           - Sid: "AllowListBuckets"
@@ -710,10 +719,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Started",
-                "Message": "Pipeline <pipeline> has STARTED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - STARTED\n\nStatus: STARTED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Succeeded events
@@ -742,10 +751,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Succeeded",
-                "Message": "Pipeline <pipeline> has SUCCEEDED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - SUCCEEDED\n\nStatus: SUCCEEDED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Failed events
@@ -774,10 +783,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "ALERT: Pipeline <pipeline> Failed",
-                "Message": "Pipeline <pipeline> has FAILED.\nExecution ID: <executionId>\nTime: <time>\nPlease check the pipeline for errors: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - FAILED\n\nStatus: FAILED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nPlease check the pipeline for errors.\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # Add required SNS topic policy to allow EventBridge to publish

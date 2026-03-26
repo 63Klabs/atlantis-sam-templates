@@ -2,8 +2,8 @@
 
 AWS CodePipeline for automated SAM deployments from GitHub repositories using AWS CodeConnections.
 
-**Version:** v2.0.1  
-**Last Updated:** 2025-05-16  
+**Version:** v2.0.3  
+**Last Updated:** 2026-03-26  
 **Template:** [templates/v2/pipeline/template-pipeline-github.yml](../../../../templates/v2/pipeline/template-pipeline-github.yml)
 
 ## Overview
@@ -467,17 +467,30 @@ Type: AWS::Events::Rule
 
 EventBridge rule that sends notification when pipeline execution starts.
 
+**Notification Format:**
+- Subject: `Pipeline <pipeline-name> Started`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
+
 ### PipelineSucceededRule
 
 Type: AWS::Events::Rule
 
 EventBridge rule that sends notification when pipeline execution succeeds.
 
+**Notification Format:**
+- Subject: `Pipeline <pipeline-name> Succeeded`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
+
 ### PipelineFailedRule
 
 Type: AWS::Events::Rule
 
 EventBridge rule that sends notification when pipeline execution fails.
+
+**Notification Format:**
+- Subject: `ALERT: Pipeline <pipeline-name> Failed`
+- Message body uses labeled fields on separate lines (Status, Pipeline, Execution ID, Time, Console Link) with blank-line separation between the header summary and detail fields
+- Includes call-to-action: "Please check the pipeline for errors."
 
 ### PipelineNotificationTopicPolicy
 

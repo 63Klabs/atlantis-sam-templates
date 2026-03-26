@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from repository - Deployed 
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.18/2026-03-17
+# Version: v2.0.20/2026-03-26
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -161,44 +161,6 @@ Parameters:
   # ---------------------------------------------------------------------------
   # Post Deployment Environment
   # 
-  # The PostDeploy stage is an optional final stage that runs after the main deployment.
-  # It's designed for tasks that require the application infrastructure to be deployed first,
-  # such as:
-  # - Integration tests against the deployed application
-  # - Configuration validation and health checks
-  # - Exporting configurations (e.g., OpenAPI specs from API Gateway)
-  # - Post-deployment data migration or setup tasks
-  #
-  # CONDITIONAL LOGIC:
-  # - When PostDeployStageEnabled="true": Creates PostDeploy resources and includes stage in pipeline
-  # - When PostDeployStageEnabled="false": No PostDeploy resources are created, stage is excluded
-  # - All PostDeploy resources use the "IsPostDeployEnabled" condition for conditional creation
-  #
-  # RESOURCE DEPENDENCIES:
-  # - PostDeployServiceRole: IAM role with similar permissions to CodeBuildServiceRole
-  # - PostDeployProject: CodeBuild project with same compute environment as Build stage
-  # - PostDeployLogGroup: CloudWatch log group with 90-day retention policy
-  # - Pipeline includes PostDeploy stage only when enabled
-  #
-  # USAGE PATTERNS:
-  # 1. API Documentation Export:
-  #    - PostDeployStageEnabled: "true"
-  #    - PostDeployS3StaticHostBucket: "my-docs-bucket"
-  #    - buildspec-postdeploy.yml exports OpenAPI specs from deployed API Gateway
-  #
-  # 2. Integration Testing:
-  #    - PostDeployStageEnabled: "true"
-  #    - buildspec-postdeploy.yml runs integration tests against deployed endpoints
-  #    - Uses same environment variables as Build stage for consistency
-  #
-  # 3. Configuration Validation:
-  #    - PostDeployStageEnabled: "true"
-  #    - buildspec-postdeploy.yml validates deployed resources meet requirements
-  #    - Can access SSM parameters and deployed resources for verification
-  #
-  # 4. Disabled PostDeploy (default):
-  #    - PostDeployStageEnabled: "false"
-  #    - No PostDeploy resources created, pipeline has only 3 stages
 
   PostDeployStageEnabled:
     Type: String
@@ -329,7 +291,7 @@ Conditions:
     - !Not [!Equals [!Ref BuildSpec, ""]]
     - !Equals [!Select [0, !Split [":", !Ref BuildSpec]], "s3"]
   UseDefaultBuildSpecLocation: !Equals [!Ref BuildSpec, ""]
-  HasManagedPoliciesForCloudFormationSvcRole: !Not [!Equals [!Join [",", !Ref CloudFormationSvcRoleIncludeManagedPolicyArns], ""]]
+  HasManagedPoliciesForCodeBuildSvcRole: !Not [!Equals [!Join [",", !Ref CodeBuildSvcRoleIncludeManagedPolicyArns], ""]]
 
   # PostDeploy Conditional Logic
   # These conditions control when PostDeploy resources are created and the stage is included in the pipeline
@@ -342,7 +304,7 @@ Conditions:
   UseDefaultPostDeployBuildSpecLocation: !Equals [!Ref PostDeployBuildSpec, ""]
   HasManagedPoliciesForPostDeploySvcRole: !Not [!Equals [!Join [",", !Ref PostDeploySvcRoleIncludeManagedPolicyArns], ""]]
 
-  HasManagedPoliciesForCodeBuildSvcRole: !Not [!Equals [!Join [",", !Ref CodeBuildSvcRoleIncludeManagedPolicyArns], ""]]
+  HasManagedPoliciesForCloudFormationSvcRole: !Not [!Equals [!Join [",", !Ref CloudFormationSvcRoleIncludeManagedPolicyArns], ""]]
 
   # Combined conditions for resource creation
   IsPostDeployEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPostDeployEnabled]
@@ -528,6 +490,15 @@ Resources:
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
           - Sid: "AllowListBuckets"
@@ -673,6 +644,15 @@ Resources:
             Effect: Allow
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
 
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
@@ -1100,6 +1080,15 @@ Resources:
             Effect: Allow
             Resource: 
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+
+          # == SSM AWS Service Public Parameters (Read-Only) ==
+          - Sid: "SsmPublicParameterReadOnly"
+            Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
 
           # == Lambda Insights == for tracing and troubleshooting
           - Sid: "LambdaLayersGetLayerForLambdaInsightsFromAWS"
@@ -1550,10 +1539,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Started",
-                "Message": "Pipeline <pipeline> has STARTED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - STARTED\n\nStatus: STARTED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Succeeded events
@@ -1582,10 +1571,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "Pipeline <pipeline> Succeeded",
-                "Message": "Pipeline <pipeline> has SUCCEEDED.\nExecution ID: <executionId>\nTime: <time>\nView in console: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - SUCCEEDED\n\nStatus: SUCCEEDED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # EventBridge Rule for Pipeline Failed events
@@ -1614,10 +1603,10 @@ Resources:
               "state": "$.detail.state"
               "executionId": "$.detail.execution-id"
               "time": "$.time"
-            InputTemplate: !Sub |
+            InputTemplate: !Sub >-
               {
                 "Subject": "ALERT: Pipeline <pipeline> Failed",
-                "Message": "Pipeline <pipeline> has FAILED.\nExecution ID: <executionId>\nTime: <time>\nPlease check the pipeline for errors: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+                "Message": "Pipeline Execution - FAILED\n\nStatus: FAILED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nPlease check the pipeline for errors.\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
               }
 
   # Add required SNS topic policy to allow EventBridge to publish
