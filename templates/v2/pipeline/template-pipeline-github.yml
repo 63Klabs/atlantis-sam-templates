@@ -59,6 +59,7 @@ Metadata:
           - AlarmNotificationEmail
           - CodeBuildSvcRoleIncludeManagedPolicyArns
           - CloudFormationSvcRoleIncludeManagedPolicyArns
+          - PostDeploySvcRoleIncludeManagedPolicyArns
       -
         Label:
           default: "Code Repository"
@@ -213,6 +214,13 @@ Parameters:
   CodeBuildSvcRoleIncludeManagedPolicyArns:
     Type: CommaDelimitedList
     Description: "List of IAM Managed Policy ARNs to add to the CodeBuild Service Role. Use when external resources provide policies to interact with them."
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[a-zA-Z0-9_\\-]+(?:\\/[a-zA-Z0-9_\\-]+)*$"
+    ConstraintDescription: "Must be an empty string or comma delimited valid IAM Policy ARNs in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+
+  PostDeploySvcRoleIncludeManagedPolicyArns:
+    Type: CommaDelimitedList
+    Description: "List of IAM Managed Policy ARNs to add to the Post Deploy Stage Service Role. Use when external resources provide policies to interact with them."
     Default: ""
     AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[a-zA-Z0-9_\\-]+(?:\\/[a-zA-Z0-9_\\-]+)*$"
     ConstraintDescription: "Must be an empty string or comma delimited valid IAM Policy ARNs in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
@@ -1435,24 +1443,24 @@ Resources:
           InputArtifacts: []
           OutputArtifacts: []
           RunOrder: 2
-        - !If
-          - IsPostDeployEnabled
-          - Name: PostDeploy
-            Actions:
-            - Name: PackageExport
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: 1
-              Configuration:
-                ProjectName: !Sub '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
-              InputArtifacts:
-              - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
-              OutputArtifacts:
-              - Name: !Sub "${ProjectId}-${StageId}-PostDeployArtifact"
-              RunOrder: 1
-          - !Ref 'AWS::NoValue'
+      - !If
+        - IsPostDeployEnabled
+        - Name: PostDeploy
+          Actions:
+          - Name: PackageExport
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: 1
+            Configuration:
+              ProjectName: !Sub '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
+            InputArtifacts:
+            - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+            OutputArtifacts:
+            - Name: !Sub "${ProjectId}-${StageId}-PostDeployArtifact"
+            RunOrder: 1
+        - !Ref 'AWS::NoValue'
 
 
   # ---------------------------------------------------------------------------

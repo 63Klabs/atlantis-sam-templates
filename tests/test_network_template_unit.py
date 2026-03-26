@@ -2476,13 +2476,13 @@ class TestCloudFrontFunctionBackwardCompatibility:
     """Tests for backward compatibility.
     Requirements: 10.1, 10.2, 10.3, 11.1"""
 
-    def test_template_version_remains_v0_0_16(self, network_template):
-        """Template version should remain v0.0.16 (PATCH=0, development mode). Req 11.1"""
+    def test_template_version_remains_v0_0_17(self, network_template):
+        """Template version should remain v0.0.17 (PATCH=0, development mode). Req 11.1"""
         # Read the raw file to check the version comment
         template_path = Path(__file__).parent.parent / "templates" / "v2" / "network" / "template-network-route53-cloudfront-s3-apigw.yml"
         content = template_path.read_text()
-        assert '# Version: v0.0.16/' in content, \
-            "Template version should remain v0.0.16"
+        assert '# Version: v0.0.17/' in content, \
+            "Template version should remain v0.0.17"
 
     @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
     def test_all_params_default_to_empty_string(self, network_template, param_name):
