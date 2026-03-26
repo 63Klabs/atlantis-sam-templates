@@ -150,7 +150,7 @@ Parameters:
     Type: String
     Description: "The local or S3 URI of the CodeBuild buildspec.yml file. For example, 'buildspec.yml', 'deploy/buildspec.yml' or 's3://mybucket/buildspec.yml'. Best practice is to have a single buildspec file for all deployments. This option exists if you cannot store your buildspec file with your source code OR wish to use a central buildspec for a group of deployments. This is not for managing multiple buildspecs on a single repo. Default is buildspec.yml, and blank will use the default buildspec.yml in the root of the repository. Though Source.BuildSpec uses an ARN for S3 locations, an S3 url is requested to make it easier to parse for permissions and other uses."
     Default: "buildspec.yml"
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^[([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec\\.yml)$|^$"
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec\\.yml)$|^$"
     ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec.yml'. For example, 'buildspec.yml', 'deploy/buildspec.yml' or 's3://mybucket/buildspec.yml'. May be empty."
 
   # ---------------------------------------------------------------------------
