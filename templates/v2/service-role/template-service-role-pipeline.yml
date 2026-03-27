@@ -5,7 +5,7 @@ Description: "Prefix-based IAM Role and Managed Policy for Atlantis Service Role
 # Atlantis for AWS SAM Deployments
 # Service Role Infrastructure Template 
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.14/2025-02-25
+# Version: v0.0.15/2026-03-27
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
@@ -186,6 +186,37 @@ Resources:
             - events:UntagResource
             Resource:
             - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Prefix}-*"
+
+          - Sid: ManageSnsTopicsByResourcePrefix
+            Effect: Allow
+            Action:
+            - sns:CreateTopic
+            - sns:DeleteTopic
+            - sns:GetTopicAttributes
+            - sns:SetTopicAttributes
+            - sns:Subscribe
+            - sns:Unsubscribe
+            - sns:TagResource
+            - sns:UntagResource
+            - sns:ListSubscriptionsByTopic
+            - sns:ListTagsForResource
+            Resource:
+            - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${Prefix}-*"
+
+          - Sid: ManageCodeStarNotificationsByResourcePrefix
+            Effect: Allow
+            Action:
+            - codestar-notifications:CreateNotificationRule
+            - codestar-notifications:DeleteNotificationRule
+            - codestar-notifications:DescribeNotificationRule
+            - codestar-notifications:UpdateNotificationRule
+            - codestar-notifications:Subscribe
+            - codestar-notifications:Unsubscribe
+            - codestar-notifications:TagResource
+            - codestar-notifications:UntagResource
+            - codestar-notifications:ListTagsForResource
+            Resource:
+            - !Sub "arn:aws:codestar-notifications:${AWS::Region}:${AWS::AccountId}:notificationrule/*"
 
           - Sid: ManageCloudFormationStacksByResourcePrefix
             Effect: Allow
