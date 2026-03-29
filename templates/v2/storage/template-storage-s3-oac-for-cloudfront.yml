@@ -141,9 +141,11 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete # Set to Delete because if we delete the stack, we don't need the bucket - don't need to retain data
     Properties:
-      BucketName: !Sub
-        - "${OrgPrefix}${Prefix}-${ProjectId}-${AWS::Region}-${AWS::AccountId}"
-        - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+      BucketName: !If # Preferred as it aligns with regional bucket naming
+        - UseS3BucketNameOrgPrefix
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-origin"
+        - !Sub "${Prefix}-${ProjectId}-origin"
+      BucketNamespace: "account-regional"
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true

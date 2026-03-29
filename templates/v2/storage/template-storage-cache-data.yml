@@ -150,10 +150,11 @@ Resources:
   CacheDataS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Join
-        - "-"
-        - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-          - !Sub "${ProjectId}-${AWS::Region}-${AWS::AccountId}"
+      BucketName: !If # Preferred as it aligns with regional bucket naming
+        - UseS3BucketNameOrgPrefix
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}"
+        - !Sub "${Prefix}-${ProjectId}"
+      BucketNamespace: "account-regional"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true

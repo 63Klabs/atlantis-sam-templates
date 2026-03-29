@@ -125,10 +125,11 @@ Resources:
     DeletionPolicy: Retain # Set to Retain because this is critical infrastructure - Even though it could be recreated, we want to keep the data as it is "live"
     UpdateReplacePolicy: Retain # Set to Retain because this is critical infrastructure
     Properties:
-      BucketName: !Join
-        - "-"
-        - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-          - !Sub "${ProjectId}-${AWS::Region}-${AWS::AccountId}"
+      BucketName: !If # Preferred as it aligns with regional bucket naming
+        - UseS3BucketNameOrgPrefix
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}"
+        - !Sub "${Prefix}-${ProjectId}"
+      BucketNamespace: "account-regional"
       VersioningConfiguration:
         Status: Suspended
       BucketEncryption:
@@ -147,7 +148,7 @@ Resources:
         LogFilePrefix: !Join
           - "-"
           - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-            - !Sub "${ProjectId}-${AWS::Region}-${AWS::AccountId}"
+            - !Sub "${ProjectId}-${AWS::AccountId}-${AWS::Region}"
       - !Ref AWS::NoValue
 
   BucketPolicy:

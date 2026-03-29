@@ -237,17 +237,28 @@ Resources:
             Resource:
             - !Sub
               - "arn:aws:s3:::${BucketPrefix}-*"
-              - BucketPrefix: !If 
+              - BucketPrefix: !If # Deprecated
+                - UseS3BucketNameOrgPrefix
+                - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
+                - !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}"
+            - !Sub
+              - "arn:aws:s3:::${BucketPrefix}-*"
+              - BucketPrefix: !If # Preferred as it aligns with regional bucket naming
+                - UseS3BucketNameOrgPrefix
+                - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
+                - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+            - !Sub
+              - "arn:aws:s3:::${BucketPrefix}-*/*"
+              - BucketPrefix: !If # Deprecated
                 - UseS3BucketNameOrgPrefix
                 - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
                 - !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}"
             - !Sub
               - "arn:aws:s3:::${BucketPrefix}-*/*"
-              - BucketPrefix: !If 
+              - BucketPrefix: !If # Preferred as it aligns with regional bucket naming
                 - UseS3BucketNameOrgPrefix
                 - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-                - !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}"
-
+                - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
 
           - Sid: ManageLogsByResourcePrefix
             Effect: Allow

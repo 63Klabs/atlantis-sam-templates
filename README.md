@@ -1,4 +1,4 @@
-# Atlantis CloudFormation Template Repository for Serverless Deployments using AWS SAM and CloudFormation
+# Atlantis Templates for Serverles Deployments
 
 This repository contains a collection of AWS CloudFormation templates designed for serverless deployments using AWS SAM (Simple Application Model). It is based on the Atlantis Template and Scripts Platform for managing Serverless Deployments using AWS SAM and CloudFormation. Templates in this repository are used by the Atlantis SAM Configuration scripts.
 

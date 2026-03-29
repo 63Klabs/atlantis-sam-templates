@@ -127,10 +127,11 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Join
-        - "-"
-        - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-          - !Sub "${ProjectId}-${AWS::Region}-${AWS::AccountId}"
+      BucketName: !If # Preferred as it aligns with regional bucket naming
+        - UseS3BucketNameOrgPrefix
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-access-logs"
+        - !Sub "${Prefix}-access-logs"
+      BucketNamespace: "account-regional"
       VersioningConfiguration:
         Status: Suspended
       BucketEncryption:
