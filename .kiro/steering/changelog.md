@@ -142,18 +142,18 @@ When a changelog entry is related to a Kiro spec, reference and link to the spec
 
 When a changelog entry addresses a GitHub issue, include the issue reference with a link:
 
-**Format:** `addresses [#123](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/123)`
+**Format:** `addresses [#123](https://github.com/63Klabs/atlantis-sam-templates/issues/123)`
 
 **Example:**
 ```markdown
 ### Fixed
-- **Pipeline: template-pipeline.yml v2.0.19** - Fixed CodeBuild timeout configuration, addresses [#45](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/45)
+- **Pipeline: template-pipeline.yml v2.0.19** - Fixed CodeBuild timeout configuration, addresses [#45](https://github.com/63Klabs/atlantis-sam-templates/issues/45)
 ```
 
 **Combined spec and issue reference:**
 ```markdown
 ### Added
-- **Post-Deployment Validation** [Spec: post-deploy-validation](../.kiro/specs/post-deploy-validation/) addresses [#78](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/78)
+- **Post-Deployment Validation** [Spec: post-deploy-validation](../.kiro/specs/post-deploy-validation/) addresses [#78](https://github.com/63Klabs/atlantis-sam-templates/issues/78)
   - Pipeline: template-pipeline.yml v2.1.0 - Added post-deployment stage support
 ```
 
@@ -256,7 +256,7 @@ Before completing a spec, verify the changelog entry:
 ## v0.0.30 - unreleased
 
 ### Added
-- **CloudFront Cache Invalidation** [Spec: cloudfront-invalidation](../.kiro/specs/cloudfront-invalidation/) addresses [#92](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/92)
+- **CloudFront Cache Invalidation** [Spec: cloudfront-invalidation](../.kiro/specs/cloudfront-invalidation/) addresses [#92](https://github.com/63Klabs/atlantis-sam-templates/issues/92)
   - Network: template-network-route53-cloudfront-s3-apigw.yml v1.5.0 - Added S3 event notifications for cache invalidation
   - Storage: template-storage-s3-oac-for-cloudfront.yml v1.2.3 - Added Lambda trigger configuration
   - Service Role: template-service-role-storage.yml v1.1.2 - Added CloudFront invalidation permissions
@@ -292,7 +292,7 @@ Before completing a spec, verify the changelog entry:
 ## v0.0.30 - unreleased
 
 ### Fixed
-- **Pipeline: template-pipeline-github.yml v2.1.5** - Fixed GitHub connection ARN validation, addresses [#103](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/103)
+- **Pipeline: template-pipeline-github.yml v2.1.5** - Fixed GitHub connection ARN validation, addresses [#103](https://github.com/63Klabs/atlantis-sam-templates/issues/103)
 - **Service Role: template-service-role-pipeline.yml v1.3.1** - Corrected IAM policy for cross-account deployments
 ```
 
@@ -316,7 +316,7 @@ Before completing a spec, verify the changelog entry:
   - **Deprecation:** v1.x deprecated with 24-month support period ending 2028-01-29
 
 ### Added
-- **CloudFront Cache Invalidation** [Spec: cloudfront-invalidation](../.kiro/specs/cloudfront-invalidation/) addresses [#92](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/92)
+- **CloudFront Cache Invalidation** [Spec: cloudfront-invalidation](../.kiro/specs/cloudfront-invalidation/) addresses [#92](https://github.com/63Klabs/atlantis-sam-templates/issues/92)
   - Network: template-network-route53-cloudfront-s3-apigw.yml v1.5.0 - Added S3 event notifications for cache invalidation
   - Storage: template-storage-s3-oac-for-cloudfront.yml v1.2.3 - Added Lambda trigger configuration
   - Service Role: template-service-role-storage.yml v1.1.2 - Added CloudFront invalidation permissions
@@ -327,7 +327,7 @@ Before completing a spec, verify the changelog entry:
 - **Documentation: Template READMEs** - Updated all pipeline template documentation with new parameter examples
 
 ### Fixed
-- **Pipeline: template-pipeline-github.yml v2.1.5** - Fixed GitHub connection ARN validation, addresses [#103](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/103)
+- **Pipeline: template-pipeline-github.yml v2.1.5** - Fixed GitHub connection ARN validation, addresses [#103](https://github.com/63Klabs/atlantis-sam-templates/issues/103)
 - **Service Role: template-service-role-pipeline.yml v1.3.1** - Corrected IAM policy for cross-account deployments
 
 ### Dependencies

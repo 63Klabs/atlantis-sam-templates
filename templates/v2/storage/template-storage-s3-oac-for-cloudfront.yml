@@ -8,7 +8,7 @@ Description: "CloudFront distribution with S3 origin access control (OAC). Suppo
 # Version: v0.1.1/2026-03-29
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 
 # =============================================================================

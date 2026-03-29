@@ -8,7 +8,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Version: v0.0.17/2026-03-17
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 # Apply custom sub-domains via Route53 to static content in an S3 bucket 
 # and/or an API Gateway. Static and API can reside on same sub-domains 

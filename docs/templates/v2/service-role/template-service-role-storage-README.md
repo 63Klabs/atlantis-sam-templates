@@ -531,4 +531,4 @@ This service role is used to deploy:
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
 - [IAM Permissions Boundaries](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html)
 - [Lambda Best Practices](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

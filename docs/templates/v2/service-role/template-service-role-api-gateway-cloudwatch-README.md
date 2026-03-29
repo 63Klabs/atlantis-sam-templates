@@ -281,4 +281,4 @@ This template is used with:
 - [API Gateway Account Settings](https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-stage-settings.html)
 - [CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/)
 - [IAM Roles for Services](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-service.html)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

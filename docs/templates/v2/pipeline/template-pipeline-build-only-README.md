@@ -624,4 +624,4 @@ This template is commonly used with:
 - [AWS CodePipeline User Guide](https://docs.aws.amazon.com/codepipeline/latest/userguide/)
 - [AWS CodeBuild User Guide](https://docs.aws.amazon.com/codebuild/latest/userguide/)
 - [CodeBuild Buildspec Reference](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

@@ -8,7 +8,7 @@ Description: "S3 for storing shared and latest (non-versioned) DevOps files (bui
 # Version: v0.0.2/2026-03-29
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 # Creates an S3 bucket with objects managed by a pipeline.
 # Objects are then available to be used by other stacks, pipelines, and CodeBuild projects.

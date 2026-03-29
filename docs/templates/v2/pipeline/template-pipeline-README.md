@@ -931,4 +931,4 @@ This template is commonly used with:
 - [AWS CodeBuild User Guide](https://docs.aws.amazon.com/codebuild/latest/userguide/)
 - [AWS SAM Developer Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/)
 - [CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

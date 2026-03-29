@@ -8,9 +8,9 @@ Feel free to browse the documentation and templates in this repository to unders
 
 > You do not need to deploy this repository to your own organization. By default, the `s3://63klabs` bucket is public and available as a template source FOR BEGINNING, EXPERIMENTAL, EDUCATIONAL, and TRAINING PURPOSES. It will get you started quicker and does not require advanced knowledge of everything covered in the deployment documentation. Just go build!
 
-If you are an organization looking to use these templates in production, please consider deploying your own copy to your own S3 bucket for security and control. See [Technical Documentation](./docs/technical/README.md).
+If you are an organization looking to use these templates in production, please consider publishing your own copy to your own S3 bucket for security and control. See Documentation for [Admins and Operations](./docs/admin-ops/README.md) and [Maintainers/Platform Engineers](./docs/maintainers/README.md).
 
-The S3 bucket `63klabs` is public and read-only. It contains the latest versions of the templates in this repository. The 63klabs bucket receives the templates from the GitHub repository: [Atlantis Template Repository for Serverless Deployments using AWS SAM and CloudFormation](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments)
+The S3 bucket `63klabs` is public and read-only. It contains the latest versions of the templates in this repository. The 63klabs bucket receives the templates from the GitHub repository: [Atlantis SAM Template Repository](https://github.com/63Klabs/atlantis-sam-templates)
 
 ## CloudFormation Template Validation
 

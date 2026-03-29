@@ -194,4 +194,4 @@ Pipeline templates are typically used with:
 - [AWS CodePipeline Documentation](https://docs.aws.amazon.com/codepipeline/)
 - [AWS CodeBuild Documentation](https://docs.aws.amazon.com/codebuild/)
 - [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

@@ -8,7 +8,7 @@ Description: "Shared storage for Lambda applications utilizing Cache-Data (S3/Dy
 # Version: v0.0.15/2026-03-29
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 
 # =============================================================================

@@ -367,4 +367,4 @@ The GitHub App created by AWS CodeConnections requests the following permissions
 - [AWS CodeConnections Documentation](https://docs.aws.amazon.com/codeconnections/latest/userguide/)
 - [GitHub Apps Documentation](https://docs.github.com/en/developers/apps)
 - [CodePipeline with GitHub](https://docs.aws.amazon.com/codepipeline/latest/userguide/connections-github.html)
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)

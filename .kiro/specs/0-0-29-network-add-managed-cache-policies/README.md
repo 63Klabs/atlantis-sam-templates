@@ -2,7 +2,7 @@
 
 Add option to attach managed cache policies
 
-[Issue #1](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues/1)
+[Issue #1](https://github.com/63Klabs/atlantis-sam-templates/issues/1)
 
 The template-network-route53-cloudfront-s3-apigw.yml template should support attaching AWS managed cache policies to the distribution.
 

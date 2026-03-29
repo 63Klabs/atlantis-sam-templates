@@ -7,7 +7,7 @@ Description: "CodePipeline for Automated Deployments from GitHub repository - De
 # Version: v2.0.3/2026-03-26
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 # Creates an AWS CodePipeline that is triggered when a watched branch
 # receives a new commit. Uses CodeBuild and then CloudFormation to deploy.

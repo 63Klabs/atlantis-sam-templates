@@ -32,7 +32,7 @@ Description: "Brief description of what this template does"
 # Version: vMAJOR.MINOR.PATCH/YYYY-MM-DD
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63Klabs/atlantis-sam-templates/
 
 # [Detailed description of template purpose and functionality]
 # [Multiple lines explaining what resources are created]

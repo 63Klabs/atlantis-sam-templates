@@ -1,12 +1,12 @@
-# Technical Documentation for Maintainers of the Repository
+# Technical Documentation for Maintainers (Platform Engineers)
 
 ## Overview
 
 This repository contains CloudFormation templates for deploying various stacks such as S3 buckets for static web sites, access logs, CloudFront and Route53 configurations, and deployment pipelines.
 
-It may be used by Platform Engineers to maintain a central repository of templates to be used by developers.
+It may be used by Platform Engineers to maintain a central repository of templates to be used by developers and operations within their organization.
 
-Developers (the end-user) will typically not have direct access to this repository. Instead, they will run scripts provided by a SAM Configuration repository hosted within the organization. The SAM Configuration repository should be created and maintained by the organization's platform engineers. It can be intialized by downloading the files from the [Atlantis SAM Configuration Repo for Serverles Deployments](https://github.com/63Klabs/atlantis-cfn-configuration-repo-for-serverless-deployments)
+Developers (the end-user) will typically not have direct access to this repository. Instead, they will run scripts provided by a SAM Configuration repository hosted within the organization. The SAM Configuration repository should be created and maintained by the organization's platform engineers. It can be intialized by downloading the files from the [Atlantis SAM Configuration Scripts repository](https://github.com/63Klabs/atlantis-sam-config-scripts)
 
 When the developer runs the `config.py` script from the SAM Configuration repository, they will be able to select a template to use.
 
@@ -14,11 +14,11 @@ When the developer runs the `config.py` script from the SAM Configuration reposi
 
 > By default, the SAM Configuration repository will list available templates from a public S3 bucket maintained by 63Klabs.
 
-When an organization is starting out with the Atlantis Templates and Scripts Platform, it is best to focus on the SAM Config repository first and use the templates provided by the 63klabs public S3 bucket (which is sourced from the [Atlantis CloudFormation Template repository on GitHub](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments)).
+When an organization is starting out with the Atlantis Templates and Scripts Platform, it is best to focus on the SAM Config repository first and use the templates provided by the 63klabs public S3 bucket (which is sourced from the [Atlantis CloudFormation Template repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates)).
 
-If, as an organization, you wish to supply your own templates, you may copy this repository to your own organization git provider and S3 bucket available internally.
+If, as an organization, you wish to supply your own templates, you may copy this repository to your own organization git provider and publish to an S3 bucket available internally.
 
-The Atlantis SAM Configuration repository allows multiple S3 buckets to serve as template sources when running the `config.py` script. You could keep the default 63klabs bucket and add your own bucket to serve as a source for custom templates.
+The Atlantis SAM Configuration repository allows multiple S3 buckets to serve as template sources when running the `config.py` script. You could keep the default `63klabs` bucket and add your own bucket to serve as a source for custom templates.
 
 ## Developers can update existing stacks to use updated templates
 

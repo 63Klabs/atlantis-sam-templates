@@ -344,10 +344,10 @@ Each environment uses the same templates with different parameter values (StageI
 
 ### Repository
 
-- [GitHub Repository](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/)
-- [Issues and Feature Requests](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/issues)
-- [Security Reports](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/security)
-- [Latest Updates](https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/releases)
+- [GitHub Repository](https://github.com/63Klabs/atlantis-sam-templates/)
+- [Issues and Feature Requests](https://github.com/63Klabs/atlantis-sam-templates/issues)
+- [Security Reports](https://github.com/63Klabs/atlantis-sam-templates/security)
+- [Latest Updates](https://github.com/63Klabs/atlantis-sam-templates/releases)
 
 ## Contributing
 
