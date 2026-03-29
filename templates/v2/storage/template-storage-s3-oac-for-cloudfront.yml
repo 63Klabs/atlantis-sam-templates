@@ -137,7 +137,7 @@ Resources:
   
   # Creates a new S3 bucket with SSE and public access blocked.
   # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
-  Bucket:
+  BucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete # Set to Delete because if we delete the stack, we don't need the bucket - don't need to retain data
     Properties:

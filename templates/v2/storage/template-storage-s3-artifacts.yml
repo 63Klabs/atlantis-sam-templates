@@ -118,7 +118,7 @@ Resources:
   # ---------------------------------------------------------------------------
   # -- S3 Artifact Bucket --
 
-  S3ArtifactsBucket:
+  S3ArtifactsBucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete # Set to Delete because if we delete the pipeline, we don't need the bucket
     Properties:

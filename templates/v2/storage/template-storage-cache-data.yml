@@ -147,7 +147,7 @@ Resources:
 
   # -- Cache-Data S3 Bucket --
 
-  CacheDataS3Bucket:
+  CacheDataS3BucketRegional:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !If # Preferred as it aligns with regional bucket naming
