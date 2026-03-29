@@ -126,7 +126,7 @@ Resources:
         - ""
         - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
           - !If [UseProjectPrefix, !Sub "${Prefix}-", ""]
-          - !Sub "cf-artifacts"
+          - !Sub "cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
       BucketNamespace: "account-regional"
       VersioningConfiguration:
         Status: Enabled

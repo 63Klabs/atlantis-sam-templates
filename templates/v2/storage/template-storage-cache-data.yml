@@ -152,8 +152,8 @@ Resources:
     Properties:
       BucketName: !If # Preferred as it aligns with regional bucket naming
         - UseS3BucketNameOrgPrefix
-        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}"
-        - !Sub "${Prefix}-${ProjectId}"
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
+        - !Sub "${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
       BucketNamespace: "account-regional"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true

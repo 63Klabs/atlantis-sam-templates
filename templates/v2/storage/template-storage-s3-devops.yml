@@ -127,8 +127,8 @@ Resources:
     Properties:
       BucketName: !If # Preferred as it aligns with regional bucket naming
         - UseS3BucketNameOrgPrefix
-        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}"
-        - !Sub "${Prefix}-${ProjectId}"
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
+        - !Sub "${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
       BucketNamespace: "account-regional"
       VersioningConfiguration:
         Status: Suspended
@@ -148,7 +148,7 @@ Resources:
         LogFilePrefix: !Join
           - "-"
           - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-            - !Sub "${ProjectId}-${AWS::AccountId}-${AWS::Region}"
+            - !Sub "${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
       - !Ref AWS::NoValue
 
   BucketPolicy:

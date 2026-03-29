@@ -143,8 +143,8 @@ Resources:
     Properties:
       BucketName: !If # Preferred as it aligns with regional bucket naming
         - UseS3BucketNameOrgPrefix
-        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-origin"
-        - !Sub "${Prefix}-${ProjectId}-origin"
+        - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an"
+        - !Sub "${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an"
       BucketNamespace: "account-regional"
       BucketEncryption:
         ServerSideEncryptionConfiguration:
