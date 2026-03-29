@@ -492,13 +492,13 @@ Resources:
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
           # == SSM AWS Service Public Parameters (Read-Only) ==
-          - Sid: "SsmPublicParameterReadOnly"
+          - Sid: "SsmAwsPublicParameterReadOnly"
             Action:
             - ssm:GetParameter
             - ssm:GetParameters
             Effect: Allow
             Resource:
-              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+              !Sub "arn:aws:ssm:${AWS::Region}::parameter/aws/service/*"
 
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
@@ -647,13 +647,13 @@ Resources:
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
           # == SSM AWS Service Public Parameters (Read-Only) ==
-          - Sid: "SsmPublicParameterReadOnly"
+          - Sid: "SsmAwsPublicParameterReadOnly"
             Action:
             - ssm:GetParameter
             - ssm:GetParameters
             Effect: Allow
             Resource:
-              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+              !Sub "arn:aws:ssm:${AWS::Region}::parameter/aws/service/*"
 
           # We have 4 permissions sets that will allow us to copy objects (such as static assets) over to S3.
 
@@ -1083,13 +1083,13 @@ Resources:
               !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
 
           # == SSM AWS Service Public Parameters (Read-Only) ==
-          - Sid: "SsmPublicParameterReadOnly"
+          - Sid: "SsmAwsPublicParameterReadOnly"
             Action:
             - ssm:GetParameter
             - ssm:GetParameters
             Effect: Allow
             Resource:
-              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/aws/service/*"
+              !Sub "arn:aws:ssm:${AWS::Region}::parameter/aws/service/*"
 
           # == Lambda Insights == for tracing and troubleshooting
           - Sid: "LambdaLayersGetLayerForLambdaInsightsFromAWS"
