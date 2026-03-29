@@ -137,7 +137,7 @@ Resources:
   
   # Creates a new S3 bucket with SSE and public access blocked.
   # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
-  BucketRegional:
+  OriginBucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete # Set to Delete because if we delete the stack, we don't need the bucket - don't need to retain data
     Properties:
@@ -184,7 +184,7 @@ Resources:
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref Bucket
+      Bucket: !Ref OriginBucketRegional
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -194,8 +194,8 @@ Resources:
             Principal: "*"
             Action: 's3:*'
             Resource:
-              - !GetAtt Bucket.Arn
-              - !Join [ '/', [ !GetAtt Bucket.Arn, '*' ] ]
+              - !GetAtt OriginBucketRegional.Arn
+              - !Join [ '/', [ !GetAtt OriginBucketRegional.Arn, '*' ] ]
             Condition:
               Bool:
                 "aws:SecureTransport": false
@@ -206,7 +206,7 @@ Resources:
             Effect: Allow
             Principal:
               Service: cloudfront.amazonaws.com
-            Resource: !Sub "${Bucket.Arn}/*"
+            Resource: !Sub "${OriginBucketRegional.Arn}/*"
             Condition:
               StringLike:
                 "aws:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
@@ -219,7 +219,7 @@ Resources:
             Effect: Allow
             Principal:
               Service: codebuild.amazonaws.com
-            Resource: !Sub "${Bucket.Arn}/*"
+            Resource: !Sub "${OriginBucketRegional.Arn}/*"
             Condition:
               StringLike:
                 "aws:SourceArn": !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-*"
@@ -235,7 +235,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: s3.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt Bucket.Arn
+      SourceArn: !GetAtt OriginBucketRegional.Arn
 
 # =============================================================================
 # OUTPUTS
@@ -250,11 +250,11 @@ Outputs:
 
   BucketName:
     Description: The S3 Bucket Name used for CloudFront Origin.
-    Value: !Ref Bucket
+    Value: !Ref OriginBucketRegional
 
   OriginBucketDomainForCloudFront:
     Description: Domain to use for CloudFront S3 Origin.
-    Value: !GetAtt Bucket.DomainName
+    Value: !GetAtt OriginBucketRegional.DomainName
 
   AllowedCloudFrontAndCodeBuild:
     Description: Access to bucket is restricted to CloudFront (Read) and CodeBuild (CRUD) with the following atlantis:Application tag value.

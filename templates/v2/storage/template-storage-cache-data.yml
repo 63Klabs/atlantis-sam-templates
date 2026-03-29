@@ -179,7 +179,7 @@ Resources:
   CacheDataS3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref CacheDataS3Bucket
+      Bucket: !Ref CacheDataS3BucketRegional
       PolicyDocument:
         Version: "2012-10-17"
         Id: SecurityPolicy
@@ -189,8 +189,8 @@ Resources:
             Principal: "*"
             Action: "s3:*"
             Resource:
-              - !Sub "arn:aws:s3:::${CacheDataS3Bucket}"
-              - !Sub "arn:aws:s3:::${CacheDataS3Bucket}/*"
+              - !Sub "arn:aws:s3:::${CacheDataS3BucketRegional}"
+              - !Sub "arn:aws:s3:::${CacheDataS3BucketRegional}/*"
             Condition:
               Bool:
                 "aws:SecureTransport": false
@@ -203,7 +203,7 @@ Resources:
             Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
-            Resource: !Sub "arn:aws:s3:::${CacheDataS3Bucket}/cache/*"
+            Resource: !Sub "arn:aws:s3:::${CacheDataS3BucketRegional}/cache/*"
             Condition:
               StringLike:
                 "aws:SourceArn": !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-*"
@@ -226,13 +226,13 @@ Resources:
             - s3:GetObject
             - s3:GetObjectVersion
             Effect: Allow
-            Resource: !Sub 'arn:aws:s3:::${CacheDataS3Bucket}/cache/*'
+            Resource: !Sub 'arn:aws:s3:::${CacheDataS3BucketRegional}/cache/*'
 
           - Sid: LambdaAccessToS3ListBucket
             Action:
             - s3:ListBucket
             Effect: Allow
-            Resource: !Sub 'arn:aws:s3:::${CacheDataS3Bucket}'
+            Resource: !Sub 'arn:aws:s3:::${CacheDataS3BucketRegional}'
             # Condition: # will be enabled in future if after further testing
             #   StringLike:
             #     s3:prefix:
@@ -268,7 +268,7 @@ Outputs:
 
   S3BucketWebConsole:
     Description: "S3 Bucket Web Console"
-    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${CacheDataS3Bucket}?region=${AWS::Region}"
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${CacheDataS3BucketRegional}?region=${AWS::Region}"
 
   # Exports
 
@@ -280,13 +280,13 @@ Outputs:
 
   S3BucketExport:
     Description: "S3 Bucket Name"
-    Value: !Ref CacheDataS3Bucket
+    Value: !Ref CacheDataS3BucketRegional
     Export:
       Name: !Sub '${Prefix}-CacheDataS3Bucket'
 
   S3BucketArnExport:
     Description: "S3 Bucket ARN"
-    Value: !Sub "arn:aws:s3:::${CacheDataS3Bucket}"
+    Value: !Sub "arn:aws:s3:::${CacheDataS3BucketRegional}"
     Export:
       Name: !Sub '${Prefix}-CacheDataS3BucketArn'
 

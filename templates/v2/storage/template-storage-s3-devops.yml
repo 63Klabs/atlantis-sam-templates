@@ -120,7 +120,7 @@ Resources:
   
   # Creates a new S3 bucket with public access blocked.
   # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
-  BucketRegional:
+  ArtifactsBucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain # Set to Retain because this is critical infrastructure - Even though it could be recreated, we want to keep the data as it is "live"
     UpdateReplacePolicy: Retain # Set to Retain because this is critical infrastructure
@@ -154,7 +154,7 @@ Resources:
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref Bucket
+      Bucket: !Ref ArtifactsBucketRegional
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -163,8 +163,8 @@ Resources:
             Principal: "*"
             Action: 's3:*'
             Resource:
-              - !GetAtt Bucket.Arn
-              - !Join [ '/', [ !GetAtt Bucket.Arn, '*' ] ]
+              - !GetAtt ArtifactsBucketRegional.Arn
+              - !Join [ '/', [ !GetAtt ArtifactsBucketRegional.Arn, '*' ] ]
             Condition:
               Bool:
                 "aws:SecureTransport": false
@@ -182,7 +182,7 @@ Resources:
               Effect: Allow
               Principal:
                 Service: codebuild.amazonaws.com
-              Resource: !Sub "${Bucket.Arn}/*" # TODO: Add in ${aws:???Tag/Stage}
+              Resource: !Sub "${ArtifactsBucketRegional.Arn}/*" # TODO: Add in ${aws:???Tag/Stage}
               Condition:
                 StringLike:
                   "aws:SourceArn": !Ref BuildSourceArn
@@ -198,8 +198,8 @@ Resources:
             Principal:
               Service: cloudformation.amazonaws.com
             Resource:
-            - !GetAtt Bucket.Arn
-            - !Sub "${Bucket.Arn}/*"
+            - !GetAtt ArtifactsBucketRegional.Arn
+            - !Sub "${ArtifactsBucketRegional.Arn}/*"
             Condition:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
@@ -212,7 +212,7 @@ Resources:
             Effect: Allow
             Principal:
               Service: codebuild.amazonaws.com
-            Resource: !Sub "${Bucket.Arn}/*"
+            Resource: !Sub "${ArtifactsBucketRegional.Arn}/*"
             Condition:
               StringLike:
                 "aws:SourceArn": !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/*"
@@ -230,7 +230,7 @@ Outputs:
 
   BucketName:
     Description: The S3 Bucket Name used for CloudFront Origin.
-    Value: !Ref Bucket
+    Value: !Ref ArtifactsBucketRegional
 
   CodeBuildSourceArn:
     Condition: UseBuildSourceArn

@@ -122,7 +122,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # S3 Logging Bucket
 
-  BucketRegional:
+  AccessLogsBucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
@@ -158,7 +158,7 @@ Resources:
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref Bucket
+      Bucket: !Ref AccessLogsBucketRegional
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -167,8 +167,8 @@ Resources:
             Principal: "*"
             Action: 's3:*'
             Resource:
-              - !GetAtt Bucket.Arn
-              - !Join [ '/', [ !GetAtt Bucket.Arn, '*' ] ]
+              - !GetAtt AccessLogsBucketRegional.Arn
+              - !Join [ '/', [ !GetAtt AccessLogsBucketRegional.Arn, '*' ] ]
             Condition:
               Bool:
                 "aws:SecureTransport": false
@@ -178,7 +178,7 @@ Resources:
               Service: logging.s3.amazonaws.com
             Action: 
               - "s3:PutObject"
-            Resource: !Sub "${Bucket.Arn}/*"
+            Resource: !Sub "${AccessLogsBucketRegional.Arn}/*"
             Condition:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
@@ -189,7 +189,7 @@ Resources:
               Principal:
                 Service: delivery.logs.amazonaws.com
               Action: "s3:PutObject"
-              Resource: !Sub "${Bucket.Arn}/*"
+              Resource: !Sub "${AccessLogsBucketRegional.Arn}/*"
               Condition:
                 StringEquals:
                   "s3:x-amz-acl": "bucket-owner-full-control"
@@ -209,12 +209,12 @@ Outputs:
 
   LoggingBucketName:
     Description: The S3 Bucket Name used for CloudFront Origin.
-    Value: !Ref Bucket
+    Value: !Ref AccessLogsBucketRegional
     Export:
       Name: !Sub "${Prefix}-${ProjectId}-LoggingBucketName"
       
   LoggingBucketArn:
     Description: The S3 Bucket Arn used for CloudFront Origin.
-    Value: !GetAtt Bucket.Arn
+    Value: !GetAtt AccessLogsBucketRegional.Arn
     Export:
       Name: !Sub "${Prefix}-${ProjectId}-LoggingBucketArn"
