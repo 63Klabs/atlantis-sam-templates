@@ -14,6 +14,7 @@ Released versions are available from the public S3 bucket `63klabs`
   - Pipeline: template-pipeline.yml v2.0.20 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
   - Pipeline: template-pipeline-github.yml v2.0.3 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
   - Pipeline: template-pipeline-build-only.yml v2.0.5 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
+- **S3 Regional Buckets** - Added support for S3 regional buckets.
 
 ## v0.0.30 - 2026-03-17
 

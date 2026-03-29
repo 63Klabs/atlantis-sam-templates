@@ -5,7 +5,7 @@ Description: "S3 for storing Artifacts for CodeBuild and CodeDeploy - Deployed u
 # Atlantis for AWS SAM Deployments
 # Storage Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.1/2025-05-16
+# Version: v0.0.2/2026-03-29
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
