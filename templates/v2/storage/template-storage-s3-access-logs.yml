@@ -122,7 +122,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # S3 Logging Bucket
 
-  AccessLogsBucketRegional:
+  AccessLogBucketRegional:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
@@ -130,7 +130,7 @@ Resources:
       BucketName: !If # Preferred as it aligns with regional bucket naming
         - UseS3BucketNameOrgPrefix
         - !Sub "${S3BucketNameOrgPrefix}-${Prefix}-access-logs-${AWS::AccountId}-${AWS::Region}-an"
-        - !Sub "${Prefix}-access-logs-${AWS::AccountId}-${AWS::Region}-an"
+        - !Sub "${Prefix}-${ProjectId}-access-${AWS::AccountId}-${AWS::Region}-an"
       BucketNamespace: "account-regional"
       VersioningConfiguration:
         Status: Suspended
