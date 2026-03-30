@@ -158,7 +158,7 @@ Resources:
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref AccessLogsBucketRegional
+      Bucket: !Ref AccessLogBucketRegional
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -167,8 +167,8 @@ Resources:
             Principal: "*"
             Action: 's3:*'
             Resource:
-              - !GetAtt AccessLogsBucketRegional.Arn
-              - !Join [ '/', [ !GetAtt AccessLogsBucketRegional.Arn, '*' ] ]
+              - !GetAtt AccessLogBucketRegional.Arn
+              - !Join [ '/', [ !GetAtt AccessLogBucketRegional.Arn, '*' ] ]
             Condition:
               Bool:
                 "aws:SecureTransport": false
@@ -178,7 +178,7 @@ Resources:
               Service: logging.s3.amazonaws.com
             Action: 
               - "s3:PutObject"
-            Resource: !Sub "${AccessLogsBucketRegional.Arn}/*"
+            Resource: !Sub "${AccessLogBucketRegional.Arn}/*"
             Condition:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
@@ -189,7 +189,7 @@ Resources:
               Principal:
                 Service: delivery.logs.amazonaws.com
               Action: "s3:PutObject"
-              Resource: !Sub "${AccessLogsBucketRegional.Arn}/*"
+              Resource: !Sub "${AccessLogBucketRegional.Arn}/*"
               Condition:
                 StringEquals:
                   "s3:x-amz-acl": "bucket-owner-full-control"
@@ -209,12 +209,12 @@ Outputs:
 
   LoggingBucketName:
     Description: The S3 Bucket Name used for CloudFront Origin.
-    Value: !Ref AccessLogsBucketRegional
+    Value: !Ref AccessLogBucketRegional
     Export:
       Name: !Sub "${Prefix}-${ProjectId}-LoggingBucketName"
       
   LoggingBucketArn:
     Description: The S3 Bucket Arn used for CloudFront Origin.
-    Value: !GetAtt AccessLogsBucketRegional.Arn
+    Value: !GetAtt AccessLogBucketRegional.Arn
     Export:
       Name: !Sub "${Prefix}-${ProjectId}-LoggingBucketArn"
