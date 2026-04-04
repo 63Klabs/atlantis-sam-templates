@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
-## v0.0.31 - unreleased
+## v0.0.31 (2026-04-03)
 
 ### Added
 - **Pipeline: template-pipeline*.yml** - Added `SSMPublicParameterReadOnly` IAM policy statement to CloudFormationSvcRole, CodeBuildSvcRole, and PostDeploySvcRole on all 3 existing pipeline templates granting `ssm:GetParameter` and `ssm:GetParameters` on `/aws/service/*` public AWS SSM parameters, enabling `{{resolve:ssm:/aws/service/...}}` dynamic references in application templates [Spec: pipeline-ssm-parameter-access](../.kiro/specs/0-0-31-pipeline-ssm-parameter-access/)
@@ -16,7 +16,7 @@ Released versions are available from the public S3 bucket `63klabs`
   - Pipeline: template-pipeline-build-only.yml v2.0.5 - Switched notification messages from raw JSON-like format to human-readable plain text with labeled fields, blank-line separation, ALERT: prefix for failures, and call-to-action for failure notifications
 - **S3 Regional Buckets** - Added support for S3 regional buckets.
 
-## v0.0.30 - 2026-03-17
+## v0.0.30 (2026-03-17)
 
 ### Changed
 - **Network: template-network-route53-cloudfront-s3-apigw.yml (v0.0.17)** [Spec: cloudfront-function-associations](../.kiro/specs/0-0-30-cloudfront-function-associations/)
@@ -26,7 +26,7 @@ Released versions are available from the public S3 bucket `63klabs`
 - **Storage: template-storage-s3-access-logs.yml v0.0.2**
   - Added optional CloudFront legacy logging support with AllowLegacyCloudFrontLogs parameter [Spec: cloudfront-logging-acl-fix](../.kiro/specs/0-0-30-cloudfront-logging-acl-fix/)
 
-## v0.0.29 - 2026-02-18
+## v0.0.29 (2026-02-18)
 
 ### Added
 - **Comprehensive Documentation**: Full documentation of the repository structure, templates, and contribution guidelines
@@ -38,7 +38,7 @@ Released versions are available from the public S3 bucket `63klabs`
 - **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.15** - Added StaticOriginPath and ApiOriginPath parameters for customizable CloudFront origin paths [Spec: 0-0-29-network-add-origin-path-to-static-and-api](../.kiro/specs/0-0-29-network-add-origin-path-to-static-and-api/)
 - **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.16** - Added support for AWS managed cache policies with environment-based overrides [Spec: 0-0-29-network-add-managed-cache-policies](../.kiro/specs/0-0-29-network-add-managed-cache-policies/)
 
-## v0.0.28 - 2026-01-08
+## v0.0.28 (2026-01-08)
 
 ### Added
 - **CloudFormation Template Validation**: Automated validation of all CloudFormation templates using cfn-lint
