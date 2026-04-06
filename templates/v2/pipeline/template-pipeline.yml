@@ -982,13 +982,16 @@ Resources:
             Effect: Allow
             Resource: 
               - !Sub 
-                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}/*"
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}"
                 - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
               - !Sub 
-                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}-*/*"
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}/*"
                 - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
               - !Sub 
-                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${AWS::Region}-${AWS::AccountId}-${ProjectId}-${StageId}-*"
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*"
+                - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+              - !Sub 
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*"
                 - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
 
           # == Lambda Function ==
