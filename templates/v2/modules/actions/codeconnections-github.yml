@@ -1,0 +1,27 @@
+  # -- GitHub Connection for CodePipeline (Account-Wide) --
+  # Parent template must define: OrgPrefix, GitHubOrg
+  # Parent template must define condition: HasGitHubOrg
+  #
+  # Manual Completion Required: After deploying, you must manually complete
+  # the connection in the AWS Console. The connection will be in a "PENDING"
+  # state until you authorize it.
+  #
+  # To complete the connection:
+  #   1. Go to the AWS Console URL provided in the stack outputs
+  #   2. Find your connection and click "Update pending connection"
+  #   3. Follow the prompts to authorize AWS to access your GitHub organization
+  #
+  # Permissions: The user completing the connection must have admin permissions
+  # in the GitHub organization.
+
+  GitHubConnection:
+    Type: AWS::CodeConnections::Connection
+    Condition: HasGitHubOrg
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ConnectionName: !Sub "${OrgPrefix}-${GitHubOrg}-github-connection"
+      ProviderType: GitHub
+      Tags:
+        - Key: GitHubOrg
+          Value: !Ref GitHubOrg
