@@ -1,0 +1,188 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Prefix-based IAM Role and Managed Policy for Atlantis Service Role to be assumed by developers when deploying CloudFront network stacks (no Route53) - Deployed using SAM"
+
+# Atlantis for AWS SAM Deployments
+# Service Role Infrastructure Template
+# Author: Chad Kluck - 63klabs.net
+# Version: v0.0.0/2026-04-23
+
+# Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
+# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+
+# USE WITH:
+# - Network: template-network-route53-cloudfront-s3-apigw.yml
+#   - templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml
+
+# =============================================================================
+# META DATA
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudformation-interface.html
+#
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Application Resource Naming"
+        Parameters:
+          - Prefix
+          - PrefixUpper
+          - S3BucketNameOrgPrefix
+          - ServiceRolePath
+      -
+        Label:
+          default: "External Resources"
+        Parameters:
+          - PermissionsBoundaryArn
+      -
+        Label:
+          default: "Resources to Attach Managed Policy To"
+        Parameters:
+          - GroupNames
+          - UserNames
+          - RoleNames
+      -
+        Label:
+          default: "Module Locations"
+        Parameters:
+          - NetworkCloudFrontMgmtPolicyModuleUrl
+          - NetworkCloudFrontMgmtRoleModuleUrl
+
+# =============================================================================
+# PARAMETERS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+#
+
+Parameters:
+
+  # ---------------------------------------------------------------------------
+  # Application Resource Naming
+
+  Prefix:
+    Type: String
+    Default: "acme"
+    AllowedPattern: "^[a-z][a-z0-9-]{0,6}[a-z0-9]$"
+    MinLength: 2
+    MaxLength: 8
+    ConstraintDescription: "2 to 8 characters. Lower case alphanumeric and dashes."
+
+  PrefixUpper:
+    Type: String
+    Default: "ACME"
+    AllowedPattern: "^[A-Z][A-Z0-9-]{0,6}[A-Z0-9]$"
+    MinLength: 2
+    MaxLength: 8
+    ConstraintDescription: "2 to 8 characters. UPPER case alphanumeric and dashes."
+
+  S3BucketNameOrgPrefix:
+    Type: String
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters."
+
+  ServiceRolePath:
+    Type: String
+    Default: "/"
+    AllowedPattern: "^\\/([a-zA-Z0-9-_]+[\\/])+$|^\\/$"
+    ConstraintDescription: "Must begin and end with a slash."
+
+  # ---------------------------------------------------------------------------
+  # External Resources
+
+  PermissionsBoundaryArn:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[\\w+=,.@\\-\\/]*[\\w+=,.@\\-]+$"
+    ConstraintDescription: "Must be empty or a valid IAM Policy ARN."
+
+  # ---------------------------------------------------------------------------
+  # Resources to Attach Managed Policy To
+
+  GroupNames:
+    Type: CommaDelimitedList
+    Default: ""
+    AllowedPattern: "^[\\w+=,_.@\\-]+$|^$"
+  RoleNames:
+    Type: CommaDelimitedList
+    Default: ""
+    AllowedPattern: "^[\\w+=,_.@\\-]+$|^$"
+  UserNames:
+    Type: CommaDelimitedList
+    Default: ""
+    AllowedPattern: "^[\\w+=,_.@\\-]+$|^$"
+
+  # ---------------------------------------------------------------------------
+  # Module Locations
+
+  NetworkCloudFrontMgmtPolicyModuleUrl:
+    Type: String
+    Description: "S3 URL of the network CloudFront management policy module."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  NetworkCloudFrontMgmtRoleModuleUrl:
+    Type: String
+    Description: "S3 URL of the network CloudFront management role module."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+# =============================================================================
+# CONDITIONS
+# -----------------------------------------------------------------------------
+
+Conditions:
+  UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
+  HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
+  HasGroupNames: !Not [!Equals [!Join ["", !Ref GroupNames], ""]]
+  HasRoleNames: !Not [!Equals [!Join ["", !Ref RoleNames], ""]]
+  HasUserNames: !Not [!Equals [!Join ["", !Ref UserNames], ""]]
+
+# =============================================================================
+# RESOURCES
+# -----------------------------------------------------------------------------
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # -- Network CloudFront Management Policy --
+  # Module: modules/management-roles/network-cloudfront-mgmt-policy.yml
+
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+
+  # ---------------------------------------------------------------------------
+  # -- Network CloudFront Management Role and PassRole Policy --
+  # Module: modules/management-roles/network-cloudfront-mgmt-role.yml
+
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+
+# =============================================================================
+# OUTPUTS
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  NetworkCloudFrontMgmtServiceRoleArn:
+    Description: "The ARN of the CloudFront Network Management Service Role (no Route53)"
+    Value: !GetAtt PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole.Arn
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Arn"
+
+  NetworkCloudFrontMgmtServiceRoleName:
+    Description: "The Name of the CloudFront Network Management Service Role"
+    Value: !Ref PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Name"
+
+  NetworkCloudFrontMgmtManagedPolicyArn:
+    Description: "The ARN of the CloudFront Network Management Managed Policy"
+    Value: !Ref PrefixBasedNetworkCloudFrontMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-ManagedPolicy-Arn"

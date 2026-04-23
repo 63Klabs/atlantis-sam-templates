@@ -1,0 +1,59 @@
+  # -- Prefix-based CloudFormation Service Role for Network CloudFront Management --
+  # Parent template must define parameters:
+  #   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath,
+  #   PermissionsBoundaryArn, GroupNames, RoleNames, UserNames
+  # Parent template must define conditions:
+  #   HasPermissionsBoundaryArn, HasGroupNames, HasRoleNames, HasUserNames
+  # Parent template must include (before this module):
+  #   modules/management-roles/network-cloudfront-mgmt-policy.yml
+
+  # ---------------------------------------------------------------------------
+  # -- Network CloudFront Management Service Role (Developer) --
+  # --
+  # Service role for CloudFormation to deploy and manage CloudFront
+  # distributions, OAC, cache policies, and API Gateway custom domains.
+  # Does NOT include Route53 permissions.
+  # --
+
+  PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: !Ref ServiceRolePath
+      RoleName: !Sub "${PrefixUpper}-CloudFormation-Service-Role-Network-CloudFront-Mgmt"
+      Description: !Sub "Service Role to manage CloudFront distributions and API Gateway custom domains for prefix ${Prefix} (no Route53)"
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
+      ManagedPolicyArns:
+        - !Ref PrefixBasedNetworkCloudFrontMgmtPolicy
+      AssumeRolePolicyDocument:
+        Statement:
+          - Sid: "CloudFormationTrustPolicy"
+            Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+
+  # ---------------------------------------------------------------------------
+  # -- Managed Policy for Network CloudFront Management --
+  # --
+
+  PrefixBasedNetworkCloudFrontMgmtManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: !Sub "Managed Policy to deploy network CloudFront stacks under prefix ${Prefix}. Can be attached to Roles, Groups, or Users."
+      Path: !Ref ServiceRolePath
+      Groups: !If [HasGroupNames, !Ref GroupNames, !Ref 'AWS::NoValue']
+      Roles: !If [HasRoleNames, !Ref RoleNames, !Ref 'AWS::NoValue']
+      Users: !If [HasUserNames, !Ref UserNames, !Ref 'AWS::NoValue']
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowUserToPassSpecificCloudFormationServiceRole"
+            Effect: "Allow"
+            Action:
+              - iam:GetRole
+              - iam:PassRole
+            Resource: !GetAtt PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole.Arn
+            Condition:
+              StringEquals:
+                "iam:PassedToService": "cloudformation.amazonaws.com"
