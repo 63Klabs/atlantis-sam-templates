@@ -1,124 +1,124 @@
-  # -- Managed Policy: Cognito User Pool CRUD (Account-Wide, ABAC-Scoped) --
-  # Parent template must define: OrgPrefix, RolePath
+# -- Managed Policy: Cognito User Pool CRUD (Account-Wide, ABAC-Scoped) --
+# Parent template must define: OrgPrefix, RolePath
 
-  CloudFormationCognitoPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      ManagedPolicyName: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
-      Description: "Allows CloudFormation service roles to manage Cognito User Pools scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
-      Path: !Ref RolePath
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
+CloudFormationCognitoPolicy:
+  Type: AWS::IAM::ManagedPolicy
+  Properties:
+    ManagedPolicyName: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
+    Description: "Allows CloudFormation service roles to manage Cognito User Pools scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
+    Path: !Ref RolePath
+    PolicyDocument:
+      Version: "2012-10-17"
+      Statement:
 
-          # ------------------------------------------------------------------
-          # Cognito User Pool - Create
-          # Uses aws:RequestTag to validate tags on the resource being created.
-          # CreateUserPool supports aws:RequestTag, aws:TagKeys, and
-          # aws:ResourceTag condition keys.
-          # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Cognito User Pool - Create
+        # Uses aws:RequestTag to validate tags on the resource being created.
+        # CreateUserPool supports aws:RequestTag, aws:TagKeys, and
+        # aws:ResourceTag condition keys.
+        # ------------------------------------------------------------------
 
-          - Sid: CognitoCreateWithTagMatch
-            Effect: Allow
-            Action:
-              - cognito-idp:CreateUserPool
-            Resource: "*"
-            Condition:
-              StringEquals:
-                "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+        - Sid: CognitoCreateWithTagMatch
+          Effect: Allow
+          Action:
+            - cognito-idp:CreateUserPool
+          Resource: "*"
+          Condition:
+            StringEquals:
+              "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-          # ------------------------------------------------------------------
-          # Cognito User Pool - Update, Delete, Read
-          # Uses aws:ResourceTag on the userpool resource to validate tags on
-          # the existing resource. Covers pool configuration, clients, domains,
-          # groups, identity providers, and resource servers.
-          # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Cognito User Pool - Update, Delete, Read
+        # Uses aws:ResourceTag on the userpool resource to validate tags on
+        # the existing resource. Covers pool configuration, clients, domains,
+        # groups, identity providers, and resource servers.
+        # ------------------------------------------------------------------
 
-          - Sid: CognitoManageWithTagMatch
-            Effect: Allow
-            Action:
-              - cognito-idp:UpdateUserPool
-              - cognito-idp:DeleteUserPool
-              - cognito-idp:DescribeUserPool
-              - cognito-idp:CreateUserPoolClient
-              - cognito-idp:UpdateUserPoolClient
-              - cognito-idp:DeleteUserPoolClient
-              - cognito-idp:DescribeUserPoolClient
-              - cognito-idp:ListUserPoolClients
-              - cognito-idp:CreateUserPoolDomain
-              - cognito-idp:UpdateUserPoolDomain
-              - cognito-idp:DeleteUserPoolDomain
-              - cognito-idp:CreateGroup
-              - cognito-idp:UpdateGroup
-              - cognito-idp:DeleteGroup
-              - cognito-idp:GetGroup
-              - cognito-idp:ListGroups
-              - cognito-idp:CreateIdentityProvider
-              - cognito-idp:UpdateIdentityProvider
-              - cognito-idp:DeleteIdentityProvider
-              - cognito-idp:DescribeIdentityProvider
-              - cognito-idp:ListIdentityProviders
-              - cognito-idp:GetIdentityProviderByIdentifier
-              - cognito-idp:CreateResourceServer
-              - cognito-idp:UpdateResourceServer
-              - cognito-idp:DeleteResourceServer
-              - cognito-idp:DescribeResourceServer
-              - cognito-idp:ListResourceServers
-              - cognito-idp:SetUserPoolMfaConfig
-              - cognito-idp:GetUserPoolMfaConfig
-              - cognito-idp:SetUICustomization
-              - cognito-idp:GetUICustomization
-              - cognito-idp:SetRiskConfiguration
-              - cognito-idp:DescribeRiskConfiguration
-              - cognito-idp:SetLogDeliveryConfiguration
-              - cognito-idp:GetLogDeliveryConfiguration
-              - cognito-idp:CreateManagedLoginBranding
-              - cognito-idp:UpdateManagedLoginBranding
-              - cognito-idp:DeleteManagedLoginBranding
-              - cognito-idp:DescribeManagedLoginBranding
-              - cognito-idp:DescribeManagedLoginBrandingByClient
-              - cognito-idp:AddCustomAttributes
-              - cognito-idp:GetSigningCertificate
-              - cognito-idp:ListTagsForResource
-            Resource: "*"
-            Condition:
-              StringEquals:
-                "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+        - Sid: CognitoManageWithTagMatch
+          Effect: Allow
+          Action:
+            - cognito-idp:UpdateUserPool
+            - cognito-idp:DeleteUserPool
+            - cognito-idp:DescribeUserPool
+            - cognito-idp:CreateUserPoolClient
+            - cognito-idp:UpdateUserPoolClient
+            - cognito-idp:DeleteUserPoolClient
+            - cognito-idp:DescribeUserPoolClient
+            - cognito-idp:ListUserPoolClients
+            - cognito-idp:CreateUserPoolDomain
+            - cognito-idp:UpdateUserPoolDomain
+            - cognito-idp:DeleteUserPoolDomain
+            - cognito-idp:CreateGroup
+            - cognito-idp:UpdateGroup
+            - cognito-idp:DeleteGroup
+            - cognito-idp:GetGroup
+            - cognito-idp:ListGroups
+            - cognito-idp:CreateIdentityProvider
+            - cognito-idp:UpdateIdentityProvider
+            - cognito-idp:DeleteIdentityProvider
+            - cognito-idp:DescribeIdentityProvider
+            - cognito-idp:ListIdentityProviders
+            - cognito-idp:GetIdentityProviderByIdentifier
+            - cognito-idp:CreateResourceServer
+            - cognito-idp:UpdateResourceServer
+            - cognito-idp:DeleteResourceServer
+            - cognito-idp:DescribeResourceServer
+            - cognito-idp:ListResourceServers
+            - cognito-idp:SetUserPoolMfaConfig
+            - cognito-idp:GetUserPoolMfaConfig
+            - cognito-idp:SetUICustomization
+            - cognito-idp:GetUICustomization
+            - cognito-idp:SetRiskConfiguration
+            - cognito-idp:DescribeRiskConfiguration
+            - cognito-idp:SetLogDeliveryConfiguration
+            - cognito-idp:GetLogDeliveryConfiguration
+            - cognito-idp:CreateManagedLoginBranding
+            - cognito-idp:UpdateManagedLoginBranding
+            - cognito-idp:DeleteManagedLoginBranding
+            - cognito-idp:DescribeManagedLoginBranding
+            - cognito-idp:DescribeManagedLoginBrandingByClient
+            - cognito-idp:AddCustomAttributes
+            - cognito-idp:GetSigningCertificate
+            - cognito-idp:ListTagsForResource
+          Resource: "*"
+          Condition:
+            StringEquals:
+              "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-          # ------------------------------------------------------------------
-          # Cognito User Pool - Tagging
-          # Allow tag/untag only when the atlantis:ApplicationDeploymentId tag
-          # on the existing resource matches the principal's tag.
-          # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Cognito User Pool - Tagging
+        # Allow tag/untag only when the atlantis:ApplicationDeploymentId tag
+        # on the existing resource matches the principal's tag.
+        # ------------------------------------------------------------------
 
-          - Sid: CognitoTagOperations
-            Effect: Allow
-            Action:
-              - cognito-idp:TagResource
-              - cognito-idp:UntagResource
-            Resource: "*"
-            Condition:
-              StringEquals:
-                "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+        - Sid: CognitoTagOperations
+          Effect: Allow
+          Action:
+            - cognito-idp:TagResource
+            - cognito-idp:UntagResource
+          Resource: "*"
+          Condition:
+            StringEquals:
+              "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-          # ------------------------------------------------------------------
-          # Deny tag tampering
-          # Prevent changing or removing the atlantis:ApplicationDeploymentId
-          # tag to a value that differs from the principal's own tag. This
-          # closes the loophole where a role could re-tag a resource to escape
-          # ABAC scope.
-          # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Deny tag tampering
+        # Prevent changing or removing the atlantis:ApplicationDeploymentId
+        # tag to a value that differs from the principal's own tag. This
+        # closes the loophole where a role could re-tag a resource to escape
+        # ABAC scope.
+        # ------------------------------------------------------------------
 
-          - Sid: DenyCognitoTagTampering
-            Effect: Deny
-            Action:
-              - cognito-idp:TagResource
-              - cognito-idp:UntagResource
-              - cognito-idp:CreateUserPool
-              - cognito-idp:UpdateUserPool
-            Resource: "*"
-            Condition:
-              StringNotEquals:
-                "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
-              "Null":
-                "aws:RequestTag/atlantis:ApplicationDeploymentId": "false"
+        - Sid: DenyCognitoTagTampering
+          Effect: Deny
+          Action:
+            - cognito-idp:TagResource
+            - cognito-idp:UntagResource
+            - cognito-idp:CreateUserPool
+            - cognito-idp:UpdateUserPool
+          Resource: "*"
+          Condition:
+            StringNotEquals:
+              "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+            "Null":
+              "aws:RequestTag/atlantis:ApplicationDeploymentId": "false"
