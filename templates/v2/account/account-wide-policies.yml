@@ -152,14 +152,14 @@ Resources:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/project-pipeline-policies/codebuild-crud.yml"
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/codebuild-crud.yml"
 
   # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
   CloudFormationCognitoPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/project-pipeline-policies/cognito-crud.yml"
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
 
   # -- GitHub Connection (Conditional) --
   GitHubConnection:
@@ -192,67 +192,67 @@ Resources:
 # your cloudformation OUTPUT section. Test URLs, direct links to resources, etc
 #
 
-Outputs:
+# Outputs:
 
-  # ---------------------------------------------------------------------------
-  # CodeBuild CRUD Policy
+#   # ---------------------------------------------------------------------------
+#   # CodeBuild CRUD Policy
 
-  CodeBuildCrudPolicyArn:
-    Description: "ARN of the CodeBuild CRUD managed policy. Pass this to pipeline templates via CodeBuildSvcRoleIncludeManagedPolicyArns or the CloudFormation service role managed policy parameter."
-    Value: !Ref CloudFormationCodeBuildPolicy
-    Export:
-      Name: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud-Arn"
+#   CodeBuildCrudPolicyArn:
+#     Description: "ARN of the CodeBuild CRUD managed policy. Pass this to pipeline templates via CodeBuildSvcRoleIncludeManagedPolicyArns or the CloudFormation service role managed policy parameter."
+#     Value: !Ref CloudFormationCodeBuildPolicy
+#     Export:
+#       Name: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud-Arn"
 
-  CodeBuildCrudPolicyName:
-    Description: "Name of the CodeBuild CRUD managed policy"
-    Value: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud"
+#   CodeBuildCrudPolicyName:
+#     Description: "Name of the CodeBuild CRUD managed policy"
+#     Value: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud"
 
-  # ---------------------------------------------------------------------------
-  # Cognito CRUD Policy
+#   # ---------------------------------------------------------------------------
+#   # Cognito CRUD Policy
 
-  CognitoCrudPolicyArn:
-    Description: "ARN of the Cognito CRUD managed policy. Pass this to pipeline templates via the CloudFormation service role managed policy parameter."
-    Value: !Ref CloudFormationCognitoPolicy
-    Export:
-      Name: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud-Arn"
+#   CognitoCrudPolicyArn:
+#     Description: "ARN of the Cognito CRUD managed policy. Pass this to pipeline templates via the CloudFormation service role managed policy parameter."
+#     Value: !Ref CloudFormationCognitoPolicy
+#     Export:
+#       Name: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud-Arn"
 
-  CognitoCrudPolicyName:
-    Description: "Name of the Cognito CRUD managed policy"
-    Value: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
+#   CognitoCrudPolicyName:
+#     Description: "Name of the Cognito CRUD managed policy"
+#     Value: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
 
-  # ---------------------------------------------------------------------------
-  # GitHub Connection
+#   # ---------------------------------------------------------------------------
+#   # GitHub Connection
 
-  GitHubConnectionArn:
-    Condition: HasGitHubOrg
-    Description: "ARN of the GitHub connection. Pass this to pipeline templates via GitHubConnectionArn. Note: You must manually complete the connection in the AWS Console."
-    Value: !Ref GitHubConnection
-    Export:
-      Name: !Sub "${OrgPrefix}-GitHub-Connection-Arn"
+#   GitHubConnectionArn:
+#     Condition: HasGitHubOrg
+#     Description: "ARN of the GitHub connection. Pass this to pipeline templates via GitHubConnectionArn. Note: You must manually complete the connection in the AWS Console."
+#     Value: !Ref GitHubConnection
+#     Export:
+#       Name: !Sub "${OrgPrefix}-GitHub-Connection-Arn"
 
-  GitHubConnectionStatus:
-    Condition: HasGitHubOrg
-    Description: "Status of the GitHub connection (PENDING until manually authorized)"
-    Value: !GetAtt GitHubConnection.ConnectionStatus
+#   GitHubConnectionStatus:
+#     Condition: HasGitHubOrg
+#     Description: "Status of the GitHub connection (PENDING until manually authorized)"
+#     Value: !GetAtt GitHubConnection.ConnectionStatus
 
-  CodeConnectionsConsole:
-    Condition: HasGitHubOrg
-    Description: "URL to complete the GitHub connection setup in the AWS Console"
-    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/settings/connections"
+#   CodeConnectionsConsole:
+#     Condition: HasGitHubOrg
+#     Description: "URL to complete the GitHub connection setup in the AWS Console"
+#     Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/settings/connections"
 
-  # ---------------------------------------------------------------------------
-  # API Gateway CloudWatch Logging
+#   # ---------------------------------------------------------------------------
+#   # API Gateway CloudWatch Logging
 
-  ApiGatewayCloudWatchLogsRoleArn:
-    Condition: EnableApiGatewayLogging
-    Description: "ARN of the IAM role used by API Gateway to push logs to CloudWatch"
-    Value: !GetAtt ApiGatewayCloudWatchLogsRole.Arn
-    Export:
-      Name: !Sub "${OrgPrefix}-ApiGateway-CloudWatch-Role-Arn"
+#   ApiGatewayCloudWatchLogsRoleArn:
+#     Condition: EnableApiGatewayLogging
+#     Description: "ARN of the IAM role used by API Gateway to push logs to CloudWatch"
+#     Value: !GetAtt ApiGatewayCloudWatchLogsRole.Arn
+#     Export:
+#       Name: !Sub "${OrgPrefix}-ApiGateway-CloudWatch-Role-Arn"
 
-  # ---------------------------------------------------------------------------
-  # Console Links
+#   # ---------------------------------------------------------------------------
+#   # Console Links
 
-  IAMPoliciesConsole:
-    Description: "IAM Policies in AWS Console"
-    Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"
+#   IAMPoliciesConsole:
+#     Description: "IAM Policies in AWS Console"
+#     Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"

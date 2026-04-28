@@ -262,7 +262,7 @@ Resources:
 # your cloudformation OUTPUT section. Test URLs, direct links to resources, etc
 #
 
-Outputs:
+# Outputs:
 
   # ---------------------------------------------------------------------------
   # Pipeline Management
