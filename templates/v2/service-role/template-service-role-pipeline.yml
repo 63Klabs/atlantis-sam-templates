@@ -49,10 +49,9 @@ Metadata:
           - RoleNames
       -
         Label:
-          default: "Module Location"
+          default: "Module Source"
         Parameters:
-          - PipelineMgmtRoleModuleUrl
-          - PipelineMgmtPassrolePolicyModuleUrl
+          - S3ModuleLocation
 
 # =============================================================================
 # PARAMETERS
@@ -133,19 +132,14 @@ Parameters:
     ConstraintDescription: "Must be empty or a comma delimited list of valid IAM User names."
 
   # ---------------------------------------------------------------------------
-  # Module Location
+  # Module Source
 
-  PipelineMgmtRoleModuleUrl:
+  S3ModuleLocation:
     Type: String
-    Description: "S3 URL of the pipeline management role module snippet (e.g., s3://my-devops-bucket/modules/management-roles/pipeline-mgmt-role.yml)."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
-
-  PipelineMgmtPassrolePolicyModuleUrl:
-    Type: String
-    Description: "S3 URL of the pipeline management passrole policy module snippet (e.g., s3://my-devops-bucket/modules/management-roles/pipeline-mgmt-passrole-policy.yml)."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+    Description: "S3 bucket name and namespace prefix for module snippets (without s3:// prefix or trailing slash). Modules are loaded from s3://<S3ModuleLocation>/templates/v2/modules/*"
+    Default: "63klabs/atlantis"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*[^\\/]$"
+    ConstraintDescription: "Must be a valid S3 bucket/path without s3:// prefix or trailing slash."
 
 # =============================================================================
 # CONDITIONS
@@ -174,13 +168,13 @@ Resources:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref PipelineMgmtRoleModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/pipeline-mgmt-role.yml"
 
   PrefixBasedPipelineMgmtManagedPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref PipelineMgmtPassrolePolicyModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/pipeline-mgmt-passrole-policy.yml"
 
 # =============================================================================
 # OUTPUTS

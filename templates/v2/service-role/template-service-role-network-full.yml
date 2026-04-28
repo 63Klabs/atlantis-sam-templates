@@ -50,12 +50,9 @@ Metadata:
           - RoleNames
       -
         Label:
-          default: "Module Locations"
+          default: "Module Source"
         Parameters:
-          - NetworkCloudFrontMgmtPolicyModuleUrl
-          - NetworkRoute53MgmtPolicyModuleUrl
-          - NetworkFullMgmtRoleModuleUrl
-          - NetworkFullMgmtPassrolePolicyModuleUrl
+          - S3ModuleLocation
 
 # =============================================================================
 # PARAMETERS
@@ -105,25 +102,12 @@ Parameters:
     Default: ""
     AllowedPattern: "^[\\w+=,_.@\\-]+$|^$"
 
-  NetworkCloudFrontMgmtPolicyModuleUrl:
+  S3ModuleLocation:
     Type: String
-    Description: "S3 URL of the network CloudFront management policy module."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-
-  NetworkRoute53MgmtPolicyModuleUrl:
-    Type: String
-    Description: "S3 URL of the network Route53 management policy module."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-
-  NetworkFullMgmtRoleModuleUrl:
-    Type: String
-    Description: "S3 URL of the full network management role module."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-
-  NetworkFullMgmtPassrolePolicyModuleUrl:
-    Type: String
-    Description: "S3 URL of the full network management passrole policy module."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    Description: "S3 bucket name and namespace prefix for module snippets (without s3:// prefix or trailing slash). Modules are loaded from s3://<S3ModuleLocation>/templates/v2/modules/*"
+    Default: "63klabs/atlantis"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*[^\\/]$"
+    ConstraintDescription: "Must be a valid S3 bucket/path without s3:// prefix or trailing slash."
 
 # =============================================================================
 # CONDITIONS
@@ -148,25 +132,25 @@ Resources:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-policy.yml"
 
   PrefixBasedNetworkRoute53MgmtPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-route53-mgmt-policy.yml"
 
   PrefixBasedCloudFormationNetworkFullMgmtServiceRole:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref NetworkFullMgmtRoleModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/templates/v2/modules/management-roles/network-full-mgmt-role.yml"
 
   PrefixBasedNetworkFullMgmtManagedPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref NetworkFullMgmtPassrolePolicyModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-full-mgmt-passrole-policy.yml"
 
 # =============================================================================
 # OUTPUTS

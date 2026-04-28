@@ -67,17 +67,9 @@ Metadata:
           - EnableApiGwCloudWatchLogs
       -
         Label:
-          default: "Module Locations (Policies)"
+          default: "Module Source"
         Parameters:
-          - CodeBuildCrudModuleUrl
-          - CognitoCrudModuleUrl
-      -
-        Label:
-          default: "Module Locations (Actions)"
-        Parameters:
-          - CodeConnectionsGitHubModuleUrl
-          - ApiGwCloudWatchRoleModuleUrl
-          - ApiGwCloudWatchAccountModuleUrl
+          - S3ModuleLocation
 
 # =============================================================================
 # PARAMETERS
@@ -110,19 +102,14 @@ Parameters:
     ConstraintDescription: "May only contain alphanumeric characters, forward slashes, underscores, and dashes. Must begin and end with a slash."
 
   # ---------------------------------------------------------------------------
-  # Policy Module Locations (S3 URLs for AWS::Include snippets)
+  # Module Source
 
-  CodeBuildCrudModuleUrl:
+  S3ModuleLocation:
     Type: String
-    Description: "S3 URL of the CodeBuild CRUD policy module snippet (e.g., s3://my-devops-bucket/modules/project-pipeline-policies/codebuild-crud.yml)."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
-
-  CognitoCrudModuleUrl:
-    Type: String
-    Description: "S3 URL of the Cognito CRUD policy module snippet (e.g., s3://my-devops-bucket/modules/project-pipeline-policies/cognito-crud.yml)."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+    Description: "S3 bucket name and namespace prefix for module snippets (without s3:// prefix or trailing slash). Modules are loaded from s3://<S3ModuleLocation>/templates/v2/modules/*"
+    Default: "63klabs/atlantis"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*[^\\/]$"
+    ConstraintDescription: "Must be a valid S3 bucket/path without s3:// prefix or trailing slash (e.g., my-bucket/path/to/modules)."
 
   # ---------------------------------------------------------------------------
   # GitHub Connection
@@ -142,27 +129,6 @@ Parameters:
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
 
-  # ---------------------------------------------------------------------------
-  # Action Module Locations (S3 URLs for AWS::Include snippets)
-
-  CodeConnectionsGitHubModuleUrl:
-    Type: String
-    Description: "S3 URL of the CodeConnections GitHub module snippet (e.g., s3://my-devops-bucket/modules/actions/codeconnections-github.yml). The module URL is always required, but the GitHub connection resource is only created when GitHubOrg is provided."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
-
-  ApiGwCloudWatchRoleModuleUrl:
-    Type: String
-    Description: "S3 URL of the API Gateway CloudWatch role module snippet."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
-
-  ApiGwCloudWatchAccountModuleUrl:
-    Type: String
-    Description: "S3 URL of the API Gateway Account configuration module snippet."
-    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
-    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
-
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -181,46 +147,41 @@ Conditions:
 
 Resources:
 
-  # ---------------------------------------------------------------------------
   # -- CodeBuild and Logs CRUD Policy (ABAC-Scoped) --
   CloudFormationCodeBuildPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref CodeBuildCrudModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/project-pipeline-policies/codebuild-crud.yml"
 
-  # ---------------------------------------------------------------------------
   # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
   CloudFormationCognitoPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref CognitoCrudModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/project-pipeline-policies/cognito-crud.yml"
 
-  # ---------------------------------------------------------------------------
   # -- GitHub Connection (Conditional) --
   GitHubConnection:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref CodeConnectionsGitHubModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/codeconnections-github.yml"
 
-  # ---------------------------------------------------------------------------
   # -- API Gateway CloudWatch Role (Conditional) --
   ApiGatewayCloudWatchLogsRole:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref ApiGwCloudWatchRoleModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-role.yml"
 
-  # ---------------------------------------------------------------------------
   # -- API Gateway Account Configuration (Conditional) --
   ApiGatewayAccount:
     DependsOn: ApiGatewayCloudWatchLogsRole
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Ref ApiGwCloudWatchAccountModuleUrl
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-account.yml"
 
 # =============================================================================
 # OUTPUTS
