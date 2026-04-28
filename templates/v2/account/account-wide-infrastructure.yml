@@ -4,10 +4,10 @@ Description: "Account-wide resources for project pipelines: ABAC-scoped managed 
 # Atlantis for AWS SAM Deployments
 # Account Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.0/2026-04-23
+# Version: v0.0.0/2026-04-28
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63klabs/atlantis-sam-templates/
 
 # This template assembles account-wide resources for project pipelines from
 # reusable modules (snippets) stored in S3. It includes:
@@ -20,16 +20,8 @@ Description: "Account-wide resources for project pipelines: ABAC-scoped managed 
 # them to their CloudFormation service roles.
 #
 # Each snippet references parameters from this template. Policy snippets
-# use OrgPrefix and RolePath. Action snippets use OrgPrefix and
+# use OrgPrefix and RolePath. Account-Wide snippets use OrgPrefix and
 # service-specific parameters (e.g., GitHubOrg).
-
-# USE WITH:
-# - Pipeline: template-pipeline.yml
-#   - templates/v2/pipeline/template-pipeline.yml
-# - Pipeline (Build Only): template-pipeline-build-only.yml
-#   - templates/v2/pipeline/template-pipeline-build-only.yml
-# - Pipeline (GitHub): template-pipeline-github.yml
-#   - templates/v2/pipeline/template-pipeline-github.yml
 
 # =============================================================================
 # META DATA
@@ -157,12 +149,12 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/codebuild-crud.yml"
 
-  # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
-  CloudFormationCognitoPolicy:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
+  # # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
+  # CloudFormationCognitoPolicy:
+  #   Fn::Transform:
+  #     Name: AWS::Include
+  #     Parameters:
+  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
 
   # # -- GitHub Connection (Conditional) --
   # GitHubConnection:
