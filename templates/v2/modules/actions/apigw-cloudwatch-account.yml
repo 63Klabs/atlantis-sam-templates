@@ -1,0 +1,9 @@
+# -- API Gateway Account Configuration --
+# Parent template must define condition: EnableApiGatewayLogging
+# Parent must name the CloudWatch role resource 'ApiGatewayCloudWatchLogsRole'
+# Note: Parent template must ensure the CloudWatch role resource is created before this resource (use DependsOn in parent)
+
+Type: AWS::ApiGateway::Account
+Condition: EnableApiGatewayLogging
+Properties:
+  CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchLogsRole.Arn

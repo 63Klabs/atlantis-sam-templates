@@ -24,7 +24,6 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
-        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
         - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
@@ -56,6 +55,7 @@ Metadata:
           - NetworkCloudFrontMgmtPolicyModuleUrl
           - NetworkRoute53MgmtPolicyModuleUrl
           - NetworkFullMgmtRoleModuleUrl
+          - NetworkFullMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # PARAMETERS
@@ -120,6 +120,11 @@ Parameters:
     Description: "S3 URL of the full network management role module."
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
 
+  NetworkFullMgmtPassrolePolicyModuleUrl:
+    Type: String
+    Description: "S3 URL of the full network management passrole policy module."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -139,24 +144,29 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  PrefixBasedNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
-  # -- Network Route53 Management Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+  PrefixBasedNetworkRoute53MgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
-  # -- Full Network Management Role and PassRole Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkFullMgmtRoleModuleUrl
+  PrefixBasedCloudFormationNetworkFullMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtRoleModuleUrl
+
+  PrefixBasedNetworkFullMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # OUTPUTS

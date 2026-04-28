@@ -1,107 +1,106 @@
 # -- Managed Policy: CodeBuild and Logs CRUD (Account-Wide, ABAC-Scoped) --
 # Parent template must define: OrgPrefix, RolePath
 
-CloudFormationCodeBuildPolicy:
-  Type: AWS::IAM::ManagedPolicy
-  Properties:
-    ManagedPolicyName: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud"
-    Description: "Allows CloudFormation service roles to manage CodeBuild projects and /aws/codebuild/ log groups scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
-    Path: !Ref RolePath
-    PolicyDocument:
-      Version: "2012-10-17"
-      Statement:
+Type: AWS::IAM::ManagedPolicy
+Properties:
+  ManagedPolicyName: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud"
+  Description: "Allows CloudFormation service roles to manage CodeBuild projects and /aws/codebuild/ log groups scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
+  Path: !Ref RolePath
+  PolicyDocument:
+    Version: "2012-10-17"
+    Statement:
 
-        # ------------------------------------------------------------------
-        # CodeBuild Project - Create
-        # Uses aws:RequestTag to validate tags on the resource being created
-        # (chicken-and-egg: resource doesn't have tags until created)
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CodeBuild Project - Create
+      # Uses aws:RequestTag to validate tags on the resource being created
+      # (chicken-and-egg: resource doesn't have tags until created)
+      # ------------------------------------------------------------------
 
-        - Sid: CodeBuildCreateWithTagMatch
-          Effect: Allow
-          Action:
-            - codebuild:CreateProject
-          Resource: "*"
-          Condition:
-            StringEquals:
-              "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+      - Sid: CodeBuildCreateWithTagMatch
+        Effect: Allow
+        Action:
+          - codebuild:CreateProject
+        Resource: "*"
+        Condition:
+          StringEquals:
+            "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-        # ------------------------------------------------------------------
-        # CodeBuild Project - Update, Delete, Read
-        # Uses aws:ResourceTag to validate tags on the existing resource
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CodeBuild Project - Update, Delete, Read
+      # Uses aws:ResourceTag to validate tags on the existing resource
+      # ------------------------------------------------------------------
 
-        - Sid: CodeBuildManageWithTagMatch
-          Effect: Allow
-          Action:
-            - codebuild:UpdateProject
-            - codebuild:DeleteProject
-            - codebuild:BatchGetProjects
-          Resource: "*"
-          Condition:
-            StringEquals:
-              "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+      - Sid: CodeBuildManageWithTagMatch
+        Effect: Allow
+        Action:
+          - codebuild:UpdateProject
+          - codebuild:DeleteProject
+          - codebuild:BatchGetProjects
+        Resource: "*"
+        Condition:
+          StringEquals:
+            "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-        # ------------------------------------------------------------------
-        # CodeBuild Tagging
-        # Allow tag/untag only when the atlantis:ApplicationDeploymentId tag matches
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CodeBuild Tagging
+      # Allow tag/untag only when the atlantis:ApplicationDeploymentId tag matches
+      # ------------------------------------------------------------------
 
-        - Sid: CodeBuildTagOperations
-          Effect: Allow
-          Action:
-            - codebuild:TagResource
-            - codebuild:UntagResource
-          Resource: "*"
-          Condition:
-            StringEquals:
-              "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+      - Sid: CodeBuildTagOperations
+        Effect: Allow
+        Action:
+          - codebuild:TagResource
+          - codebuild:UntagResource
+        Resource: "*"
+        Condition:
+          StringEquals:
+            "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
 
-        # ------------------------------------------------------------------
-        # CloudWatch Logs CRUD for /aws/codebuild/* log groups
-        # Log groups do not support tag-based authorization on all actions,
-        # so we scope by resource name pattern. The log group name follows:
-        #   /aws/codebuild/Prefix-ProjectId-StageId-SchedContainer
-        # which is deterministic from the CodeBuild project name.
-        #
-        # Since we cannot use ABAC on log group creation, we use a wildcard
-        # on /aws/codebuild/* and rely on the fact that only the CloudFormation
-        # service role (which is already scoped) calls these actions.
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudWatch Logs CRUD for /aws/codebuild/* log groups
+      # Log groups do not support tag-based authorization on all actions,
+      # so we scope by resource name pattern. The log group name follows:
+      #   /aws/codebuild/Prefix-ProjectId-StageId-SchedContainer
+      # which is deterministic from the CodeBuild project name.
+      #
+      # Since we cannot use ABAC on log group creation, we use a wildcard
+      # on /aws/codebuild/* and rely on the fact that only the CloudFormation
+      # service role (which is already scoped) calls these actions.
+      # ------------------------------------------------------------------
 
-        - Sid: LogGroupCRUDForCodeBuild
-          Effect: Allow
-          Action:
-            - logs:CreateLogGroup
-            - logs:DeleteLogGroup
-            - logs:PutRetentionPolicy
-            - logs:DeleteRetentionPolicy
-            - logs:TagLogGroup
-            - logs:UntagLogGroup
-            - logs:TagResource
-            - logs:UntagResource
-            - logs:ListTagsForResource
-            - logs:DescribeLogGroups
-          Resource:
-            - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+      - Sid: LogGroupCRUDForCodeBuild
+        Effect: Allow
+        Action:
+          - logs:CreateLogGroup
+          - logs:DeleteLogGroup
+          - logs:PutRetentionPolicy
+          - logs:DeleteRetentionPolicy
+          - logs:TagLogGroup
+          - logs:UntagLogGroup
+          - logs:TagResource
+          - logs:UntagResource
+          - logs:ListTagsForResource
+          - logs:DescribeLogGroups
+        Resource:
+          - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
 
-        # ------------------------------------------------------------------
-        # Deny tag tampering
-        # Prevent changing or removing the atlantis:ApplicationDeploymentId tag to a
-        # value that differs from the principal's own tag. This closes the
-        # loophole where a role could re-tag a resource to escape ABAC scope.
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # Deny tag tampering
+      # Prevent changing or removing the atlantis:ApplicationDeploymentId tag to a
+      # value that differs from the principal's own tag. This closes the
+      # loophole where a role could re-tag a resource to escape ABAC scope.
+      # ------------------------------------------------------------------
 
-        - Sid: DenyCodeBuildTagTampering
-          Effect: Deny
-          Action:
-            - codebuild:TagResource
-            - codebuild:UntagResource
-            - codebuild:CreateProject
-            - codebuild:UpdateProject
-          Resource: "*"
-          Condition:
-            StringNotEquals:
-              "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
-            "Null":
-              "aws:RequestTag/atlantis:ApplicationDeploymentId": "false"
+      - Sid: DenyCodeBuildTagTampering
+        Effect: Deny
+        Action:
+          - codebuild:TagResource
+          - codebuild:UntagResource
+          - codebuild:CreateProject
+          - codebuild:UpdateProject
+        Resource: "*"
+        Condition:
+          StringNotEquals:
+            "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+          "Null":
+            "aws:RequestTag/atlantis:ApplicationDeploymentId": "false"

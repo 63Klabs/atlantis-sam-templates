@@ -52,6 +52,7 @@ Metadata:
           default: "Module Location"
         Parameters:
           - StorageMgmtRoleModuleUrl
+          - StorageMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # PARAMETERS
@@ -140,6 +141,12 @@ Parameters:
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
+  StorageMgmtPassrolePolicyModuleUrl:
+    Type: String
+    Description: "S3 URL of the storage management passrole policy module snippet (e.g., s3://my-devops-bucket/modules/management-roles/storage-mgmt-passrole-policy.yml)."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -163,10 +170,17 @@ Resources:
   
   # ---------------------------------------------------------------------------
   # -- Prefix-based IAM Service Roles and Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref StorageMgmtRoleModuleUrl
+  PrefixBasedCloudFormationStorageMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtRoleModuleUrl
+
+  PrefixBasedStorageMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # OUTPUTS

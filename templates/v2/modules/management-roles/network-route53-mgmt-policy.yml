@@ -12,36 +12,35 @@
 # it provides full network management access.
 # --
 
-PrefixBasedNetworkRoute53MgmtPolicy:
-  Type: AWS::IAM::ManagedPolicy
-  Properties:
-    ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-Route53-Mgmt"
-    Description: !Sub "Allows CloudFormation service roles to manage Route53 DNS records for CloudFront and API Gateway custom domains"
-    Path: !Ref ServiceRolePath
-    PolicyDocument:
-      Version: "2012-10-17"
-      Statement:
+Type: AWS::IAM::ManagedPolicy
+Properties:
+  ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-Route53-Mgmt"
+  Description: !Sub "Allows CloudFormation service roles to manage Route53 DNS records for CloudFront and API Gateway custom domains"
+  Path: !Ref ServiceRolePath
+  PolicyDocument:
+    Version: "2012-10-17"
+    Statement:
 
-        # ------------------------------------------------------------------
-        # Route53 Record Set Management
-        # Required for creating DNS records that point to CloudFront
-        # distributions and API Gateway custom domains.
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # Route53 Record Set Management
+      # Required for creating DNS records that point to CloudFront
+      # distributions and API Gateway custom domains.
+      # ------------------------------------------------------------------
 
-        - Sid: Route53RecordSetCRUD
-          Effect: Allow
-          Action:
-            - route53:ChangeResourceRecordSets
-            - route53:GetHostedZone
-            - route53:ListResourceRecordSets
-            - route53:GetChange
-          Resource:
-            - "arn:aws:route53:::hostedzone/*"
-            - "arn:aws:route53:::change/*"
+      - Sid: Route53RecordSetCRUD
+        Effect: Allow
+        Action:
+          - route53:ChangeResourceRecordSets
+          - route53:GetHostedZone
+          - route53:ListResourceRecordSets
+          - route53:GetChange
+        Resource:
+          - "arn:aws:route53:::hostedzone/*"
+          - "arn:aws:route53:::change/*"
 
-        - Sid: Route53ListHostedZones
-          Effect: Allow
-          Action:
-            - route53:ListHostedZones
-            - route53:ListHostedZonesByName
-          Resource: "*"
+      - Sid: Route53ListHostedZones
+        Effect: Allow
+        Action:
+          - route53:ListHostedZones
+          - route53:ListHostedZonesByName
+        Resource: "*"

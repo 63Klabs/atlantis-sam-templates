@@ -14,148 +14,147 @@
 # This is the "developer" policy — it does NOT include Route53 permissions.
 # --
 
-PrefixBasedNetworkCloudFrontMgmtPolicy:
-  Type: AWS::IAM::ManagedPolicy
-  Properties:
-    ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-CloudFront-Mgmt"
-    Description: !Sub "Allows CloudFormation service roles to manage CloudFront distributions, OAC, cache policies, and API Gateway V2 custom domains for prefix ${Prefix}"
-    Path: !Ref ServiceRolePath
-    PolicyDocument:
-      Version: "2012-10-17"
-      Statement:
+Type: AWS::IAM::ManagedPolicy
+Properties:
+  ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-CloudFront-Mgmt"
+  Description: !Sub "Allows CloudFormation service roles to manage CloudFront distributions, OAC, cache policies, and API Gateway V2 custom domains for prefix ${Prefix}"
+  Path: !Ref ServiceRolePath
+  PolicyDocument:
+    Version: "2012-10-17"
+    Statement:
 
-        # ------------------------------------------------------------------
-        # CloudFormation Stack Management (scoped by prefix)
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudFormation Stack Management (scoped by prefix)
+      # ------------------------------------------------------------------
 
-        - Sid: ManageCloudFormationStacksByResourcePrefix
-          Effect: Allow
-          Action:
-            - cloudformation:*Stack*
-            - cloudformation:CreateChangeSet
-            - cloudformation:ExecuteChangeSet
-            - cloudformation:DeleteChangeSet
-            - cloudformation:DescribeChangeSet
-            - cloudformation:GetTemplate
-            - cloudformation:GetTemplateSummary
-          Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
+      - Sid: ManageCloudFormationStacksByResourcePrefix
+        Effect: Allow
+        Action:
+          - cloudformation:*Stack*
+          - cloudformation:CreateChangeSet
+          - cloudformation:ExecuteChangeSet
+          - cloudformation:DeleteChangeSet
+          - cloudformation:DescribeChangeSet
+          - cloudformation:GetTemplate
+          - cloudformation:GetTemplateSummary
+        Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
 
-        - Sid: AllowTransformOperations
-          Effect: Allow
-          Action:
-            - cloudformation:CreateChangeSet
-          Resource:
-            - "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
-            - "arn:aws:cloudformation:*:aws:transform/LanguageExtensions"
-            - "arn:aws:cloudformation:*:aws:transform/Include"
+      - Sid: AllowTransformOperations
+        Effect: Allow
+        Action:
+          - cloudformation:CreateChangeSet
+        Resource:
+          - "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
+          - "arn:aws:cloudformation:*:aws:transform/LanguageExtensions"
+          - "arn:aws:cloudformation:*:aws:transform/Include"
 
-        # ------------------------------------------------------------------
-        # CloudFront Distribution CRUD
-        # CloudFront is a global service; resources use wildcard but are
-        # scoped by the stack prefix via CloudFormation.
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudFront Distribution CRUD
+      # CloudFront is a global service; resources use wildcard but are
+      # scoped by the stack prefix via CloudFormation.
+      # ------------------------------------------------------------------
 
-        - Sid: CloudFrontDistributionCRUD
-          Effect: Allow
-          Action:
-            - cloudfront:CreateDistribution
-            - cloudfront:CreateDistributionWithTags
-            - cloudfront:UpdateDistribution
-            - cloudfront:DeleteDistribution
-            - cloudfront:GetDistribution
-            - cloudfront:GetDistributionConfig
-            - cloudfront:ListDistributions
-            - cloudfront:TagResource
-            - cloudfront:UntagResource
-            - cloudfront:ListTagsForResource
-          Resource: "*"
+      - Sid: CloudFrontDistributionCRUD
+        Effect: Allow
+        Action:
+          - cloudfront:CreateDistribution
+          - cloudfront:CreateDistributionWithTags
+          - cloudfront:UpdateDistribution
+          - cloudfront:DeleteDistribution
+          - cloudfront:GetDistribution
+          - cloudfront:GetDistributionConfig
+          - cloudfront:ListDistributions
+          - cloudfront:TagResource
+          - cloudfront:UntagResource
+          - cloudfront:ListTagsForResource
+        Resource: "*"
 
-        # ------------------------------------------------------------------
-        # CloudFront Origin Access Control
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudFront Origin Access Control
+      # ------------------------------------------------------------------
 
-        - Sid: CloudFrontOACCRUD
-          Effect: Allow
-          Action:
-            - cloudfront:CreateOriginAccessControl
-            - cloudfront:UpdateOriginAccessControl
-            - cloudfront:DeleteOriginAccessControl
-            - cloudfront:GetOriginAccessControl
-            - cloudfront:GetOriginAccessControlConfig
-            - cloudfront:ListOriginAccessControls
-          Resource: "*"
+      - Sid: CloudFrontOACCRUD
+        Effect: Allow
+        Action:
+          - cloudfront:CreateOriginAccessControl
+          - cloudfront:UpdateOriginAccessControl
+          - cloudfront:DeleteOriginAccessControl
+          - cloudfront:GetOriginAccessControl
+          - cloudfront:GetOriginAccessControlConfig
+          - cloudfront:ListOriginAccessControls
+        Resource: "*"
 
-        # ------------------------------------------------------------------
-        # CloudFront Cache Policies
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudFront Cache Policies
+      # ------------------------------------------------------------------
 
-        - Sid: CloudFrontCachePolicyCRUD
-          Effect: Allow
-          Action:
-            - cloudfront:CreateCachePolicy
-            - cloudfront:UpdateCachePolicy
-            - cloudfront:DeleteCachePolicy
-            - cloudfront:GetCachePolicy
-            - cloudfront:GetCachePolicyConfig
-            - cloudfront:ListCachePolicies
-          Resource: "*"
+      - Sid: CloudFrontCachePolicyCRUD
+        Effect: Allow
+        Action:
+          - cloudfront:CreateCachePolicy
+          - cloudfront:UpdateCachePolicy
+          - cloudfront:DeleteCachePolicy
+          - cloudfront:GetCachePolicy
+          - cloudfront:GetCachePolicyConfig
+          - cloudfront:ListCachePolicies
+        Resource: "*"
 
-        # ------------------------------------------------------------------
-        # CloudFront Functions (for viewer-request/response associations)
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CloudFront Functions (for viewer-request/response associations)
+      # ------------------------------------------------------------------
 
-        - Sid: CloudFrontFunctionRead
-          Effect: Allow
-          Action:
-            - cloudfront:GetFunction
-            - cloudfront:DescribeFunction
-            - cloudfront:ListFunctions
-          Resource: "*"
+      - Sid: CloudFrontFunctionRead
+        Effect: Allow
+        Action:
+          - cloudfront:GetFunction
+          - cloudfront:DescribeFunction
+          - cloudfront:ListFunctions
+        Resource: "*"
 
-        # ------------------------------------------------------------------
-        # API Gateway V2 Custom Domain and Mapping
-        # Used when API Gateway is placed behind CloudFront or has its
-        # own custom domain.
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # API Gateway V2 Custom Domain and Mapping
+      # Used when API Gateway is placed behind CloudFront or has its
+      # own custom domain.
+      # ------------------------------------------------------------------
 
-        - Sid: ApiGatewayV2DomainCRUD
-          Effect: Allow
-          Action:
-            - apigateway:POST
-            - apigateway:GET
-            - apigateway:PATCH
-            - apigateway:DELETE
-            - apigateway:PUT
-          Resource:
-            - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames"
-            - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/*"
+      - Sid: ApiGatewayV2DomainCRUD
+        Effect: Allow
+        Action:
+          - apigateway:POST
+          - apigateway:GET
+          - apigateway:PATCH
+          - apigateway:DELETE
+          - apigateway:PUT
+        Resource:
+          - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames"
+          - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/*"
 
-        # ------------------------------------------------------------------
-        # S3 Bucket Read (for log bucket and origin verification)
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # S3 Bucket Read (for log bucket and origin verification)
+      # ------------------------------------------------------------------
 
-        - Sid: S3BucketReadForLogging
-          Effect: Allow
-          Action:
-            - s3:GetBucketLocation
-            - s3:ListBucket
-          Resource:
-            - !Sub
-              - "arn:aws:s3:::${BucketPrefix}-*"
-              - BucketPrefix: !If
-                - UseS3BucketNameOrgPrefix
-                - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-                - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+      - Sid: S3BucketReadForLogging
+        Effect: Allow
+        Action:
+          - s3:GetBucketLocation
+          - s3:ListBucket
+        Resource:
+          - !Sub
+            - "arn:aws:s3:::${BucketPrefix}-*"
+            - BucketPrefix: !If
+              - UseS3BucketNameOrgPrefix
+              - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
+              - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
 
-        # ------------------------------------------------------------------
-        # ACM Certificate Read (for CloudFront and API Gateway)
-        # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # ACM Certificate Read (for CloudFront and API Gateway)
+      # ------------------------------------------------------------------
 
-        - Sid: AcmCertificateRead
-          Effect: Allow
-          Action:
-            - acm:DescribeCertificate
-            - acm:ListCertificates
-            - acm:GetCertificate
-            - acm:ListTagsForCertificate
-          Resource: "*"
+      - Sid: AcmCertificateRead
+        Effect: Allow
+        Action:
+          - acm:DescribeCertificate
+          - acm:ListCertificates
+          - acm:GetCertificate
+          - acm:ListTagsForCertificate
+        Resource: "*"

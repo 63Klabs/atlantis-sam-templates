@@ -42,7 +42,6 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
-        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -77,7 +76,8 @@ Metadata:
           default: "Module Locations (Actions)"
         Parameters:
           - CodeConnectionsGitHubModuleUrl
-          - ApiGwCloudWatchModuleUrl
+          - ApiGwCloudWatchRoleModuleUrl
+          - ApiGwCloudWatchAccountModuleUrl
 
 # =============================================================================
 # PARAMETERS
@@ -151,9 +151,15 @@ Parameters:
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
-  ApiGwCloudWatchModuleUrl:
+  ApiGwCloudWatchRoleModuleUrl:
     Type: String
-    Description: "S3 URL of the API Gateway CloudWatch role module snippet (e.g., s3://my-devops-bucket/modules/actions/apigw-cloudwatch-role.yml). The module URL is always required, but resources are only created when EnableApiGwCloudWatchLogs is 'true'."
+    Description: "S3 URL of the API Gateway CloudWatch role module snippet."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  ApiGwCloudWatchAccountModuleUrl:
+    Type: String
+    Description: "S3 URL of the API Gateway Account configuration module snippet."
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
@@ -177,31 +183,44 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- CodeBuild and Logs CRUD Policy (ABAC-Scoped) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CodeBuildCrudModuleUrl
+  CloudFormationCodeBuildPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CodeBuildCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CognitoCrudModuleUrl
+  CloudFormationCognitoPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CognitoCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- GitHub Connection (Conditional) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CodeConnectionsGitHubModuleUrl
+  GitHubConnection:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CodeConnectionsGitHubModuleUrl
 
   # ---------------------------------------------------------------------------
-  # -- API Gateway CloudWatch Logging (Conditional) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref ApiGwCloudWatchModuleUrl
+  # -- API Gateway CloudWatch Role (Conditional) --
+  ApiGatewayCloudWatchLogsRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref ApiGwCloudWatchRoleModuleUrl
+
+  # ---------------------------------------------------------------------------
+  # -- API Gateway Account Configuration (Conditional) --
+  ApiGatewayAccount:
+    DependsOn: ApiGatewayCloudWatchLogsRole
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref ApiGwCloudWatchAccountModuleUrl
 
 # =============================================================================
 # OUTPUTS

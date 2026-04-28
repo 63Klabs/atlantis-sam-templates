@@ -24,7 +24,6 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
-        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
         - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
@@ -55,6 +54,7 @@ Metadata:
         Parameters:
           - NetworkCloudFrontMgmtPolicyModuleUrl
           - NetworkCloudFrontMgmtRoleModuleUrl
+          - NetworkCloudFrontMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # PARAMETERS
@@ -135,6 +135,12 @@ Parameters:
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
+  NetworkCloudFrontMgmtPassrolePolicyModuleUrl:
+    Type: String
+    Description: "S3 URL of the network CloudFront management passrole policy module."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -154,17 +160,23 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  PrefixBasedNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
-  # -- Network CloudFront Management Role and PassRole Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+
+  PrefixBasedNetworkCloudFrontMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # OUTPUTS

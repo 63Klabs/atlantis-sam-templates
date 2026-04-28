@@ -41,7 +41,6 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
-        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
         - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
@@ -72,11 +71,15 @@ Metadata:
           default: "Module Locations"
         Parameters:
           - PipelineMgmtRoleModuleUrl
+          - PipelineMgmtPassrolePolicyModuleUrl
           - StorageMgmtRoleModuleUrl
+          - StorageMgmtPassrolePolicyModuleUrl
           - NetworkCloudFrontMgmtPolicyModuleUrl
           - NetworkRoute53MgmtPolicyModuleUrl
           - NetworkCloudFrontMgmtRoleModuleUrl
+          - NetworkCloudFrontMgmtPassrolePolicyModuleUrl
           - NetworkFullMgmtRoleModuleUrl
+          - NetworkFullMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # PARAMETERS
@@ -167,37 +170,51 @@ Parameters:
 
   PipelineMgmtRoleModuleUrl:
     Type: String
-    Description: "S3 URL of the pipeline management role module snippet (e.g., s3://my-devops-bucket/modules/management-roles/pipeline-mgmt-role.yml)."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  PipelineMgmtPassrolePolicyModuleUrl:
+    Type: String
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
   StorageMgmtRoleModuleUrl:
     Type: String
-    Description: "S3 URL of the storage management role module snippet (e.g., s3://my-devops-bucket/modules/management-roles/storage-mgmt-role.yml)."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  StorageMgmtPassrolePolicyModuleUrl:
+    Type: String
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
   NetworkCloudFrontMgmtPolicyModuleUrl:
     Type: String
-    Description: "S3 URL of the network CloudFront management policy module."
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
   NetworkRoute53MgmtPolicyModuleUrl:
     Type: String
-    Description: "S3 URL of the network Route53 management policy module."
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
   NetworkCloudFrontMgmtRoleModuleUrl:
     Type: String
-    Description: "S3 URL of the network CloudFront management role module (developer - no Route53)."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  NetworkCloudFrontMgmtPassrolePolicyModuleUrl:
+    Type: String
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
   NetworkFullMgmtRoleModuleUrl:
     Type: String
-    Description: "S3 URL of the full network management role module (CloudFront + Route53)."
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
+    ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
+
+  NetworkFullMgmtPassrolePolicyModuleUrl:
+    Type: String
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*\\.yml$"
     ConstraintDescription: "Must be a valid S3 URI pointing to a .yml file."
 
@@ -222,47 +239,71 @@ Conditions:
 
 Resources:
 
-  # ---------------------------------------------------------------------------
-  # -- Pipeline Management Service Role and Managed Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref PipelineMgmtRoleModuleUrl
+  # -- Pipeline Management --
+  PrefixBasedCloudFormationPipelineMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref PipelineMgmtRoleModuleUrl
 
-  # ---------------------------------------------------------------------------
-  # -- Storage Management Service Role and Managed Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref StorageMgmtRoleModuleUrl
+  PrefixBasedPipelineMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref PipelineMgmtPassrolePolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
+  # -- Storage Management --
+  PrefixBasedCloudFormationStorageMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtRoleModuleUrl
+
+  PrefixBasedStorageMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtPassrolePolicyModuleUrl
+
   # -- Network CloudFront Management Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  PrefixBasedNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
   # -- Network Route53 Management Policy --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+  PrefixBasedNetworkRoute53MgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
 
-  # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Role (Developer) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
 
-  # ---------------------------------------------------------------------------
+  PrefixBasedNetworkCloudFrontMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPassrolePolicyModuleUrl
+
   # -- Full Network Management Role (CloudFront + Route53) --
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkFullMgmtRoleModuleUrl
+  PrefixBasedCloudFormationNetworkFullMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtRoleModuleUrl
+
+  PrefixBasedNetworkFullMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtPassrolePolicyModuleUrl
 
 # =============================================================================
 # OUTPUTS

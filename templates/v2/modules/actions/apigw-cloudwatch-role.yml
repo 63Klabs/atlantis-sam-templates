@@ -1,4 +1,4 @@
-# -- API Gateway CloudWatch Logs Role and Account Configuration --
+# -- API Gateway CloudWatch Logs Role --
 # Parent template must define condition: EnableApiGatewayLogging
 #
 # In order to push API Gateway logs to CloudWatch, a role must be created
@@ -7,26 +7,17 @@
 #
 # This module will:
 #   1. Create a service role allowing API Gateway to write to CloudWatch
-#   2. Set the API Gateway account to use this role for logging
 #
 # See https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html
 
-ApiGatewayCloudWatchLogsRole:
-  Type: AWS::IAM::Role
-  Condition: EnableApiGatewayLogging
-  Properties:
-    AssumeRolePolicyDocument:
-      Statement:
-        - Effect: Allow
-          Principal:
-            Service: apigateway.amazonaws.com
-          Action: sts:AssumeRole
-    ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
-
-ApiGatewayAccount:
-  Type: AWS::ApiGateway::Account
-  Condition: EnableApiGatewayLogging
-  DependsOn: ApiGatewayCloudWatchLogsRole
-  Properties:
-    CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchLogsRole.Arn
+Type: AWS::IAM::Role
+Condition: EnableApiGatewayLogging
+Properties:
+  AssumeRolePolicyDocument:
+    Statement:
+      - Effect: Allow
+        Principal:
+          Service: apigateway.amazonaws.com
+        Action: sts:AssumeRole
+  ManagedPolicyArns:
+    - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs

@@ -14,14 +14,13 @@
 # Permissions: The user completing the connection must have admin permissions
 # in the GitHub organization.
 
-GitHubConnection:
-  Type: AWS::CodeConnections::Connection
-  Condition: HasGitHubOrg
-  DeletionPolicy: Retain
-  UpdateReplacePolicy: Retain
-  Properties:
-    ConnectionName: !Sub "${OrgPrefix}-${GitHubOrg}-github-connection"
-    ProviderType: GitHub
-    Tags:
-      - Key: GitHubOrg
-        Value: !Ref GitHubOrg
+Type: AWS::CodeConnections::Connection
+Condition: HasGitHubOrg
+DeletionPolicy: Retain
+UpdateReplacePolicy: Retain
+Properties:
+  ConnectionName: !Sub "${OrgPrefix}-${GitHubOrg}-github-connection"
+  ProviderType: GitHub
+  Tags:
+    - Key: GitHubOrg
+      Value: !Ref GitHubOrg
