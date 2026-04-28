@@ -1,17 +1,18 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Combined prefix-based IAM Service Roles and Managed Policies for Pipeline and Storage management - Assembled from reusable modules"
 
-# Atlantis for AWS SAM Deployments
-# Account Infrastructure Template
+# 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
+# Prefix-Based Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.0/2026-04-23
+# Version: v0.0.0/2026-04-28
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
+# https://github.com/63klabs/atlantis-sam-templates/
 
-# This template combines the Pipeline Management and Storage Management
-# service roles into a single stack. It uses reusable modules (snippets)
-# stored in S3 via AWS::Include.
+# This template combines Deploy Management service roles into a single stack. 
+# It uses reusable modules (snippets) stored in S3 via AWS::Include.
+# These are the same modules used if each service-role was deployed independently 
+# using config.py/deploy.py service-role ${prefix} ${pipeline|storage|network}
 #
 # Each module creates:
 #   - A CloudFormation service role (assumed by cloudformation.amazonaws.com)
@@ -29,6 +30,8 @@ Description: "Combined prefix-based IAM Service Roles and Managed Policies for P
 #   - templates/v2/pipeline/template-pipeline-github.yml
 # - Storage templates (S3, DynamoDB, Cache-Data)
 #   - templates/v2/storage/
+# - Network templates (CloudFront, Route53)
+#   - templates/v2/network/
 
 # =============================================================================
 # META DATA

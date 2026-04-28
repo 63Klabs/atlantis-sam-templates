@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Account-wide resources for project pipelines: ABAC-scoped managed policies and shared connections - Assembled from reusable modules"
 
-# Atlantis for AWS SAM Deployments
-# Account Infrastructure Template
+# 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
+# Account-Wide Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
 # Version: v0.0.0/2026-04-28
 
@@ -143,11 +143,10 @@ Conditions:
 Resources:
 
   # -- CodeBuild and Logs CRUD Policy (ABAC-Scoped) --
-  CloudFormationCodeBuildPolicy:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/codebuild-crud.yml"
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/codebuild-crud.yml"
 
   # # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
   # CloudFormationCognitoPolicy:
