@@ -217,85 +217,51 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Pipeline Management Service Role and Managed Policy --
-  # --
-  # Service role for CloudFormation to create and manage CodePipeline,
-  # CodeBuild, and related resources scoped by prefix.
-  # --
-  # Module: modules/management-roles/pipeline-mgmt-role.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref PipelineMgmtRoleModuleUrl
+  IncludePipelineMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref PipelineMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Storage Management Service Role and Managed Policy --
-  # --
-  # Service role for CloudFormation to create and manage S3, DynamoDB,
-  # Lambda, and related resources scoped by prefix.
-  # --
-  # Module: modules/management-roles/storage-mgmt-role.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref StorageMgmtRoleModuleUrl
+  IncludeStorageMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  # --
-  # Managed policy for CloudFront, OAC, cache policies, and API Gateway
-  # custom domains. Shared by both network roles.
-  # --
-  # Module: modules/management-roles/network-cloudfront-mgmt-policy.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  IncludeNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network Route53 Management Policy --
-  # --
-  # Managed policy for Route53 DNS record management.
-  # Only attached to the full network management role.
-  # --
-  # Module: modules/management-roles/network-route53-mgmt-policy.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+  IncludeNetworkRoute53MgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Role (Developer) --
-  # --
-  # Service role with CloudFront policy only (no Route53).
-  # --
-  # Module: modules/management-roles/network-cloudfront-mgmt-role.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  IncludeNetworkCloudFrontMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Full Network Management Role (CloudFront + Route53) --
-  # --
-  # Service role with both CloudFront and Route53 policies.
-  # --
-  # Module: modules/management-roles/network-full-mgmt-role.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkFullMgmtRoleModuleUrl
+  IncludeNetworkFullMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

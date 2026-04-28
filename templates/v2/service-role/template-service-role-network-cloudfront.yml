@@ -147,21 +147,19 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  # Module: modules/management-roles/network-cloudfront-mgmt-policy.yml
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  IncludeNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Role and PassRole Policy --
-  # Module: modules/management-roles/network-cloudfront-mgmt-role.yml
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  IncludeNetworkCloudFrontMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

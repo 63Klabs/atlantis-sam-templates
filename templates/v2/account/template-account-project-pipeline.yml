@@ -171,65 +171,35 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- CodeBuild and Logs CRUD Policy (ABAC-Scoped) --
-  # --
-  # Allows CloudFormation service roles to manage CodeBuild projects and
-  # /aws/codebuild/ log groups, scoped by atlantis:ApplicationDeploymentId tag.
-  # --
-  # Module: modules/project-pipeline-policies/codebuild-crud.yml
-  # Produces: <OrgPrefix>-ProjectPipeline-CodeBuildCrud managed policy
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CodeBuildCrudModuleUrl
+  IncludeCodeBuildCrud:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CodeBuildCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
-  # --
-  # Allows CloudFormation service roles to manage Cognito User Pools,
-  # scoped by atlantis:ApplicationDeploymentId tag.
-  # --
-  # Module: modules/project-pipeline-policies/cognito-crud.yml
-  # Produces: <OrgPrefix>-ProjectPipeline-CognitoCrud managed policy
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CognitoCrudModuleUrl
+  IncludeCognitoCrud:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CognitoCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- GitHub Connection (Conditional) --
-  # --
-  # Creates a CodeConnections GitHub connection for use by pipeline templates.
-  # Only created when GitHubOrg is provided.
-  # --
-  # Module: modules/actions/codeconnections-github.yml
-  # Produces: <OrgPrefix>-<GitHubOrg>-github-connection
-  # Condition: HasGitHubOrg
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref CodeConnectionsGitHubModuleUrl
+  IncludeCodeConnectionsGitHub:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref CodeConnectionsGitHubModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- API Gateway CloudWatch Logging (Conditional) --
-  # --
-  # Creates the account-level IAM role and API Gateway Account resource
-  # required for API Gateway to push logs to CloudWatch.
-  # Only created when EnableApiGwCloudWatchLogs is 'true'.
-  # --
-  # Module: modules/actions/apigw-cloudwatch-role.yml
-  # Condition: EnableApiGatewayLogging
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref ApiGwCloudWatchModuleUrl
+  IncludeApiGwCloudWatch:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref ApiGwCloudWatchModuleUrl
 
 # =============================================================================
 # OUTPUTS

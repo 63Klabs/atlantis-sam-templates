@@ -132,30 +132,27 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  # Module: modules/management-roles/network-cloudfront-mgmt-policy.yml
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  IncludeNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network Route53 Management Policy --
-  # Module: modules/management-roles/network-route53-mgmt-policy.yml
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+  IncludeNetworkRoute53MgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Full Network Management Role and PassRole Policy --
-  # Module: modules/management-roles/network-full-mgmt-role.yml
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref NetworkFullMgmtRoleModuleUrl
+  IncludeNetworkFullMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref NetworkFullMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

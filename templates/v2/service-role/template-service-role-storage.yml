@@ -157,16 +157,12 @@ Resources:
   
   # ---------------------------------------------------------------------------
   # -- Prefix-based IAM Service Roles and Policy --
-  # --
-  # When deploying a Storage Stack, it must be given a service role
-  # --
   # Module: modules/management-roles/storage-mgmt-role.yml
-  # --
-
-  Fn::Transform:
-    Name: AWS::Include
-    Parameters:
-      Location: !Ref StorageMgmtRoleModuleUrl
+  IncludeStorageMgmtRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Ref StorageMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

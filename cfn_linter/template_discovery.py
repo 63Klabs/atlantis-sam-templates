@@ -26,6 +26,11 @@ class TemplateDiscovery:
         '.gitkeep'
     }
     
+    # Directories to exclude from template discovery
+    EXCLUDED_DIRS = {
+        'modules'
+    }
+    
     def __init__(self, project_root: Path = None):
         """Initialize the template discovery engine.
         
@@ -55,6 +60,9 @@ class TemplateDiscovery:
             # Recursively walk through all directories
             for root, dirs, files in os.walk(search_path):
                 root_path = Path(root)
+                
+                # Skip excluded directories
+                dirs[:] = [d for d in dirs if d not in self.EXCLUDED_DIRS]
                 
                 for file in files:
                     file_path = root_path / file
