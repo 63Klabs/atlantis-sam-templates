@@ -41,8 +41,11 @@ Metadata:
   cfn-lint:
     config:
       ignore_checks:
+        - E3001 # Resource Type property is defined inside AWS::Include modules
+        - E3005 # Resource names resolved at deploy time via AWS::Include transforms
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
         - W2001 # Parameters consumed by AWS::Include modules appear unused
+        - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
     ParameterGroups:
       -
