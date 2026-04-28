@@ -1,6 +1,8 @@
 # -- Prefix-based Policy: Network Route53 Management --
 # Parent template must define parameters:
 #   PrefixUpper, ServiceRolePath
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
 # ---------------------------------------------------------------------------
 # -- Route53 DNS Record Management Policy --
@@ -14,9 +16,12 @@
 
 Type: AWS::IAM::ManagedPolicy
 Properties:
-  ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-Route53-Mgmt"
-  Description: !Sub "Allows CloudFormation service roles to manage Route53 DNS records for CloudFront and API Gateway custom domains"
-  Path: !Ref ServiceRolePath
+  ManagedPolicyName:
+    Fn::Sub: "${PrefixUpper}-CfnSvcRole-Network-Route53-Mgmt"
+  Description:
+    Fn::Sub: "Allows CloudFormation service roles to manage Route53 DNS records for CloudFront and API Gateway custom domains"
+  Path:
+    Ref: ServiceRolePath
   PolicyDocument:
     Version: "2012-10-17"
     Statement:

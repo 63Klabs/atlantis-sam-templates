@@ -203,58 +203,58 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/pipeline-mgmt-passrole-policy.yml"
 
-  # # -- Storage Management --
-  # PrefixBasedCloudFormationStorageMgmtServiceRole:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/storage-mgmt-role.yml"
+  # -- Storage Management --
+  PrefixBasedCloudFormationStorageMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/storage-mgmt-role.yml"
 
-  # PrefixBasedStorageMgmtManagedPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/storage-mgmt-passrole-policy.yml"
+  PrefixBasedStorageMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/storage-mgmt-passrole-policy.yml"
 
-  # # -- Network CloudFront Management Policy --
-  # PrefixBasedNetworkCloudFrontMgmtPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-policy.yml"
+  # -- Network CloudFront Management Policy --
+  PrefixBasedNetworkCloudFrontMgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-policy.yml"
 
-  # # -- Network Route53 Management Policy --
-  # PrefixBasedNetworkRoute53MgmtPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-route53-mgmt-policy.yml"
+  # -- Network Route53 Management Policy --
+  PrefixBasedNetworkRoute53MgmtPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-route53-mgmt-policy.yml"
 
-  # # -- Network CloudFront Management Role (Developer) --
-  # PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-role.yml"
+  # -- Network CloudFront Management Role (Developer) --
+  PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-role.yml"
 
-  # PrefixBasedNetworkCloudFrontMgmtManagedPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-passrole-policy.yml"
+  PrefixBasedNetworkCloudFrontMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-cloudfront-mgmt-passrole-policy.yml"
 
-  # # -- Full Network Management Role (CloudFront + Route53) --
-  # PrefixBasedCloudFormationNetworkFullMgmtServiceRole:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-full-mgmt-role.yml"
+  # -- Full Network Management Role (CloudFront + Route53) --
+  PrefixBasedCloudFormationNetworkFullMgmtServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-full-mgmt-role.yml"
 
-  # PrefixBasedNetworkFullMgmtManagedPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-full-mgmt-passrole-policy.yml"
+  PrefixBasedNetworkFullMgmtManagedPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/network-full-mgmt-passrole-policy.yml"
 
 # =============================================================================
 # OUTPUTS
@@ -265,111 +265,111 @@ Resources:
 # your cloudformation OUTPUT section. Test URLs, direct links to resources, etc
 #
 
-# Outputs:
+Outputs:
 
   # ---------------------------------------------------------------------------
   # Pipeline Management
 
-  # PipelineMgmtServiceRoleArn:
-  #   Description: "The ARN of the Prefix-based CloudFormation Service Role for Pipeline Management"
-  #   Value: !GetAtt PrefixBasedCloudFormationPipelineMgmtServiceRole.Arn
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-Role-Arn"
+  PipelineMgmtServiceRoleArn:
+    Description: "The ARN of the Prefix-based CloudFormation Service Role for Pipeline Management"
+    Value: !GetAtt PrefixBasedCloudFormationPipelineMgmtServiceRole.Arn
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-Role-Arn"
 
-  # PipelineMgmtServiceRoleName:
-  #   Description: "The Name of the Prefix-based CloudFormation Service Role for Pipeline Management"
-  #   Value: !Ref PrefixBasedCloudFormationPipelineMgmtServiceRole
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-Role-Name"
+  PipelineMgmtServiceRoleName:
+    Description: "The Name of the Prefix-based CloudFormation Service Role for Pipeline Management"
+    Value: !Ref PrefixBasedCloudFormationPipelineMgmtServiceRole
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-Role-Name"
 
-  # PipelineMgmtManagedPolicyArn:
-  #   Description: "The ARN of the Pipeline Management Managed Policy"
-  #   Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Arn"
+  PipelineMgmtManagedPolicyArn:
+    Description: "The ARN of the Pipeline Management Managed Policy"
+    Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Arn"
 
-  # PipelineMgmtManagedPolicyName:
-  #   Description: "The Name of the Pipeline Management Managed Policy"
-  #   Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Name"
+  PipelineMgmtManagedPolicyName:
+    Description: "The Name of the Pipeline Management Managed Policy"
+    Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Name"
 
-  # # ---------------------------------------------------------------------------
-  # # Storage Management
+  # ---------------------------------------------------------------------------
+  # Storage Management
 
-  # StorageMgmtServiceRoleArn:
-  #   Description: "The ARN of the Prefix-based CloudFormation Service Role for Storage Management"
-  #   Value: !GetAtt PrefixBasedCloudFormationStorageMgmtServiceRole.Arn
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-Role-Arn"
+  StorageMgmtServiceRoleArn:
+    Description: "The ARN of the Prefix-based CloudFormation Service Role for Storage Management"
+    Value: !GetAtt PrefixBasedCloudFormationStorageMgmtServiceRole.Arn
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-Role-Arn"
 
-  # StorageMgmtServiceRoleName:
-  #   Description: "The Name of the Prefix-based CloudFormation Service Role for Storage Management"
-  #   Value: !Ref PrefixBasedCloudFormationStorageMgmtServiceRole
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-Role-Name"
+  StorageMgmtServiceRoleName:
+    Description: "The Name of the Prefix-based CloudFormation Service Role for Storage Management"
+    Value: !Ref PrefixBasedCloudFormationStorageMgmtServiceRole
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-Role-Name"
 
-  # StorageMgmtManagedPolicyArn:
-  #   Description: "The ARN of the Storage Management Managed Policy"
-  #   Value: !Ref PrefixBasedStorageMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Arn"
+  StorageMgmtManagedPolicyArn:
+    Description: "The ARN of the Storage Management Managed Policy"
+    Value: !Ref PrefixBasedStorageMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Arn"
 
-  # StorageMgmtManagedPolicyName:
-  #   Description: "The Name of the Storage Management Managed Policy"
-  #   Value: !Ref PrefixBasedStorageMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Name"
+  StorageMgmtManagedPolicyName:
+    Description: "The Name of the Storage Management Managed Policy"
+    Value: !Ref PrefixBasedStorageMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Name"
 
-  # # ---------------------------------------------------------------------------
-  # # Network CloudFront Management (Developer)
+  # ---------------------------------------------------------------------------
+  # Network CloudFront Management (Developer)
 
-  # NetworkCloudFrontMgmtServiceRoleArn:
-  #   Description: "The ARN of the Network CloudFront Management Service Role (no Route53)"
-  #   Value: !GetAtt PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole.Arn
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Arn"
+  NetworkCloudFrontMgmtServiceRoleArn:
+    Description: "The ARN of the Network CloudFront Management Service Role (no Route53)"
+    Value: !GetAtt PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole.Arn
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Arn"
 
-  # NetworkCloudFrontMgmtServiceRoleName:
-  #   Description: "The Name of the Network CloudFront Management Service Role"
-  #   Value: !Ref PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Name"
+  NetworkCloudFrontMgmtServiceRoleName:
+    Description: "The Name of the Network CloudFront Management Service Role"
+    Value: !Ref PrefixBasedCloudFormationNetworkCloudFrontMgmtServiceRole
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Name"
 
-  # NetworkCloudFrontMgmtManagedPolicyArn:
-  #   Description: "The ARN of the Network CloudFront Management Managed Policy"
-  #   Value: !Ref PrefixBasedNetworkCloudFrontMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-ManagedPolicy-Arn"
+  NetworkCloudFrontMgmtManagedPolicyArn:
+    Description: "The ARN of the Network CloudFront Management Managed Policy"
+    Value: !Ref PrefixBasedNetworkCloudFrontMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-ManagedPolicy-Arn"
 
-  # # ---------------------------------------------------------------------------
-  # # Full Network Management (CloudFront + Route53)
+  # ---------------------------------------------------------------------------
+  # Full Network Management (CloudFront + Route53)
 
-  # NetworkFullMgmtServiceRoleArn:
-  #   Description: "The ARN of the Full Network Management Service Role (CloudFront + Route53)"
-  #   Value: !GetAtt PrefixBasedCloudFormationNetworkFullMgmtServiceRole.Arn
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Arn"
+  NetworkFullMgmtServiceRoleArn:
+    Description: "The ARN of the Full Network Management Service Role (CloudFront + Route53)"
+    Value: !GetAtt PrefixBasedCloudFormationNetworkFullMgmtServiceRole.Arn
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Arn"
 
-  # NetworkFullMgmtServiceRoleName:
-  #   Description: "The Name of the Full Network Management Service Role"
-  #   Value: !Ref PrefixBasedCloudFormationNetworkFullMgmtServiceRole
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Name"
+  NetworkFullMgmtServiceRoleName:
+    Description: "The Name of the Full Network Management Service Role"
+    Value: !Ref PrefixBasedCloudFormationNetworkFullMgmtServiceRole
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Name"
 
-  # NetworkFullMgmtManagedPolicyArn:
-  #   Description: "The ARN of the Full Network Management Managed Policy"
-  #   Value: !Ref PrefixBasedNetworkFullMgmtManagedPolicy
-  #   Export:
-  #     Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-ManagedPolicy-Arn"
+  NetworkFullMgmtManagedPolicyArn:
+    Description: "The ARN of the Full Network Management Managed Policy"
+    Value: !Ref PrefixBasedNetworkFullMgmtManagedPolicy
+    Export:
+      Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-ManagedPolicy-Arn"
 
-  # # ---------------------------------------------------------------------------
-  # # Console Links
+  # ---------------------------------------------------------------------------
+  # Console Links
 
-  # IAMRolesConsole:
-  #   Description: "IAM Roles in AWS Console"
-  #   Value: !Sub "https://console.aws.amazon.com/iam/home#/roles"
+  IamRolesConsole:
+    Description: "IAM Roles in AWS Console"
+    Value: !Sub "https://console.aws.amazon.com/iam/home#/roles"
 
-  # IAMPoliciesConsole:
-  #   Description: "IAM Policies in AWS Console"
-  #   Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"
+  IamPoliciesConsole:
+    Description: "IAM Policies in AWS Console"
+    Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"

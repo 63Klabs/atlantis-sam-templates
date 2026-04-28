@@ -3,6 +3,8 @@
 #   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
 # ---------------------------------------------------------------------------
 # -- CloudFront and API Gateway Management Policy --
@@ -16,9 +18,12 @@
 
 Type: AWS::IAM::ManagedPolicy
 Properties:
-  ManagedPolicyName: !Sub "${PrefixUpper}-CfnSvcRole-Network-CloudFront-Mgmt"
-  Description: !Sub "Allows CloudFormation service roles to manage CloudFront distributions, OAC, cache policies, and API Gateway V2 custom domains for prefix ${Prefix}"
-  Path: !Ref ServiceRolePath
+  ManagedPolicyName:
+    Fn::Sub: "${PrefixUpper}-CfnSvcRole-Network-CloudFront-Mgmt"
+  Description:
+    Fn::Sub: "Allows CloudFormation service roles to manage CloudFront distributions, OAC, cache policies, and API Gateway V2 custom domains for prefix ${Prefix}"
+  Path:
+    Ref: ServiceRolePath
   PolicyDocument:
     Version: "2012-10-17"
     Statement:
@@ -37,7 +42,8 @@ Properties:
           - cloudformation:DescribeChangeSet
           - cloudformation:GetTemplate
           - cloudformation:GetTemplateSummary
-        Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
+        Resource:
+          Fn::Sub: "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
 
       - Sid: AllowTransformOperations
         Effect: Allow
@@ -126,8 +132,8 @@ Properties:
           - apigateway:DELETE
           - apigateway:PUT
         Resource:
-          - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames"
-          - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/*"
+          - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/domainnames"
+          - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/domainnames/*"
 
       # ------------------------------------------------------------------
       # S3 Bucket Read (for log bucket and origin verification)
@@ -139,12 +145,13 @@ Properties:
           - s3:GetBucketLocation
           - s3:ListBucket
         Resource:
-          - !Sub
+          - Fn::Sub:
             - "arn:aws:s3:::${BucketPrefix}-*"
-            - BucketPrefix: !If
-              - UseS3BucketNameOrgPrefix
-              - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-              - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+            - BucketPrefix:
+                Fn::If:
+                  - UseS3BucketNameOrgPrefix
+                  - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                  - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
 
       # ------------------------------------------------------------------
       # ACM Certificate Read (for CloudFront and API Gateway)

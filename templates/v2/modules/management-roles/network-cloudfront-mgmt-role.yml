@@ -6,6 +6,8 @@
 #   HasPermissionsBoundaryArn, HasGroupNames, HasRoleNames, HasUserNames
 # Parent template must include (before this module):
 #   modules/management-roles/network-cloudfront-mgmt-policy.yml
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
 # ---------------------------------------------------------------------------
 # -- Network CloudFront Management Service Role (Developer) --
@@ -17,12 +19,19 @@
 
 Type: AWS::IAM::Role
 Properties:
-  Path: !Ref ServiceRolePath
-  RoleName: !Sub "${PrefixUpper}-CloudFormation-Service-Role-Network-CloudFront-Mgmt"
-  Description: !Sub "Service Role to manage CloudFront distributions and API Gateway custom domains for prefix ${Prefix} (no Route53)"
-  PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
+  Path:
+    Ref: ServiceRolePath
+  RoleName:
+    Fn::Sub: "${PrefixUpper}-CloudFormation-Service-Role-Network-CloudFront-Mgmt"
+  Description:
+    Fn::Sub: "Service Role to manage CloudFront distributions and API Gateway custom domains for prefix ${Prefix} (no Route53)"
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: "AWS::NoValue"
   ManagedPolicyArns:
-    - !Ref PrefixBasedNetworkCloudFrontMgmtPolicy
+    - Ref: PrefixBasedNetworkCloudFrontMgmtPolicy
   AssumeRolePolicyDocument:
     Statement:
       - Sid: "CloudFormationTrustPolicy"

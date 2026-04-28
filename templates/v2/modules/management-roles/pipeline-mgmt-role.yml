@@ -5,6 +5,8 @@
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix, HasPermissionsBoundaryArn,
 #   HasGroupNames, HasRoleNames, HasUserNames
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
 # ---------------------------------------------------------------------------
 # -- Prefix-based IAM Service Role --
@@ -18,10 +20,17 @@
 
 Type: AWS::IAM::Role
 Properties:
-  Path: !Ref ServiceRolePath
-  RoleName: !Sub "${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management"
-  Description: !Sub "Service Role to Create and Manage an AWS CodePipeline for application projects under prefix ${Prefix}"
-  PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue' ]
+  Path:
+    Ref: ServiceRolePath
+  RoleName:
+    Fn::Sub: "${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management"
+  Description:
+    Fn::Sub: "Service Role to Create and Manage an AWS CodePipeline for application projects under prefix ${Prefix}"
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: "AWS::NoValue"
 
   AssumeRolePolicyDocument:
     Statement:
@@ -33,7 +42,8 @@ Properties:
         - cloudformation.amazonaws.com
 
   Policies:
-  - PolicyName: !Sub "${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management-Policy"
+  - PolicyName:
+      Fn::Sub: "${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management-Policy"
     PolicyDocument:
       Version: "2012-10-17"
       Statement:
@@ -49,7 +59,7 @@ Properties:
         - events:TagResource
         - events:UntagResource
         Resource:
-        - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Prefix}-*"
+        - Fn::Sub: "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Prefix}-*"
 
       - Sid: ManageSnsTopicsByResourcePrefix
         Effect: Allow
@@ -65,7 +75,7 @@ Properties:
         - sns:ListSubscriptionsByTopic
         - sns:ListTagsForResource
         Resource:
-        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${Prefix}-*"
+        - Fn::Sub: "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${Prefix}-*"
 
       - Sid: ManageCodeStarNotificationsByResourcePrefix
         Effect: Allow
@@ -80,7 +90,7 @@ Properties:
         - codestar-notifications:UntagResource
         - codestar-notifications:ListTagsForResource
         Resource:
-        - !Sub "arn:aws:codestar-notifications:${AWS::Region}:${AWS::AccountId}:notificationrule/*"
+        - Fn::Sub: "arn:aws:codestar-notifications:${AWS::Region}:${AWS::AccountId}:notificationrule/*"
 
       - Sid: ManageCloudFormationStacksByResourcePrefix
         Effect: Allow
@@ -92,62 +102,71 @@ Properties:
         - cloudformation:DescribeChangeSet
         - cloudformation:GetTemplate
         - cloudformation:GetTemplateSummary
-        Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
+        Resource:
+          Fn::Sub: "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-*"
 
       - Sid: ManageBucketsByResourcePrefix
         Effect: Allow
         Action:
         - s3:*
         Resource:
-        - !Sub
+        - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*"
-          - BucketPrefix: !If # Deprecated
-            - UseS3BucketNameOrgPrefix
-            - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-            - !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}"
-        - !Sub
+          - BucketPrefix:
+              Fn::If: # Deprecated
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                - Fn::Sub: "${Prefix}-${AWS::Region}-${AWS::AccountId}"
+        - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*"
-          - BucketPrefix: !If # Preferred as it aligns with regional bucket naming
-            - UseS3BucketNameOrgPrefix
-            - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-            - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
-        - !Sub
+          - BucketPrefix:
+              Fn::If: # Preferred as it aligns with regional bucket naming
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+        - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*/*"
-          - BucketPrefix: !If # Deprecated
-            - UseS3BucketNameOrgPrefix
-            - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-            - !Sub "${Prefix}-${AWS::Region}-${AWS::AccountId}"
-        - !Sub
+          - BucketPrefix:
+              Fn::If: # Deprecated
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                - Fn::Sub: "${Prefix}-${AWS::Region}-${AWS::AccountId}"
+        - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*/*"
-          - BucketPrefix: !If # Preferred as it aligns with regional bucket naming
-            - UseS3BucketNameOrgPrefix
-            - !Sub "${S3BucketNameOrgPrefix}-${Prefix}"
-            - !Sub "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+          - BucketPrefix:
+              Fn::If: # Preferred as it aligns with regional bucket naming
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
 
       - Sid: ManageLogsByResourcePrefix
         Effect: Allow
         Action:
         - logs:*
-        Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-*"
+        Resource:
+          Fn::Sub: "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-*"
 
       - Sid: ManageCodePipelineByResourcePrefix
         Effect: Allow
         Action:
         - codepipeline:*
-        Resource: !Sub "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Prefix}-*"
+        Resource:
+          Fn::Sub: "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Prefix}-*"
 
       - Sid: ManageCodeBuildByResourcePrefix
         Effect: Allow
         Action:
         - codebuild:*
-        Resource: !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-*"
+        Resource:
+          Fn::Sub: "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-*"
 
       - Sid: PassAndDeleteWorkerRolesByResourcePrefix
         Effect: Allow
         Action:
         - iam:PassRole
         - iam:DeleteRole
-        Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
+        Resource:
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
 
       - Sid: IAMReadOnly
         Effect: Allow
@@ -155,8 +174,8 @@ Properties:
         - iam:Get*
         - iam:List*
         Resource: 
-        - !Sub "arn:aws:iam::${AWS::AccountId}:role/*"
-        - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*"
+        - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/*"
+        - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:policy/*"
 
       - Sid: ManageWorkerRolesByResourcePrefix
         Effect: Allow
@@ -169,16 +188,19 @@ Properties:
         - iam:UntagRole
         - iam:TagRole
         - iam:UpdateRoleDescription
-        Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
+        Resource:
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
         Condition: 
           Fn::If:
             - HasPermissionsBoundaryArn
             - StringEquals:
-                "iam:PermissionsBoundary": !Ref PermissionsBoundaryArn
-            - !Ref 'AWS::NoValue'
+                "iam:PermissionsBoundary":
+                  Ref: PermissionsBoundaryArn
+            - Ref: "AWS::NoValue"
 
       - Sid: InspectServiceRole
         Effect: Allow
         Action:
         - iam:ListAttachedRolePolicies
-        Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role${RolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
+        Resource:
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
