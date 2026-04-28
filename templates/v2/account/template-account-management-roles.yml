@@ -37,6 +37,12 @@ Description: "Combined prefix-based IAM Service Roles and Managed Policies for P
 #
 
 Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
+        - W2001 # Parameters consumed by AWS::Include modules appear unused
+        - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
     ParameterGroups:
       -
