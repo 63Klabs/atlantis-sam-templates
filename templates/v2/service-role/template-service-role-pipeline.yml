@@ -163,12 +163,10 @@ Resources:
   
   # ---------------------------------------------------------------------------
   # -- Prefix-based IAM Service Roles and Policy --
-  # Module: modules/management-roles/pipeline-mgmt-role.yml
-  IncludePipelineMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref PipelineMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref PipelineMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

@@ -41,6 +41,7 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
+        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
         - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
@@ -223,51 +224,45 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Pipeline Management Service Role and Managed Policy --
-  IncludePipelineMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref PipelineMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref PipelineMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Storage Management Service Role and Managed Policy --
-  IncludeStorageMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref StorageMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref StorageMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  IncludeNetworkCloudFrontMgmtPolicy:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network Route53 Management Policy --
-  IncludeNetworkRoute53MgmtPolicy:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkRoute53MgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Role (Developer) --
-  IncludeNetworkCloudFrontMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Full Network Management Role (CloudFront + Route53) --
-  IncludeNetworkFullMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkFullMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkFullMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

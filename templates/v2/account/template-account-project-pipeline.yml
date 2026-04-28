@@ -42,6 +42,7 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
+        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -176,35 +177,31 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- CodeBuild and Logs CRUD Policy (ABAC-Scoped) --
-  IncludeCodeBuildCrud:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref CodeBuildCrudModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref CodeBuildCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
-  IncludeCognitoCrud:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref CognitoCrudModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref CognitoCrudModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- GitHub Connection (Conditional) --
-  IncludeCodeConnectionsGitHub:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref CodeConnectionsGitHubModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref CodeConnectionsGitHubModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- API Gateway CloudWatch Logging (Conditional) --
-  IncludeApiGwCloudWatch:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref ApiGwCloudWatchModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref ApiGwCloudWatchModuleUrl
 
 # =============================================================================
 # OUTPUTS

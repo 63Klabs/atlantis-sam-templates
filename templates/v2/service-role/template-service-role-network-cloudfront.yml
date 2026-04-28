@@ -24,6 +24,7 @@ Metadata:
     config:
       ignore_checks:
         - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
+        - E0000 # Duplicate Fn::Transform keys required for multiple AWS::Include
         - W2001 # Parameters consumed by AWS::Include modules appear unused
         - W8001 # Conditions consumed by AWS::Include modules appear unused
   AWS::CloudFormation::Interface:
@@ -153,19 +154,17 @@ Resources:
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Policy --
-  IncludeNetworkCloudFrontMgmtPolicy:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtPolicyModuleUrl
 
   # ---------------------------------------------------------------------------
   # -- Network CloudFront Management Role and PassRole Policy --
-  IncludeNetworkCloudFrontMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref NetworkCloudFrontMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS

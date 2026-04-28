@@ -163,12 +163,10 @@ Resources:
   
   # ---------------------------------------------------------------------------
   # -- Prefix-based IAM Service Roles and Policy --
-  # Module: modules/management-roles/storage-mgmt-role.yml
-  IncludeStorageMgmtRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Ref StorageMgmtRoleModuleUrl
+  Fn::Transform:
+    Name: AWS::Include
+    Parameters:
+      Location: !Ref StorageMgmtRoleModuleUrl
 
 # =============================================================================
 # OUTPUTS
