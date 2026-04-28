@@ -1013,6 +1013,19 @@ Resources:
             Resource:
               - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Prefix}-${ProjectId}-${StageId}-*'
 
+          # == SSM Parameters ==
+          - Sid: "SsmParameterCRUDThisDeploymentOnly"
+            Action:
+            - ssm:PutParameter
+            - ssm:AddTagsToResource
+            - ssm:GetParameters
+            - ssm:GetParameter
+            - ssm:GetParametersByPath
+            - ssm:ListTagsForResource
+            Effect: Allow
+            Resource: 
+              !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/app-stack/*" # app-stack/ sub-path is CRUD for application templates
+
           # ===================================================================
           # Limited CRUD permissions for application resources
           # ===================================================================
