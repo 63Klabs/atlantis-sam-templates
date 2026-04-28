@@ -148,12 +148,12 @@ Resources:
     Parameters:
       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/codebuild-crud.yml"
 
-  # # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
-  # CloudFormationCognitoPolicy:
-  #   Fn::Transform:
-  #     Name: AWS::Include
-  #     Parameters:
-  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
+  # -- Cognito User Pool CRUD Policy (ABAC-Scoped) --
+  CloudFormationCognitoPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
 
   # # -- GitHub Connection (Conditional) --
   # GitHubConnection:

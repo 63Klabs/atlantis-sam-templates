@@ -6,4 +6,5 @@
 Type: AWS::ApiGateway::Account
 Condition: EnableApiGatewayLogging
 Properties:
-  CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchLogsRole.Arn
+  CloudWatchRoleArn:
+    Fn::GetAtt: [ApiGatewayCloudWatchLogsRole, Arn]

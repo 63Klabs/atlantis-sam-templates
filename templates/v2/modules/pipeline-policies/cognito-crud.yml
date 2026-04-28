@@ -3,9 +3,11 @@
 
 Type: AWS::IAM::ManagedPolicy
 Properties:
-  ManagedPolicyName: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
+  ManagedPolicyName:
+    Fn::Sub: "${OrgPrefix}-ProjectPipeline-CognitoCrud"
   Description: "Allows CloudFormation service roles to manage Cognito User Pools scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
-  Path: !Ref RolePath
+  Path:
+    Ref: RolePath
   PolicyDocument:
     Version: "2012-10-17"
     Statement:

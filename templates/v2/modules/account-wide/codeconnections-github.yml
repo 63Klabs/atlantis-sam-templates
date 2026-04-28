@@ -19,8 +19,10 @@ Condition: HasGitHubOrg
 DeletionPolicy: Retain
 UpdateReplacePolicy: Retain
 Properties:
-  ConnectionName: !Sub "${OrgPrefix}-${GitHubOrg}-github-connection"
+  ConnectionName:
+    Fn::Sub: "${OrgPrefix}-${GitHubOrg}-github-connection"
   ProviderType: GitHub
   Tags:
     - Key: GitHubOrg
-      Value: !Ref GitHubOrg
+      Value:
+        Ref: GitHubOrg
