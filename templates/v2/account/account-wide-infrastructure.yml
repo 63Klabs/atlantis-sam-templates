@@ -164,27 +164,27 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
 
-  # -- GitHub Connection (Conditional) --
-  GitHubConnection:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/codeconnections-github.yml"
+  # # -- GitHub Connection (Conditional) --
+  # GitHubConnection:
+  #   Fn::Transform:
+  #     Name: AWS::Include
+  #     Parameters:
+  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/codeconnections-github.yml"
 
-  # -- API Gateway CloudWatch Role (Conditional) --
-  ApiGatewayCloudWatchLogsRole:
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-role.yml"
+  # # -- API Gateway CloudWatch Role (Conditional) --
+  # ApiGatewayCloudWatchLogsRole:
+  #   Fn::Transform:
+  #     Name: AWS::Include
+  #     Parameters:
+  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-role.yml"
 
-  # -- API Gateway Account Configuration (Conditional) --
-  ApiGatewayAccount:
-    DependsOn: ApiGatewayCloudWatchLogsRole
-    Fn::Transform:
-      Name: AWS::Include
-      Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-account.yml"
+  # # -- API Gateway Account Configuration (Conditional) --
+  # ApiGatewayAccount:
+  #   DependsOn: ApiGatewayCloudWatchLogsRole
+  #   Fn::Transform:
+  #     Name: AWS::Include
+  #     Parameters:
+  #       Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/account-wide/apigw-cloudwatch-account.yml"
 
 # =============================================================================
 # OUTPUTS
