@@ -1017,7 +1017,9 @@ Resources:
           - Sid: "SsmParameterCRUDThisDeploymentOnly"
             Action:
             - ssm:PutParameter
+            - ssm:DeleteParameter
             - ssm:AddTagsToResource
+            - ssm:RemoveTagsFromResource
             - ssm:GetParameters
             - ssm:GetParameter
             - ssm:GetParametersByPath

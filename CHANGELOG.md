@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
+## v0.0.33 (unreleased)
+
+### Added
+- **Pipelines: template-pipeline.yml, template-pipeline-github.yml** - Added `SsmParameterCRUDThisDeploymentOnly` IAM policy statement to CloudFormationSvcRole. This allows the application template to manage SSM Parameters under the `${ParameterStoreHierarchy}app-stack/` path. For example: `/sam-app/PROD/acme-myapp-prod/app-stack/*` Note the use of the additional path segment `app-stack` restricting the application infrastructure stack more than CodeBuild and PostDeploy permissions would. This should be used for resolving circular dependencies and storing configurations only, not for secrets. It is best practice to not store secrets as Environment variables or pass as parameters, but rather access SSM Parameter store at runtime.
+
 ## v0.0.31 (2026-04-03)
 
 ### Added
