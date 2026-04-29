@@ -4,23 +4,23 @@
 # chmod +x sync_templates.sh
 
 # Basic usage
-# ./sync_templates.sh templates my-bucket atlantis/templates
-# ./sync_templates.sh templates my-bucket atlantis/templates --profile myprofile
+# ./sync_templates.sh templates my-bucket /atlantis/templates
+# ./sync_templates.sh templates my-bucket /atlantis/templates --profile myprofile
 
 # Basic usage with default credentials
-# ./sync_templates.sh templates my-bucket atlantis/templates
+# ./sync_templates.sh templates my-bucket /atlantis/templates
 
 # With specific profile
-# ./sync_templates.sh templates my-bucket atlantis/templates --profile myprofile
+# ./sync_templates.sh templates my-bucket /atlantis/templates --profile myprofile
 
 # With custom source directory
-# ./sync_templates.sh templates my-bucket atlantis/templates --profile myprofile
+# ./sync_templates.sh templates my-bucket /atlantis/templates --profile myprofile
 
 # Dryrun to preview changes
-# ./sync_templates.sh templates my-bucket atlantis/templates --dryrun
+# ./sync_templates.sh templates my-bucket /atlantis/templates --dryrun
 
 # Full example with all options
-# ./sync_templates.sh templates my-bucket atlantis/templates --profile myprofile --dryrun
+# ./sync_templates.sh templates my-bucket /atlantis/templates --profile myprofile --dryrun
 
 set -e  # Exit on error
 
@@ -108,8 +108,6 @@ echo "Syncing files from $SOURCE_DIR to s3://${BUCKET_NAME}${BASE_PATH}..."
 # Perform the sync operation
 $AWS_CMD s3 sync "./$SOURCE_DIR" "s3://${BUCKET_NAME}${BASE_PATH}" \
     --delete \
-    --exact-timestamps \
-    --size-only \
     --exclude "*" \
     --exclude ".*" \
     --exclude ".*/*" \

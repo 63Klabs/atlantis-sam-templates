@@ -7,11 +7,18 @@ Released versions are available from the public S3 bucket `63klabs`
 ## v0.0.33 (unreleased)
 
 ### Added
+- **Modules** - Template snipits, which can also be used as modules to insert into your CloudFormation templates, have been added to the repository! These will find their way into other templates to provide consistency and easy maintainability. Currently, there is no versioning. While a previous version can be retreived from the AWS CLI, since they are still in the S3 bucket, CloudFormation does not support versions. An optimal solution for versioning will be developed later.
+- **`account` category** - In addition to `network`, `pipeline`, and `storage` there is now an `account` template directory for admins managing account-wide resources.
+
+### Updated
 - **Pipelines: template-pipeline.yml, template-pipeline-github.yml** - Added `SsmParameterCRUDThisDeploymentOnly` IAM policy statement to CloudFormationSvcRole. This allows the application template to manage SSM Parameters under the `${ParameterStoreHierarchy}app-stack/` path. For example: `/sam-app/PROD/acme-myapp-prod/app-stack/*` Note the use of the additional path segment `app-stack` restricting the application infrastructure stack more than CodeBuild and PostDeploy permissions would. This should be used for resolving circular dependencies and storing configurations only, not for secrets. It is best practice to not store secrets as Environment variables or pass as parameters, but rather access SSM Parameter store at runtime.
+
+### Deprecated
+- **`service-role` category** - Deploying service-roles for each prefix was a temporary solution, never meant for developers. This process has been assumed into the `templates/v2/account/prefix-based-infrastructure.yml` template that admins can deploy at account creation time. This template also includes new `network` roles.
 
 ## v0.0.31 (2026-04-03)
 
-### Added
+### Updated
 - **Pipeline: template-pipeline*.yml** - Added `SSMPublicParameterReadOnly` IAM policy statement to CloudFormationSvcRole, CodeBuildSvcRole, and PostDeploySvcRole on all 3 existing pipeline templates granting `ssm:GetParameter` and `ssm:GetParameters` on `/aws/service/*` public AWS SSM parameters, enabling `{{resolve:ssm:/aws/service/...}}` dynamic references in application templates [Spec: pipeline-ssm-parameter-access](../.kiro/specs/0-0-31-pipeline-ssm-parameter-access/)
 
 ### Changed
