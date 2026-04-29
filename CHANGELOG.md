@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
-## v0.0.33 (unreleased)
+## v0.0.33 (2026-04-30)
 
 ### Added
 - **Modules** - Template snipits, which can also be used as modules to insert into your CloudFormation templates, have been added to the repository! These will find their way into other templates to provide consistency and easy maintainability. Currently, there is no versioning. While a previous version can be retreived from the AWS CLI, since they are still in the S3 bucket, CloudFormation does not support versions. An optimal solution for versioning will be developed later.

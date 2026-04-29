@@ -68,6 +68,13 @@ phases:
 
   post_build:
     commands:
+      # Only deploy if the build phase succeeded
+      - |
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" != "1" ]; then
+          echo "Build phase failed — skipping deployment to S3"
+          exit 1
+        fi
+
       - export S3_HOST_BASE_PATH_UTILITIES="${S3_HOST_BASE_PATH}utilities/v2/"
       - export S3_HOST_BASE_PATH_TEMPLATES="${S3_HOST_BASE_PATH}templates/"
 
