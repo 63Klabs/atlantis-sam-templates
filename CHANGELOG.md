@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
+## v0.0.34 (unreleased)
+
+TODO
+
 ## v0.0.33 (2026-04-30)
 
 ### Added
