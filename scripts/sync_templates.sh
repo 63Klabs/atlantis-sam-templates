@@ -83,6 +83,13 @@ if [ -z "$SOURCE_DIR" ] || [ -z "$BUCKET_NAME" ] || [ -z "$BASE_PATH" ]; then
     usage
 fi
 
+# Normalize BASE_PATH: strip leading slash (S3 keys should not start with /)
+BASE_PATH="${BASE_PATH#/}"
+# Ensure BASE_PATH ends with / if not empty
+if [ -n "$BASE_PATH" ] && [[ "$BASE_PATH" != */ ]]; then
+    BASE_PATH="${BASE_PATH}/"
+fi
+
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "Error: Source directory '$SOURCE_DIR' not found"
