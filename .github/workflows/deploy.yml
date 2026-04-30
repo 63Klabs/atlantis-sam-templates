@@ -54,4 +54,4 @@ jobs:
 
       - name: Upload utility scripts
         run: |
-          ./scripts/upload_scripts.sh ${{ vars.AWS_RELEASE_BUCKET }}${{ vars.AWS_RELEASE_BUCKET_UTILS_PATH }} scripts
+          ./scripts/upload_scripts.sh ${{ vars.AWS_RELEASE_BUCKET }} ${{ vars.AWS_RELEASE_BUCKET_UTILS_PATH }} scripts

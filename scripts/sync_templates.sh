@@ -108,13 +108,16 @@ fi
 
 echo "Syncing files from $SOURCE_DIR to s3://${BUCKET_NAME}${BASE_PATH}..."
 
-# Build find pattern for included extensions
-FIND_PATTERN=""
+# Build find arguments for included extensions
+FIND_ARGS=()
+FIRST=true
 for ext in $INCLUDE_EXTENSIONS; do
-    if [ -n "$FIND_PATTERN" ]; then
-        FIND_PATTERN="$FIND_PATTERN -o"
+    if [ "$FIRST" = true ]; then
+        FIRST=false
+    else
+        FIND_ARGS+=("-o")
     fi
-    FIND_PATTERN="$FIND_PATTERN -name *.$ext"
+    FIND_ARGS+=("-name" "*.$ext")
 done
 
 # Counters
@@ -157,7 +160,7 @@ while IFS= read -r LOCAL_FILE; do
         SKIPPED=$((SKIPPED + 1))
         echo "Unchanged: $LOCAL_FILE"
     fi
-done < <(find "$SOURCE_DIR" -type f \( $FIND_PATTERN \) ! -path '*/.*' | sort)
+done < <(find "$SOURCE_DIR" -type f \( "${FIND_ARGS[@]}" \) ! -path '*/.*' | sort)
 
 # Delete remote files that no longer exist locally (replicate --delete behavior)
 echo ""
