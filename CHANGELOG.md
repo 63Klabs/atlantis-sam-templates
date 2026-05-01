@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
-## v0.0.34 (unreleased)
+## v0.0.34 (2026-05-01)
 
 ### Changed
 - **Network: template-network-route53-cloudfront-s3-apigw.yml v0.0.18** - Added AllViewerExceptHostHeader origin request policy to API Gateway cache behaviors, replacing custom header forwarding via the cache policy with the modern origin request policy approach [Spec: cloudfront-origin-request-policy](../.kiro/specs/0-0-34-cloudfront-origin-request-policy/)
