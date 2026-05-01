@@ -364,8 +364,7 @@ class TestExistingConditionsCompatibilityProperty:
         'HasRouteForApiInCloudFront',
         'CreateDistribution',
         'CreateDnsRecordForCloudFront',
-        'CreateDnsRecordForApiGateway',
-        'HasHeadersToForwardToApi'
+        'CreateDnsRecordForApiGateway'
     ]
     
     @given(condition_name=st.sampled_from(EXISTING_CONDITIONS))

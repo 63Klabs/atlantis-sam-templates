@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.17/2026-03-17
+# Version: v0.0.18/2026-05-01
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -99,7 +99,7 @@ Metadata:
           - AcmCertificateArnForApiGateway
 
       - Label:
-          default: API behind CloudFront Forwarding
+          default: "API behind CloudFront Forwarding (Deprecated)"
         Parameters: 
           # - AllowedMethodsForApi
           - HeadersToForwardToApi
@@ -465,11 +465,11 @@ Parameters:
 
   HeadersToForwardToApi:
     Type: CommaDelimitedList
-    Description: 'If you are placing an API Gateway behind CloudFront, you will
-      need to specify the headers that you want to forward to the API. For example,
-      if you want to forward the X-Forwarded-For header, then specify ''X-Forwarded-For''
-      in this list. Leave blank if you are not placing API Gateway behind a CloudFront
-      Distribution or you are not forwarding any headers to the API.'
+    Description: 'DEPRECATED - This parameter is no longer used. Header forwarding
+      to API Gateway is now handled by the AllViewerExceptHostHeader origin request
+      policy, which forwards all viewer headers, cookies, and query strings except
+      the Host header. This parameter is retained for backward compatibility with
+      existing stack deployments.'
     Default: 'Accept,Origin,Referer,User-Agent,Authorization'
 
 # =============================================================================
@@ -537,13 +537,6 @@ Conditions:
     - !Not [!Equals [!Ref DomainForApiGateway, '']]
     - !Not [!Equals [!Ref CustomSubdomainApiGateway, '']]
     - !Not [!Equals [!Ref AcmCertificateArnForApiGateway, '']]
-
-  HasHeadersToForwardToApi: !Not
-    - !Equals # Requires string, so we join the list (possibly empty)
-      - !Join
-        - ''
-        - !Ref HeadersToForwardToApi
-      - ''
 
   # Static Origin Path Conditions
   StaticOriginPathIsEmpty: !Equals [!Ref StaticOriginPath, ""]
@@ -692,6 +685,7 @@ Resources:
                   - !Ref CloudFrontApiCustomCachePolicyArn
                   - !FindInMap [CachePolicyIds, !Ref CloudFrontApiCachePolicy, Id]
               - !FindInMap [CachePolicyIds, CachingDisabled, Id]
+          OriginRequestPolicyId: !If [StaticOriginIsRoot, !Ref "AWS::NoValue", "b689b0a8-53d0-40ab-baf2-68738e2966ac"]
           TargetOriginId: !If [ StaticOriginIsRoot, "StaticS3Origin", "ApiGatewayOrigin" ]
           ViewerProtocolPolicy: redirect-to-https
           Compress: true
@@ -803,6 +797,7 @@ Resources:
                     - !Ref CloudFrontApiCustomCachePolicyArn
                     - !FindInMap [CachePolicyIds, !Ref CloudFrontApiCachePolicy, Id]
                 - !FindInMap [CachePolicyIds, CachingDisabled, Id]
+              OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
               TargetOriginId: ApiGatewayOrigin
               ViewerProtocolPolicy: redirect-to-https
               Compress: true
@@ -910,11 +905,8 @@ Resources:
           EnableAcceptEncodingGzip: false
           QueryStringsConfig:
             QueryStringBehavior: all
-          HeadersConfig: !If 
-            - HasHeadersToForwardToApi
-            - HeaderBehavior: whitelist
-              Headers: !Ref HeadersToForwardToApi
-            - HeaderBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
 
   # --------------------------------------------------
   # Route53 for CloudFront Distribution Custom Domain

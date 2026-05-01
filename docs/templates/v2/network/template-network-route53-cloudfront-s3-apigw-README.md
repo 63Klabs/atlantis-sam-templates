@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.0.16/2026-02-02  
+**Version:** v0.0.18/2026-05-01  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -111,9 +111,9 @@ Configure custom domain routing for standalone API Gateway (not behind CloudFron
 - [PathApi](#pathapi)
 - [AcmCertificateArnForApiGateway](#acmcertificatearnforapigateway)
 
-### API behind CloudFront Forwarding
+### API behind CloudFront Forwarding (Deprecated)
 
-Configure header forwarding when API Gateway is placed behind CloudFront.
+> **Deprecated:** Header forwarding to API Gateway is now handled automatically by the AllViewerExceptHostHeader origin request policy applied to API cache behaviors. The parameters in this section are retained for backward compatibility but are no longer used.
 
 - [HeadersToForwardToApi](#headerstoforwardtoapi)
 
@@ -521,7 +521,7 @@ The Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
 
 #### HeadersToForwardToApi
 
-If you are placing an API Gateway behind CloudFront, you will need to specify the headers that you want to forward to the API. For example, if you want to forward the X-Forwarded-For header, then specify 'X-Forwarded-For' in this list. Leave blank if you are not placing API Gateway behind a CloudFront Distribution or you are not forwarding any headers to the API.
+> **Deprecated:** This parameter is no longer used. Header forwarding to API Gateway is now handled by the AllViewerExceptHostHeader origin request policy, which forwards all viewer headers, cookies, and query strings except the Host header. This parameter is retained for backward compatibility with existing stack deployments.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -558,6 +558,10 @@ Environment-based override ensures DEV and TEST environments always use CachingD
 
 For more information about AWS managed cache policies, see [AWS Managed Cache Policies](#aws-managed-cache-policies).
 
+**Origin Request Policy:**
+
+API cache behaviors (both the default behavior when API is root and the path-based API behavior) use the AWS managed AllViewerExceptHostHeader origin request policy (`b689b0a8-53d0-40ab-baf2-68738e2966ac`). This policy forwards all viewer headers, cookies, and query strings to the API Gateway origin except the Host header, which must remain set to the API Gateway domain for proper routing. Static content behaviors do not use an origin request policy.
+
 **Key Properties:**
 - Supports both S3 (with OAC) and API Gateway origins
 - Configurable price class based on deployment environment
@@ -567,6 +571,7 @@ For more information about AWS managed cache policies, see [AWS Managed Cache Po
 - Custom domain support with ACM certificates
 - Optional access logging to S3 bucket with organized prefix structure
 - Flexible cache policy selection (managed, custom default, or custom ARN)
+- AllViewerExceptHostHeader origin request policy on API behaviors for header forwarding
 
 **Cost Consideration:** CloudFront distributions incur costs based on data transfer and requests. Price class affects the number of edge locations used.
 
@@ -627,7 +632,7 @@ When using AWS managed policies (like CachingDisabled, which is the default) or 
 **Key Properties:**
 - DefaultTTL: 10s, MaxTTL: 30s
 - Includes all cookies and query strings in cache key
-- Forwards specified headers to origin (configurable via HeadersToForwardToApi)
+- HeadersConfig set to `none` (header forwarding is handled by the AllViewerExceptHostHeader origin request policy on API cache behaviors)
 - Suitable for dynamic API responses
 
 **Operational Note:** Short TTLs prevent stale API responses while still providing some caching benefit for repeated requests. In DEV/TEST environments, the distribution uses CachingDisabled managed policy instead, so this resource is not created.
@@ -809,7 +814,6 @@ The template uses several conditions to control resource creation:
 - **CreateDistribution**: True when either static origin or API behind CloudFront is configured
 - **CreateDnsRecordForCloudFront**: True when all CloudFront domain parameters are provided
 - **CreateDnsRecordForApiGateway**: True when all API Gateway domain parameters are provided
-- **HasHeadersToForwardToApi**: True when headers list is not empty
 - **HasLogBucket**: True when S3LogBucketName is provided (non-empty)
 - **CreateCustomStaticCachePolicy**: True when static origin exists, environment is PROD, and CloudFrontStaticCachePolicy is CustomDefault
 - **CreateCustomApiCachePolicy**: True when environment is PROD and CloudFrontApiCachePolicy is CustomDefault
