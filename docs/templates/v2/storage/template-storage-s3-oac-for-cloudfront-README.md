@@ -2,7 +2,7 @@
 
 CloudFront distribution with S3 origin access control (OAC). Supports external invalidator services via S3 event notifications - Deployed using SAM
 
-**Version:** v0.1.0/2025-12-08  
+**Version:** v0.1.2/2026-05-04  
 **Template:** [templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml](../../../../templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml)
 
 ## Overview
@@ -218,11 +218,11 @@ The S3 Bucket Name used for CloudFront Origin.
 
 ### OriginBucketDomainForCloudFront
 
-Domain to use for CloudFront S3 Origin.
+Regional S3 domain (with `https://` prefix) to use for CloudFront S3 Origin. Uses the regional endpoint format to avoid 307 redirects when used with Origin Access Control (OAC).
 
-**Example Value:** `acme-webapp-us-east-1-123456789012.s3.us-east-1.amazonaws.com`
+**Example Value:** `https://acme-webapp-us-east-1-123456789012.s3.us-east-1.amazonaws.com`
 
-**Usage:** Use this domain when configuring the CloudFront distribution's S3 origin.
+**Usage:** Use this domain when configuring the CloudFront distribution's S3 origin. The `https://` prefix and regional format (`<bucket>.s3.<region>.amazonaws.com`) are required for OAC-based distributions.
 
 ### AllowedCloudFrontAndCodeBuild
 

@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
+## v0.0.35 (unreleased)
+
+### Fixed
+- **Storage: template-storage-s3-oac-for-cloudfront.yml v0.1.2** - Fixed OriginBucketDomainForCloudFront output to use regional S3 domain format (`https://<bucket>.s3.<region>.amazonaws.com`) instead of global format, preventing 307 redirects for CloudFront distributions using OAC [Spec: 0-0-35-s3-oac-domain-fix](../.kiro/specs/0-0-35-s3-oac-domain-fix/) addresses [#3](https://github.com/63Klabs/atlantis-sam-templates/issues/3)
 
 ## v0.0.34 (2026-05-01)
 
