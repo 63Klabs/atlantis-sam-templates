@@ -254,7 +254,7 @@ Outputs:
 
   OriginBucketDomainForCloudFront:
     Description: Domain to use for CloudFront S3 Origin.
-    Value: !Sub "https://${OriginBucketRegional}.s3.${AWS::Region}.amazonaws.com"
+    Value: !Sub "${OriginBucketRegional}.s3.${AWS::Region}.amazonaws.com"
 
   AllowedCloudFrontAndCodeBuild:
     Description: Access to bucket is restricted to CloudFront (Read) and CodeBuild (CRUD) with the following atlantis:Application tag value.
