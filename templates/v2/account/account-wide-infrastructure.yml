@@ -193,7 +193,7 @@ Outputs:
   # CodeBuild CRUD Policy
 
   CodeBuildCrudPolicyArn:
-    Description: "ARN of the CodeBuild CRUD managed policy. Pass this to pipeline templates via CodeBuildSvcRoleIncludeManagedPolicyArns or the CloudFormation service role managed policy parameter."
+    Description: "ARN of the CodeBuild CRUD managed policy. Pass this to pipeline templates via the CloudFormationSvcRoleIncludeManagedPolicyArns parameter."
     Value: !Ref CloudFormationCodeBuildPolicy
     Export:
       Name: !Sub "${OrgPrefix}-ProjectPipeline-CodeBuildCrud-Arn"
@@ -206,7 +206,7 @@ Outputs:
   # Cognito CRUD Policy
 
   CognitoCrudPolicyArn:
-    Description: "ARN of the Cognito CRUD managed policy. Pass this to pipeline templates via the CloudFormation service role managed policy parameter."
+    Description: "ARN of the Cognito CRUD managed policy. Pass this to pipeline templates via the CloudFormationSvcRoleIncludeManagedPolicyArns parameter."
     Value: !Ref CloudFormationCognitoPolicy
     Export:
       Name: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud-Arn"
