@@ -2,8 +2,8 @@
 
 Prefix-based IAM service role for deploying and managing storage infrastructure (S3, DynamoDB).
 
-**Version:** v0.0.1  
-**Last Updated:** 2025-08-09  
+**Version:** v0.0.2  
+**Last Updated:** 2026-03-29  
 **Template:** [templates/v2/service-role/template-service-role-storage.yml](../../../../templates/v2/service-role/template-service-role-storage.yml)
 
 ## Overview
@@ -185,6 +185,58 @@ Optional IAM user names to attach managed policy to.
 
 Friendly names (not ARNs) of existing IAM users.
 
+### Module Source
+
+Parameters for configuring where CloudFormation module snippets are loaded from. By default, modules are loaded from a regional S3 bucket based on the deployment region. You can override this with a custom bucket name and/or namespace.
+
+- [S3ModuleLocation](#s3modulelocation)
+- [S3ModuleNamespace](#s3modulenamespace)
+
+#### S3ModuleLocation
+
+S3 bucket name override for module snippets. Leave empty to use the default regional bucket from the RegionalModuleBuckets mapping.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^$\|^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$` |
+| Constraint Description | Must be empty or a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens. |
+
+When left empty (default), the template resolves the module bucket automatically using the `RegionalModuleBuckets` mapping based on the deployment region. If specified, modules are loaded from `s3://<S3ModuleLocation>/<S3ModuleNamespace>/templates/v2/modules/*`.
+
+> **Tip:** Only specify this parameter if you are hosting module snippets in your own S3 bucket. For standard deployments in supported regions (us-east-1, us-east-2, us-west-1, us-west-2), leave this empty.
+
+#### S3ModuleNamespace
+
+Namespace prefix within the S3 module bucket. This is the path prefix where modules are stored.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | atlantis |
+| Allowed Pattern | `^[a-z0-9][a-z0-9\-]*(\/[a-z0-9][a-z0-9\-]*)*$` |
+| Min Length | 1 |
+| Max Length | 128 |
+| Constraint Description | Must be 1 to 128 characters containing only lowercase alphanumeric characters, hyphens, and forward slashes. Must not start or end with a slash. Each segment between slashes must start with a lowercase alphanumeric character. |
+
+Modules are loaded from `s3://<BucketName>/<S3ModuleNamespace>/templates/v2/modules/*`. The default value `atlantis` points to the standard module location.
+
+## Mappings
+
+### RegionalModuleBuckets
+
+Maps AWS regions to their corresponding S3 bucket names for module storage. This mapping is used when `S3ModuleLocation` is left empty (default behavior).
+
+| Region | Bucket Name |
+|--------|-------------|
+| us-east-1 | 63klabs-atlas-us-east-1 |
+| us-east-2 | 63klabs-zenith-us-east-2 |
+| us-west-1 | 63klabs-fabric-us-west-1 |
+| us-west-2 | 63klabs-orbit-us-west-2 |
+
+> **Important:** If you deploy this template in a region not listed above without providing an `S3ModuleLocation` override, the stack will fail with a mapping lookup error. Supported regions for default module resolution are us-east-1, us-east-2, us-west-1, and us-west-2.
+
 ## Resources
 
 This template creates the following resources:
@@ -326,6 +378,7 @@ Name of the managed policy.
 
 The template uses several conditions to control resource configuration:
 
+- **HasS3ModuleLocation**: True when S3ModuleLocation is not empty. When true, the provided bucket name is used for module resolution instead of the RegionalModuleBuckets mapping.
 - **UseS3BucketNameOrgPrefix**: True when S3BucketNameOrgPrefix is not empty
 - **HasPermissionsBoundaryArn**: True when PermissionsBoundaryArn is not empty
 - **HasGroupNames**: True when GroupNames is not empty

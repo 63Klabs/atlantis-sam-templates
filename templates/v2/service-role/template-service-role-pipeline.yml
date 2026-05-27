@@ -5,7 +5,7 @@ Description: "Prefix-based IAM Role and Managed Policy for Atlantis Service Role
 # Atlantis for AWS SAM Deployments
 # Service Role Infrastructure Template 
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.16/2026-03-27
+# Version: v0.0.17/2026-05-27
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -52,6 +52,7 @@ Metadata:
           default: "Module Source"
         Parameters:
           - S3ModuleLocation
+          - S3ModuleNamespace
 
 # =============================================================================
 # PARAMETERS
@@ -136,10 +137,35 @@ Parameters:
 
   S3ModuleLocation:
     Type: String
-    Description: "S3 bucket name and namespace prefix for module snippets (without s3:// prefix or trailing slash). Modules are loaded from s3://<S3ModuleLocation>/templates/v2/modules/*"
-    Default: "63klabs/atlantis"
-    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*[^\\/]$"
-    ConstraintDescription: "Must be a valid S3 bucket/path without s3:// prefix or trailing slash."
+    Description: "S3 bucket name override for module snippets. Leave empty to use the default regional bucket from the RegionalModuleBuckets mapping. If specified, modules are loaded from s3://<S3ModuleLocation>/<S3ModuleNamespace>/templates/v2/modules/*"
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+    ConstraintDescription: "Must be empty or a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens."
+  S3ModuleNamespace:
+    Type: String
+    Description: "Namespace prefix within the S3 module bucket. This is the path prefix where modules are stored. Modules are loaded from s3://<BucketName>/<S3ModuleNamespace>/templates/v2/modules/*"
+    Default: "atlantis"
+    AllowedPattern: "^[a-z0-9][a-z0-9\\-]*(\\/[a-z0-9][a-z0-9\\-]*)*$"
+    MinLength: 1
+    MaxLength: 128
+    ConstraintDescription: "Must be 1 to 128 characters containing only lowercase alphanumeric characters, hyphens, and forward slashes. Must not start or end with a slash. Each segment between slashes must start with a lowercase alphanumeric character."
+
+# =============================================================================
+# MAPPINGS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+#
+
+Mappings:
+  RegionalModuleBuckets:
+    us-east-1:
+      BucketName: 63klabs-atlas-us-east-1
+    us-east-2:
+      BucketName: 63klabs-zenith-us-east-2
+    us-west-1:
+      BucketName: 63klabs-fabric-us-west-1
+    us-west-2:
+      BucketName: 63klabs-orbit-us-west-2
 
 # =============================================================================
 # CONDITIONS
@@ -148,6 +174,7 @@ Parameters:
 #
 
 Conditions:
+  HasS3ModuleLocation: !Not [!Equals [!Ref S3ModuleLocation, ""]]
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
   HasGroupNames: !Not [!Equals [!Join ["", !Ref GroupNames], ""]]
@@ -168,13 +195,25 @@ Resources:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/pipeline-mgmt-role.yml"
+        Location: !Sub
+          - "s3://${BucketName}/${Namespace}/templates/v2/modules/management-roles/pipeline-mgmt-role.yml"
+          - BucketName: !If
+              - HasS3ModuleLocation
+              - !Ref S3ModuleLocation
+              - !FindInMap [RegionalModuleBuckets, !Ref "AWS::Region", BucketName]
+            Namespace: !Ref S3ModuleNamespace
 
   PrefixBasedPipelineMgmtManagedPolicy:
     Fn::Transform:
       Name: AWS::Include
       Parameters:
-        Location: !Sub "s3://${S3ModuleLocation}/templates/v2/modules/management-roles/pipeline-mgmt-passrole-policy.yml"
+        Location: !Sub
+          - "s3://${BucketName}/${Namespace}/templates/v2/modules/management-roles/pipeline-mgmt-passrole-policy.yml"
+          - BucketName: !If
+              - HasS3ModuleLocation
+              - !Ref S3ModuleLocation
+              - !FindInMap [RegionalModuleBuckets, !Ref "AWS::Region", BucketName]
+            Namespace: !Ref S3ModuleNamespace
 
 # =============================================================================
 # OUTPUTS
