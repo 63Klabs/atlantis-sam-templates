@@ -102,11 +102,12 @@ Parameters:
 
   S3ModuleLocation:
     Type: String
-    Description: "S3 bucket name containing module snippets. Modules are loaded from s3://<S3ModuleLocation>/<S3ModuleNamespace>/templates/v2/modules/*. Regional buckets: us-east-1=63klabs-atlas-us-east-1, us-east-2=63klabs-zenith-us-east-2, us-west-1=63klabs-fabric-us-west-1, us-west-2=63klabs-orbit-us-west-2. Admins must supply their own bucket if deploying outside us-*"
+    Description: "S3 bucket name containing module snippets. Modules are loaded from s3://<S3ModuleLocation>/<S3ModuleNamespace>/templates/v2/modules/*. Regional buckets provided by 63klabs: 63klabs-atlas-us-east-1, 63klabs-zenith-us-east-2, 63klabs-fabric-us-west-1, 63klabs-orbit-us-west-2. Admins must supply their own bucket if deploying outside us-*"
     AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
     MinLength: 3
     MaxLength: 63
     ConstraintDescription: "Must be a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens."
+
   S3ModuleNamespace:
     Type: String
     Description: "Namespace prefix within the S3 module bucket. This is the path prefix where modules are stored. Modules are loaded from s3://<BucketName>/<S3ModuleNamespace>/templates/v2/modules/*"
