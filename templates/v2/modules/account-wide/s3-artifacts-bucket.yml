@@ -15,6 +15,7 @@ Properties:
       - UseS3BucketNameOrgPrefix
       - Fn::Sub: "${S3BucketNameOrgPrefix}-cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
       - Fn::Sub: "cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
+  BucketNamespace: "account-regional"
   VersioningConfiguration:
     Status: Enabled
   PublicAccessBlockConfiguration:
