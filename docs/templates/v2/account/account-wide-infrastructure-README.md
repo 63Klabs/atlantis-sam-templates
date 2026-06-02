@@ -130,7 +130,7 @@ Set to 'true' to create a shared, account-wide S3 artifacts bucket for pipeline 
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 
-> **Note:** When enabled, this creates an S3 bucket with a bucket policy granting access to all CodePipeline, CodeBuild, and CloudFormation service roles in the account (regardless of prefix). This is an alternative to per-project artifacts buckets created by `template-storage-s3-artifacts.yml`.
+> **Note:** When enabled, this creates an S3 bucket with a bucket policy that uses `Principal: "*"` with `aws:PrincipalArn` `ArnLike` conditions to grant access to all CodePipeline, CodeBuild, and CloudFormation service roles matching the suffix convention (`*-CodePipelineServiceRole`, `*-CodeBuildServiceRole`, `*-CloudFormationSvcRole`). Roles do not need to exist at deploy time. This is an alternative to per-project artifacts buckets created by `template-storage-s3-artifacts.yml`.
 
 #### S3BucketNameOrgPrefix
 
@@ -271,23 +271,27 @@ Creates a shared S3 artifacts bucket for pipeline build artifacts. The bucket is
 Type: AWS::S3::BucketPolicy (via AWS::Include)  
 Condition: EnableS3ArtifactsBucket
 
-Bucket policy for the shared S3 artifacts bucket. Enforces HTTPS-only access and grants permissions to all pipeline service roles in the account.
+Bucket policy for the shared S3 artifacts bucket. Enforces HTTPS-only access and grants permissions to all pipeline service roles in the account using condition-based principal matching.
 
 **Policy Statements:**
-| Statement | Effect | Principal | Actions |
-|-----------|--------|-----------|---------|
-| DenyNonSecureTransportAccess | Deny | * | s3:* (when SecureTransport=false) |
-| WhitelistedGet | Allow | CodePipeline/CodeBuild/CloudFormation roles | s3:GetObject, s3:GetObjectVersion, s3:GetBucketVersioning |
-| WhitelistedPut | Allow | CodePipeline/CodeBuild roles | s3:PutObject |
+| Statement | Effect | Principal | Condition | Actions |
+|-----------|--------|-----------|-----------|---------|
+| DenyNonSecureTransportAccess | Deny | * | SecureTransport=false | s3:* |
+| WhitelistedGet | Allow | * | ArnLike on aws:PrincipalArn (CodePipeline/CodeBuild/CloudFormation roles) | s3:GetObject, s3:GetObjectVersion, s3:GetBucketVersioning |
+| WhitelistedPut | Allow | * | ArnLike on aws:PrincipalArn (CodePipeline/CodeBuild roles) | s3:PutObject |
 
-**Principal Patterns (unprefixed wildcards):**
-- `arn:aws:iam::{AccountId}:role{RolePath}CodePipelineServiceRole-*`
-- `arn:aws:iam::{AccountId}:role{RolePath}CodeBuildServiceRole-*`
-- `arn:aws:iam::{AccountId}:role{RolePath}CloudFormationSvcRole-*`
+**Access Control Mechanism:**
+
+The WhitelistedGet and WhitelistedPut statements use `Principal: "*"` with `aws:PrincipalArn` `ArnLike` conditions to match pipeline service roles by suffix convention. This approach does not require the roles to exist at policy creation time, allowing the account-wide infrastructure to be deployed before any project pipelines.
+
+**ArnLike Condition Patterns (role suffix convention):**
+- `arn:aws:iam::{AccountId}:role{RolePath}*-CodePipelineServiceRole`
+- `arn:aws:iam::{AccountId}:role{RolePath}*-CodeBuildServiceRole`
+- `arn:aws:iam::{AccountId}:role{RolePath}*-CloudFormationSvcRole` (WhitelistedGet only)
 
 **Module Source:** `templates/v2/modules/account-wide/s3-artifacts-bucket-policy.yml`
 
-> **Note:** Unlike the per-project `template-storage-s3-artifacts.yml`, this bucket policy uses unprefixed wildcard patterns, granting access to ALL pipeline roles in the account regardless of their Prefix. This is intentional for account-wide shared usage.
+> **Note:** Unlike the per-project `template-storage-s3-artifacts.yml`, this bucket policy uses suffix wildcard patterns (`*-RoleType`), granting access to ALL pipeline roles in the account regardless of their Prefix. This is intentional for account-wide shared usage. The condition-based approach (`Principal: "*"` with `ArnLike`) avoids "Invalid principal in policy" errors that occur when named principals don't yet exist.
 
 ## Outputs
 
@@ -487,3 +491,10 @@ This creates: `acme-cf-artifacts-123456789012-us-east-1-an`
 - The S3 artifacts bucket uses `DeletionPolicy: Retain` — it will NOT be deleted when the stack is deleted
 - You must manually delete the bucket after stack deletion if no longer needed
 - This protects pipeline artifacts needed for rollbacks
+
+### S3 Bucket Policy "Invalid principal in policy" Error
+
+- This error occurs when a bucket policy uses named `Principal.AWS` ARNs that reference IAM roles not yet created
+- The account-wide infrastructure template avoids this by using `Principal: "*"` with `aws:PrincipalArn` `ArnLike` conditions
+- If you encounter this error with an older module version, update to the latest `s3-artifacts-bucket-policy.yml` module which uses the condition-based principal approach
+- The corrected patterns use the role suffix convention: `*-CodePipelineServiceRole`, `*-CodeBuildServiceRole`, `*-CloudFormationSvcRole`

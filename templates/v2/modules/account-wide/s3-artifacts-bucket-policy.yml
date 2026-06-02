@@ -39,29 +39,33 @@ Properties:
           - "s3:GetObject"
           - "s3:GetObjectVersion"
           - "s3:GetBucketVersioning"
-        Principal:
-          AWS:
-            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodePipelineServiceRole-*"
-            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodeBuildServiceRole-*"
-            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CloudFormationSvcRole-*"
+        Principal: "*"
         Resource:
           - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
           - Fn::Join:
               - "/"
               - - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
                 - "*"
+        Condition:
+          ArnLike:
+            "aws:PrincipalArn":
+              - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodePipelineServiceRole"
+              - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodeBuildServiceRole"
+              - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CloudFormationSvcRole"
 
       - Sid: "WhitelistedPut"
         Effect: Allow
         Action:
           - "s3:PutObject"
-        Principal:
-          AWS:
-            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodePipelineServiceRole-*"
-            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodeBuildServiceRole-*"
+        Principal: "*"
         Resource:
           - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
           - Fn::Join:
               - "/"
               - - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
                 - "*"
+        Condition:
+          ArnLike:
+            "aws:PrincipalArn":
+              - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodePipelineServiceRole"
+              - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodeBuildServiceRole"
