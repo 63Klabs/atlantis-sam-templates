@@ -4,16 +4,24 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
+## v0.0.37 (2026-06-01)
+
+### Added
+- **S3 Artifacts Bucket Modules** [Spec: 0-0-37-s3-artifacts-module-extraction](.kiro/specs/0-0-37-s3-artifacts-module-extraction/) - Added account-wide S3 artifacts bucket modules and integration into the account-wide-infrastructure template, providing a shared artifacts bucket accessible by all pipeline roles in the account regardless of prefix
+  - Account: account-wide-infrastructure.yml v0.0.0 - Added EnableS3ArtifactsBucket parameter, S3BucketNameOrgPrefix parameter, S3LogBucketName parameter, conditions, module references via AWS::Include, and conditional outputs
+  - Modules: s3-artifacts-bucket.yml - New account-wide S3 bucket module with versioning, encryption, lifecycle rules, and conditional logging
+  - Modules: s3-artifacts-bucket-policy.yml - New account-wide bucket policy module granting access to all pipeline service roles
+
 ## v0.0.36 (2026-05-27)
 
 ### Changed
-- **Regional S3 Bucket Mapping for Module Resolution** [Spec: 0-0-36-add-mapping-for-regional-template-imports](.kiro/specs/0-0-36-add-mapping-for-regional-template-imports/) - Added regional S3 bucket mapping for AWS::Include module resolution, enabling multi-region deployment without manual bucket specification
-  - Account: account-wide-infrastructure.yml v0.0.0 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
-  - Account: prefix-based-infrastructure.yml v0.0.0 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
-  - Service Role: template-service-role-pipeline.yml v0.0.17 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
-  - Service Role: template-service-role-network-cloudfront.yml v0.0.0 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
-  - Service Role: template-service-role-network-full.yml v0.0.0 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
-  - Service Role: template-service-role-storage.yml v0.0.2 - Added RegionalModuleBuckets mapping, S3ModuleNamespace parameter, and conditional bucket resolution for all AWS::Include transforms
+- **Regional S3 Bucket for Module Resolution** [Spec: 0-0-36-add-mapping-for-regional-template-imports](.kiro/specs/0-0-36-add-mapping-for-regional-template-imports/) - Added regional S3 buckets for AWS::Include module resolution, enabling multi-region deployment without manual bucket specification
+  - Account: account-wide-infrastructure.yml v0.0.0 - Added S3ModuleNamespace parameter
+  - Account: prefix-based-infrastructure.yml v0.0.0 - Added S3ModuleNamespace parameter
+  - Service Role: template-service-role-pipeline.yml v0.0.17 - Added S3ModuleNamespace parameter
+  - Service Role: template-service-role-network-cloudfront.yml v0.0.0 - Added S3ModuleNamespace parameter
+  - Service Role: template-service-role-network-full.yml v0.0.0 - Added S3ModuleNamespace parameter
+  - Service Role: template-service-role-storage.yml v0.0.2 - Added S3ModuleNamespace parameter
 
 ## v0.0.35 (2026-05-04)
 

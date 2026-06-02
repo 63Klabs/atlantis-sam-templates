@@ -1,0 +1,42 @@
+# -- S3 Artifacts Bucket (Account-Wide) --
+# Parent template must define parameters: S3BucketNameOrgPrefix, S3LogBucketName
+# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket
+#
+# Creates an account-wide S3 bucket for pipeline build artifacts.
+# Unlike the per-project storage template, this bucket is shared across
+# all projects in the account without prefix or project scoping.
+
+Type: AWS::S3::Bucket
+Condition: EnableS3ArtifactsBucket
+DeletionPolicy: Retain
+Properties:
+  BucketName:
+    Fn::If:
+      - UseS3BucketNameOrgPrefix
+      - Fn::Sub: "${S3BucketNameOrgPrefix}-cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
+      - Fn::Sub: "cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
+  VersioningConfiguration:
+    Status: Enabled
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  BucketEncryption:
+    ServerSideEncryptionConfiguration:
+      - ServerSideEncryptionByDefault:
+          SSEAlgorithm: AES256
+  LifecycleConfiguration:
+    Rules:
+      - Id: "ExpireObjects"
+        AbortIncompleteMultipartUpload:
+          DaysAfterInitiation: 1
+        ExpirationInDays: 395
+        NoncurrentVersionExpirationInDays: 30
+        Status: "Enabled"
+  LoggingConfiguration:
+    Fn::If:
+      - HasLoggingBucket
+      - DestinationBucketName:
+          Ref: S3LogBucketName
+      - Ref: "AWS::NoValue"

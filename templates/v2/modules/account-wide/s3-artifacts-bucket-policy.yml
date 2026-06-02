@@ -1,0 +1,67 @@
+# -- S3 Artifacts Bucket Policy --
+# Parent template must define:
+#   Parameters: RolePath
+#   Conditions: EnableS3ArtifactsBucket
+#   Pseudo-parameters: AWS::AccountId
+#   Bucket resource logical name: S3ArtifactsBucketRegional
+#
+# This policy grants access to ALL pipeline service roles in the account
+# regardless of prefix. It denies non-secure transport and whitelists
+# Get/Put operations for CodePipeline, CodeBuild, and CloudFormation roles.
+
+Type: AWS::S3::BucketPolicy
+Condition: EnableS3ArtifactsBucket
+Properties:
+  Bucket:
+    Ref: S3ArtifactsBucketRegional
+  PolicyDocument:
+    Version: "2012-10-17"
+    Id: SSEAndSSLPolicy
+    Statement:
+
+      - Sid: "DenyNonSecureTransportAccess"
+        Effect: Deny
+        Principal: "*"
+        Action: "s3:*"
+        Resource:
+          - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+          - Fn::Join:
+              - "/"
+              - - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+                - "*"
+        Condition:
+          Bool:
+            "aws:SecureTransport": false
+
+      - Sid: "WhitelistedGet"
+        Effect: Allow
+        Action:
+          - "s3:GetObject"
+          - "s3:GetObjectVersion"
+          - "s3:GetBucketVersioning"
+        Principal:
+          AWS:
+            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodePipelineServiceRole-*"
+            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodeBuildServiceRole-*"
+            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CloudFormationSvcRole-*"
+        Resource:
+          - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+          - Fn::Join:
+              - "/"
+              - - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+                - "*"
+
+      - Sid: "WhitelistedPut"
+        Effect: Allow
+        Action:
+          - "s3:PutObject"
+        Principal:
+          AWS:
+            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodePipelineServiceRole-*"
+            - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}CodeBuildServiceRole-*"
+        Resource:
+          - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+          - Fn::Join:
+              - "/"
+              - - Fn::GetAtt: [S3ArtifactsBucketRegional, Arn]
+                - "*"

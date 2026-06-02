@@ -4,8 +4,9 @@ Comprehensive collection of CloudFormation templates for building serverless app
 
 ## Overview
 
-This repository provides production-ready CloudFormation templates organized into four categories:
+This repository provides production-ready CloudFormation templates organized into five categories:
 
+- **[Account](#account-templates)**: Account-wide shared resources, managed policies, and connections
 - **[Network](#network-templates)**: CloudFront distributions, Route53 DNS, API Gateway custom domains
 - **[Pipeline](#pipeline-templates)**: CI/CD pipelines with CodePipeline, CodeBuild, and GitHub integration
 - **[Service Role](#service-role-templates)**: IAM roles and policies for AWS services
@@ -14,6 +15,24 @@ This repository provides production-ready CloudFormation templates organized int
 All templates follow semantic versioning and include comprehensive documentation, parameter validation, and example configurations.
 
 ## Template Categories
+
+### Account Templates
+
+[View Account Templates Documentation](./account/README.md)
+
+Account templates deploy shared, account-level resources assembled from reusable modules.
+
+| Template | Description | Use Cases |
+|----------|-------------|-----------|
+| [account-wide-infrastructure](./account/account-wide-infrastructure-README.md) | ABAC-scoped managed policies, shared connections, and optional S3 artifacts bucket | Centralized pipeline policies, GitHub integration, shared artifacts storage |
+
+**Common Use Cases:**
+- ABAC-scoped managed policies for CloudFormation service roles
+- Shared GitHub connection for all pipeline templates
+- Account-level API Gateway CloudWatch logging
+- Shared S3 artifacts bucket for all pipeline roles
+
+---
 
 ### Network Templates
 
@@ -143,25 +162,28 @@ Before using these templates, ensure you have:
 
 For a complete serverless application, deploy templates in this order:
 
-1. **Service Roles**: Create IAM roles for CloudFormation and other services
+1. **Account-Wide Infrastructure**: Deploy shared account-level resources (once per account per region)
+   - `account-wide-infrastructure.yml` (managed policies, GitHub connection, optional shared artifacts bucket)
+
+2. **Service Roles**: Create IAM roles for CloudFormation and other services
    - `template-service-role-pipeline.yml`
    - `template-service-role-storage.yml`
    - `template-service-role-api-gateway-cloudwatch.yml` (if using API Gateway)
 
-2. **Storage**: Create S3 buckets and DynamoDB tables
+3. **Storage**: Create S3 buckets and DynamoDB tables
    - `template-storage-s3-access-logs.yml` (for logging)
    - `template-storage-s3-artifacts.yml` (for CI/CD)
    - `template-storage-s3-devops.yml` (for shared resources)
    - `template-storage-s3-oac-for-cloudfront.yml` (for static content)
    - `template-storage-cache-data.yml` (for Lambda caching)
 
-3. **Application**: Deploy your SAM application
+4. **Application**: Deploy your SAM application
    - Your custom SAM template with Lambda functions, API Gateway, etc.
 
-4. **Network**: Configure routing and custom domains
+5. **Network**: Configure routing and custom domains
    - `template-network-route53-cloudfront-s3-apigw.yml`
 
-5. **Pipeline**: Automate deployments
+6. **Pipeline**: Automate deployments
    - `template-pipeline-github.yml` or `template-pipeline.yml`
 
 ### Parameter Naming Conventions

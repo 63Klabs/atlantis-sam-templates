@@ -62,6 +62,13 @@ Metadata:
           - EnableApiGwCloudWatchLogs
       -
         Label:
+          default: "S3 Artifacts Bucket"
+        Parameters:
+          - EnableS3ArtifactsBucket
+          - S3BucketNameOrgPrefix
+          - S3LogBucketName
+      -
+        Label:
           default: "Module Source"
         Parameters:
           - S3ModuleLocation
@@ -135,6 +142,30 @@ Parameters:
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
 
+  # ---------------------------------------------------------------------------
+  # S3 Artifacts Bucket
+
+  EnableS3ArtifactsBucket:
+    Type: String
+    Description: "Set to 'true' to create a shared, account-wide S3 artifacts bucket for pipeline build artifacts. This bucket is accessible by all pipeline roles in the account."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
+
+  S3BucketNameOrgPrefix:
+    Type: String
+    Description: "Optional lowercase organization prefix prepended to the S3 artifacts bucket name for uniqueness. Leave empty to omit. Example: 'acme' would produce 'acme-cf-artifacts-123456789012-us-east-1-an'."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters (8 or less recommended). Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
+  S3LogBucketName:
+    Type: String
+    Description: "Optional S3 bucket name for server access logging of the artifacts bucket. Leave empty to disable logging."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$|^$"
+    ConstraintDescription: "Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -144,6 +175,9 @@ Parameters:
 Conditions:
   HasGitHubOrg: !Not [!Equals [!Ref GitHubOrg, ""]]
   EnableApiGatewayLogging: !Equals [!Ref EnableApiGwCloudWatchLogs, "true"]
+  EnableS3ArtifactsBucket: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
+  UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
+  HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
 
 # =============================================================================
 # RESOURCES
@@ -188,6 +222,20 @@ Resources:
       Name: AWS::Include
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/account-wide/apigw-cloudwatch-account.yml"
+
+  # -- S3 Artifacts Bucket (Conditional) --
+  S3ArtifactsBucketRegional:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/account-wide/s3-artifacts-bucket.yml"
+
+  # -- S3 Artifacts Bucket Policy (Conditional) --
+  S3ArtifactBucketPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/account-wide/s3-artifacts-bucket-policy.yml"
 
 # =============================================================================
 # OUTPUTS
@@ -255,6 +303,21 @@ Outputs:
     Value: !GetAtt ApiGatewayCloudWatchLogsRole.Arn
     Export:
       Name: !Sub "${OrgPrefix}-ApiGateway-CloudWatch-Role-Arn"
+
+  # ---------------------------------------------------------------------------
+  # S3 Artifacts Bucket
+
+  S3ArtifactsBucketName:
+    Condition: EnableS3ArtifactsBucket
+    Description: "Name of the S3 artifacts bucket for pipeline build artifacts"
+    Value: !Ref S3ArtifactsBucketRegional
+    Export:
+      Name: !Sub "${OrgPrefix}-S3-Artifacts-Bucket-Name"
+
+  S3ArtifactsBucketConsole:
+    Condition: EnableS3ArtifactsBucket
+    Description: "S3 console link for the artifacts bucket"
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${S3ArtifactsBucketRegional}"
 
   # ---------------------------------------------------------------------------
   # Console Links

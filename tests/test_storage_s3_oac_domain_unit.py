@@ -87,11 +87,11 @@ class TestOriginBucketDomainMatchesRegionalPattern:
     """
 
     def test_output_value_matches_regional_domain_pattern(self, template):
-        """OriginBucketDomainForCloudFront should produce https://<bucket>.s3.<region>.amazonaws.com."""
+        """OriginBucketDomainForCloudFront should produce <bucket>.s3.<region>.amazonaws.com (without protocol prefix, CloudFront adds it)."""
         output = template["Outputs"]["OriginBucketDomainForCloudFront"]
         value = output["Value"]
 
-        expected_pattern = "https://${OriginBucketRegional}.s3.${AWS::Region}.amazonaws.com"
+        expected_pattern = "${OriginBucketRegional}.s3.${AWS::Region}.amazonaws.com"
 
         # The value must be a !Sub with the regional domain pattern
         assert isinstance(value, dict) and "!Sub" in value, (
@@ -103,7 +103,7 @@ class TestOriginBucketDomainMatchesRegionalPattern:
         assert sub_value == expected_pattern, (
             f"COUNTEREXAMPLE: OriginBucketDomainForCloudFront !Sub value is '{sub_value}'. "
             f"Expected '{expected_pattern}'. "
-            "The output must use the regional S3 domain format with https:// prefix."
+            "The output must use the regional S3 domain format (protocol-free for CloudFront origin)."
         )
 
 
