@@ -212,4 +212,4 @@ Properties:
         Action:
         - iam:ListAttachedRolePolicies
         Resource:
-          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${ServiceRolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
