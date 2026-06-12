@@ -91,31 +91,17 @@ Properties:
         - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*"
           - BucketPrefix:
-              Fn::If: # Deprecated
+              Fn::If:
                 - UseS3BucketNameOrgPrefix
                 - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
-                - Fn::Sub: "${Prefix}-${AWS::Region}-${AWS::AccountId}"
-        - Fn::Sub:
-          - "arn:aws:s3:::${BucketPrefix}-*"
-          - BucketPrefix:
-              Fn::If: # Preferred as it aligns with regional bucket naming
-                - UseS3BucketNameOrgPrefix
-                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
-                - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+                - Fn::Sub: "${Prefix}"
         - Fn::Sub:
           - "arn:aws:s3:::${BucketPrefix}-*/*"
           - BucketPrefix:
-              Fn::If: # Deprecated
+              Fn::If:
                 - UseS3BucketNameOrgPrefix
                 - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
-                - Fn::Sub: "${Prefix}-${AWS::Region}-${AWS::AccountId}"
-        - Fn::Sub:
-          - "arn:aws:s3:::${BucketPrefix}-*/*"
-          - BucketPrefix:
-              Fn::If: # Preferred as it aligns with regional bucket naming
-                - UseS3BucketNameOrgPrefix
-                - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
-                - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+                - Fn::Sub: "${Prefix}"
 
       # == CloudWatch Alarms ==
       - Sid: "CloudWatchAlarmsLimitedCRUDThisDeploymentOnly"
@@ -194,6 +180,18 @@ Properties:
         Resource: 
         - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/*"
         - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:policy/*"
+
+      - Sid: ManageManagedPoliciesByResourcePrefix
+        Effect: Allow
+        Action:
+        - iam:CreatePolicy
+        - iam:DeletePolicy
+        - iam:CreatePolicyVersion
+        - iam:DeletePolicyVersion
+        - iam:TagPolicy
+        - iam:UntagPolicy
+        Resource:
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:policy${RolePath}${Prefix}-*"
 
       - Sid: ManageWorkerRolesByResourcePrefix
         Effect: Allow

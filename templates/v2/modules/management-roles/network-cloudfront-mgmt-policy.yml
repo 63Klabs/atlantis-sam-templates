@@ -106,6 +106,18 @@ Properties:
         Resource: "*"
 
       # ------------------------------------------------------------------
+      # CloudFront Origin Request Policies
+      # ------------------------------------------------------------------
+
+      - Sid: CloudFrontOriginRequestPolicyRead
+        Effect: Allow
+        Action:
+          - cloudfront:GetOriginRequestPolicy
+          - cloudfront:GetOriginRequestPolicyConfig
+          - cloudfront:ListOriginRequestPolicies
+        Resource: "*"
+
+      # ------------------------------------------------------------------
       # CloudFront Functions (for viewer-request/response associations)
       # ------------------------------------------------------------------
 
@@ -136,6 +148,18 @@ Properties:
           - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/domainnames/*"
 
       # ------------------------------------------------------------------
+      # API Gateway V2 Read APIs (for ApiMapping validation)
+      # ------------------------------------------------------------------
+
+      - Sid: ApiGatewayV2ReadApis
+        Effect: Allow
+        Action:
+          - apigateway:GET
+        Resource:
+          - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/apis"
+          - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/apis/*"
+
+      # ------------------------------------------------------------------
       # S3 Bucket Read (for log bucket and origin verification)
       # ------------------------------------------------------------------
 
@@ -151,7 +175,7 @@ Properties:
                 Fn::If:
                   - UseS3BucketNameOrgPrefix
                   - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
-                  - Fn::Sub: "${Prefix}-${AWS::AccountId}-${AWS::Region}"
+                  - Fn::Sub: "${Prefix}"
 
       # ------------------------------------------------------------------
       # ACM Certificate Read (for CloudFront and API Gateway)

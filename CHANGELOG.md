@@ -13,6 +13,13 @@ Released versions are available from the public S3 bucket `63klabs`
 - **AllowTransformOperations for Management Roles** [Spec: 0-0-38-mgmt-role-allow-transform-operations](.kiro/specs/0-0-38-mgmt-role-allow-transform-operations/) addresses [#6](https://github.com/63Klabs/atlantis-sam-templates/issues/6)
   - Modules: pipeline-mgmt-role.yml - Added `AllowTransformOperations` statement granting `cloudformation:CreateChangeSet` on AWS-managed transform ARNs to unblock SAM/LanguageExtensions/Include deployments
   - Modules: storage-mgmt-role.yml - Same fix applied
+- **Network CloudFront Management Policy Permissions Gaps** [Spec: 0-0-38-network-cloudfront-mgmt-policy-gaps](.kiro/specs/0-0-38-network-cloudfront-mgmt-policy-gaps/) addresses [#8](https://github.com/63Klabs/atlantis-sam-templates/issues/8)
+  - Modules: network-cloudfront-mgmt-policy.yml - Added `CloudFrontOriginRequestPolicyRead` statement for Origin Request Policy validation during CloudFront distribution deployments
+  - Modules: network-cloudfront-mgmt-policy.yml - Added `ApiGatewayV2ReadApis` statement for API reference validation during ApiMapping creation
+  - Modules: network-cloudfront-mgmt-policy.yml - Fixed `S3BucketReadForLogging` resource pattern to use `${Prefix}-*` instead of `${Prefix}-${AccountId}-${Region}-*`, matching actual bucket names that include ProjectId
+- **Storage Management Role S3 Pattern Fix** [Spec: 0-0-38-storage-mgmt-role-s3-pattern-fix](.kiro/specs/0-0-38-storage-mgmt-role-s3-pattern-fix/) addresses [#7](https://github.com/63Klabs/atlantis-sam-templates/issues/7)
+  - Modules: storage-mgmt-role.yml - Fixed `ManageBucketsByResourcePrefix` S3 resource pattern from `${Prefix}-${AccountId}-${Region}-*` to simplified `${Prefix}-*` wildcard that matches actual bucket names containing ProjectId
+  - Modules: storage-mgmt-role.yml - Added `ManageManagedPoliciesByResourcePrefix` statement granting IAM managed policy CRUD operations scoped to `${RolePath}${Prefix}-*`
 
 ## v0.0.37 (2026-06-01)
 
