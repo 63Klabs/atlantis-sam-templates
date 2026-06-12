@@ -185,8 +185,6 @@ Properties:
         - iam:DeleteRolePolicy
         - iam:DetachRolePolicy
         - iam:PutRolePolicy
-        - iam:UntagRole
-        - iam:TagRole
         - iam:UpdateRoleDescription
         Resource:
           Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
@@ -197,6 +195,14 @@ Properties:
                 "iam:PermissionsBoundary":
                   Ref: PermissionsBoundaryArn
             - Ref: "AWS::NoValue"
+
+      - Sid: TagWorkerRolesByResourcePrefix
+        Effect: Allow
+        Action:
+        - iam:TagRole
+        - iam:UntagRole
+        Resource:
+          Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-*"
 
       - Sid: InspectServiceRole
         Effect: Allow
