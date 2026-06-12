@@ -10,6 +10,9 @@ Released versions are available from the public S3 bucket `63klabs`
 - **IAM TagRole/UntagRole Permissions Boundary Fix** [Spec: 0-0-38-iam-tagrole-permissions-boundary-fix](.kiro/specs/0-0-38-iam-tagrole-permissions-boundary-fix/) addresses [#5](https://github.com/63Klabs/atlantis-sam-templates/issues/5)
   - Modules: pipeline-mgmt-role.yml - Extracted `iam:TagRole` and `iam:UntagRole` into separate unconditional statement to prevent denial when PermissionsBoundaryArn is configured
   - Modules: storage-mgmt-role.yml - Same fix applied
+- **AllowTransformOperations for Management Roles** [Spec: 0-0-38-mgmt-role-allow-transform-operations](.kiro/specs/0-0-38-mgmt-role-allow-transform-operations/) addresses [#6](https://github.com/63Klabs/atlantis-sam-templates/issues/6)
+  - Modules: pipeline-mgmt-role.yml - Added `AllowTransformOperations` statement granting `cloudformation:CreateChangeSet` on AWS-managed transform ARNs to unblock SAM/LanguageExtensions/Include deployments
+  - Modules: storage-mgmt-role.yml - Same fix applied
 
 ## v0.0.37 (2026-06-01)
 
