@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
-## v0.0.38 (unreleased)
+## v0.0.38 (2026-06-12)
 
 ### Fixed
 - **IAM TagRole/UntagRole Permissions Boundary Fix** [Spec: 0-0-38-iam-tagrole-permissions-boundary-fix](.kiro/specs/0-0-38-iam-tagrole-permissions-boundary-fix/) addresses [#5](https://github.com/63Klabs/atlantis-sam-templates/issues/5)
