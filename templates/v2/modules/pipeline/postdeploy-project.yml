@@ -1,0 +1,100 @@
+# -- PostDeploy CodeBuild Project --
+# Parent template must define parameters: Prefix, ProjectId, StageId, S3ArtifactsBucket, S3BucketNameOrgPrefix, Repository, RepositoryBranch, ParameterStoreHierarchy, DeployEnvironment, AlarmNotificationEmail, PostDeployS3StaticHostBucket, RolePath, PermissionsBoundaryArn, PostDeployBuildSpec
+# Parent template must define conditions: IsPostDeployEnabledAndNotDev, UseS3BucketNameOrgPrefix, HasPostDeployBuildSpecS3Location, UseDefaultPostDeployBuildSpecLocation
+# Parent must name the PostDeployServiceRole resource 'PostDeployServiceRole'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::CodeBuild::Project
+Condition: IsPostDeployEnabledAndNotDev
+Properties:
+  Name:
+    Fn::Sub: '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
+  Description:
+    Fn::Sub: "PostDeploy CodeBuild Project for ${Prefix}-${ProjectId}-${StageId}. Runs post-deployment tasks such as integration tests, configuration validation, and artifact export. Only created when PostDeployStageEnabled is true."
+  ServiceRole:
+    Fn::GetAtt:
+      - PostDeployServiceRole
+      - Arn
+  Artifacts:
+    Packaging: ZIP
+    Type: CODEPIPELINE
+  Cache:
+    Type: LOCAL
+    Modes:
+      - LOCAL_CUSTOM_CACHE
+  Environment:
+    ComputeType: BUILD_GENERAL1_SMALL
+    Type: LINUX_CONTAINER
+    Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+    EnvironmentVariables:
+      - Name: AWS_PARTITION
+        Value:
+          Ref: AWS::Partition
+      - Name: AWS_REGION
+        Value:
+          Ref: AWS::Region
+      - Name: AWS_ACCOUNT
+        Value:
+          Ref: AWS::AccountId
+      - Name: S3_ARTIFACTS_BUCKET
+        Value:
+          Ref: S3ArtifactsBucket
+      - Name: PREFIX
+        Value:
+          Ref: Prefix
+      - Name: PROJECT_ID
+        Value:
+          Ref: ProjectId
+      - Name: STAGE_ID
+        Value:
+          Ref: StageId
+      - Name: S3_BUCKET_NAME_ORG_PREFIX
+        Value:
+          Fn::If:
+            - UseS3BucketNameOrgPrefix
+            - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+            - ""
+      - Name: REPOSITORY
+        Value:
+          Ref: Repository
+      - Name: REPOSITORY_BRANCH
+        Value:
+          Ref: RepositoryBranch
+      - Name: PARAM_STORE_HIERARCHY
+        Value:
+          Fn::Sub: '${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/'
+      - Name: DEPLOY_ENVIRONMENT
+        Value:
+          Ref: DeployEnvironment
+      - Name: ALARM_NOTIFICATION_EMAIL
+        Value:
+          Ref: AlarmNotificationEmail
+      - Name: S3_STATIC_HOST_BUCKET
+        Value:
+          Ref: PostDeployS3StaticHostBucket
+      - Name: ROLE_PATH
+        Value:
+          Ref: RolePath
+      - Name: PERMISSIONS_BOUNDARY_ARN
+        Value:
+          Ref: PermissionsBoundaryArn
+      - Name: NODE_ENV
+        Value: "production"
+  Source:
+    Type: CODEPIPELINE
+    BuildSpec:
+      Fn::If:
+        - HasPostDeployBuildSpecS3Location
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - Fn::Select:
+                  - 1
+                  - Fn::Split:
+                      - "s3://"
+                      - Ref: PostDeployBuildSpec
+        - Fn::If:
+            - UseDefaultPostDeployBuildSpecLocation
+            - "buildspec-postdeploy.yml"
+            - Ref: PostDeployBuildSpec

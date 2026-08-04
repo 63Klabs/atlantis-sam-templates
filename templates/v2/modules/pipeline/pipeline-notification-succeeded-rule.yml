@@ -1,0 +1,43 @@
+# -- Pipeline Notification Succeeded EventBridge Rule --
+# Parent template must define parameters: Prefix, ProjectId, StageId
+# Parent template must define pseudo-parameters: AWS::Region
+# Parent must name the SNS topic resource 'PipelineNotificationTopic'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# Creates an EventBridge rule that triggers when the CodePipeline execution
+# state changes to SUCCEEDED. Sends a notification to the PipelineNotificationTopic
+# SNS topic with execution details and console link.
+
+Type: AWS::Events::Rule
+Properties:
+  Name:
+    Fn::Sub: "${Prefix}-${ProjectId}-${StageId}-pipeline-succeeded"
+  Description: "Rule for CodePipeline execution succeeded events"
+  EventPattern:
+    source:
+      - "aws.codepipeline"
+    detail-type:
+      - "CodePipeline Pipeline Execution State Change"
+    detail:
+      state:
+        - "SUCCEEDED"
+      pipeline:
+        - Fn::Sub: "${Prefix}-${ProjectId}-${StageId}-Pipeline"
+  State: ENABLED
+  Targets:
+    - Arn:
+        Ref: PipelineNotificationTopic
+      Id: "PipelineSucceededTarget"
+      InputTransformer:
+        InputPathsMap:
+          "pipeline": "$.detail.pipeline"
+          "state": "$.detail.state"
+          "executionId": "$.detail.execution-id"
+          "time": "$.time"
+        InputTemplate:
+          Fn::Sub: >-
+            {
+              "Subject": "Pipeline <pipeline> Succeeded",
+              "Message": "Pipeline Execution - SUCCEEDED\n\nStatus: SUCCEEDED\nPipeline: <pipeline>\nExecution ID: <executionId>\nTime: <time>\n\nConsole Link: https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+            }

@@ -1,0 +1,175 @@
+# -- CodeBuild Service Role --
+# Parent template must define parameters: Prefix, ProjectId, StageId, RolePath,
+#   PermissionsBoundaryArn, S3ArtifactsBucket, S3BucketNameOrgPrefix,
+#   S3StaticHostBucket, ParameterStoreHierarchy, DeployEnvironment, BuildSpec,
+#   CodeBuildSvcRoleIncludeManagedPolicyArns
+# Parent template must define conditions: IsNotDevelopment,
+#   HasPermissionsBoundaryArn, HasManagedPoliciesForCodeBuildSvcRole,
+#   UseS3BucketNameOrgPrefix, HasS3StaticHostBucket, HasS3BuildSpecLocation
+#
+# Service Role to access resources during the application infrastructure build
+# phase of AWS CodePipeline.
+#
+# This is a reconciled version that serves all three pipeline templates:
+# - Includes s3:GetBucketLocation in the AllowListBuckets statement (superset
+#   preserving build-only's capability)
+# - Uses Fn::Sub + OrgPrefix ARN construction (functionally identical to
+#   build-only's Fn::Join form)
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::IAM::Role
+Condition: IsNotDevelopment
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-CodeBuildServiceRole"
+  Description: "Service Role to access resources during the application infrastructure build phase of AWS CodePipeline"
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: "AWS::NoValue"
+  ManagedPolicyArns:
+    Fn::If:
+      - HasManagedPoliciesForCodeBuildSvcRole
+      - Ref: CodeBuildSvcRoleIncludeManagedPolicyArns
+      - Ref: "AWS::NoValue"
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: "CodeBuildTrustPolicy"
+        Effect: Allow
+        Action: sts:AssumeRole
+        Principal:
+          Service: codebuild.amazonaws.com
+  Policies:
+    - PolicyName:
+        Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-CodeBuildServicePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowCodeBuildToManageItsLogs"
+            Effect: Allow
+            Action:
+              - logs:*
+            Resource:
+              Fn::Sub: "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Build:*"
+          - Sid: "AllowCodeBuildToManageItsArtifacts"
+            Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:List*
+              - s3:PutObject
+            Resource:
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}"
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/*"
+          - Sid: "SsmAccessDuringCodeBuild"
+            Action:
+              - ssm:PutParameter
+              - ssm:AddTagsToResource
+              - ssm:GetParameters
+              - ssm:GetParameter
+              - ssm:GetParametersByPath
+              - ssm:ListTagsForResource
+            Effect: Allow
+            Resource:
+              Fn::Sub: "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+          - Sid: "SsmAwsPublicParameterReadOnly"
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              Fn::Sub: "arn:aws:ssm:${AWS::Region}::parameter/aws/service/*"
+          - Sid: "AllowListBuckets"
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - "arn:aws:s3:::*"
+          - Sid: CopyAssetsToS3DuringBuildByPath
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}-${ProjectId}/${StageId}/*"
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}-${ProjectId}-${StageId}/*"
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}/${ProjectId}/${StageId}/*"
+          - Sid: CopyAssetsToS3DuringBuildByBucketApplicationTag
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              Fn::Sub:
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-*/${StageId}/*"
+                - OrgPrefix:
+                    Fn::If:
+                      - UseS3BucketNameOrgPrefix
+                      - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+                      - ""
+          - Sid: CopyAssetsToS3DuringBuildByBucketApplicationDeploymentTag
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              Fn::Sub:
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*"
+                - OrgPrefix:
+                    Fn::If:
+                      - UseS3BucketNameOrgPrefix
+                      - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+                      - ""
+          - Fn::If:
+              - HasS3StaticHostBucket
+              - Sid: CopyAssetsToS3HostBucketDuringBuild
+                Action:
+                  - s3:PutObject
+                  - s3:Get*
+                  - s3:List*
+                  - s3:DeleteObject
+                Effect: Allow
+                Resource:
+                  - Fn::Sub: "arn:aws:s3:::${S3StaticHostBucket}"
+                  - Fn::Sub: "arn:aws:s3:::${S3StaticHostBucket}/*"
+              - Ref: "AWS::NoValue"
+          - Fn::If:
+              - HasS3BuildSpecLocation
+              - Sid: CopyBuildSpecFromS3ForBuild
+                Action:
+                  - s3:Get*
+                  - s3:List*
+                Effect: Allow
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:s3:::"
+                        - Fn::Select:
+                            - 0
+                            - Fn::Split:
+                                - "/"
+                                - Fn::Select:
+                                    - 1
+                                    - Fn::Split:
+                                        - "s3://"
+                                        - Ref: BuildSpec
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:s3:::"
+                        - Fn::Select:
+                            - 1
+                            - Fn::Split:
+                                - "s3://"
+                                - Ref: BuildSpec
+              - Ref: "AWS::NoValue"

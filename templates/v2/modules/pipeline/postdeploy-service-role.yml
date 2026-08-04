@@ -1,0 +1,215 @@
+# -- PostDeploy Service Role Module --
+# 
+# IAM role for CodeBuild PostDeploy stage with permissions to access artifacts,
+# Parameter Store, S3 buckets, and read deployed stack/API Gateway information.
+#
+# Parent template must define parameters:
+#   - Prefix: Team/org namespace identifier
+#   - ProjectId: Project identifier
+#   - StageId: Stage identifier
+#   - RolePath: IAM role path
+#   - PermissionsBoundaryArn: Optional permissions boundary ARN
+#   - S3ArtifactsBucket: S3 bucket for artifacts
+#   - S3BucketNameOrgPrefix: Optional org prefix for S3 bucket names
+#   - ParameterStoreHierarchy: SSM parameter hierarchy path
+#   - DeployEnvironment: Deployment environment (DEV, TEST, PROD)
+#   - PostDeployS3StaticHostBucket: Optional S3 bucket for static hosting
+#   - PostDeployBuildSpec: PostDeploy buildspec location
+#   - PostDeploySvcRoleIncludeManagedPolicyArns: Optional managed policy ARNs
+#
+# Parent template must define conditions:
+#   - IsPostDeployEnabledAndNotDev: PostDeploy enabled and not DEV environment
+#   - HasPermissionsBoundaryArn: PermissionsBoundaryArn is not empty
+#   - HasManagedPoliciesForPostDeploySvcRole: PostDeploySvcRoleIncludeManagedPolicyArns not empty
+#   - UseS3BucketNameOrgPrefix: S3BucketNameOrgPrefix is not empty
+#   - HasPostDeployS3StaticHostBucket: PostDeployS3StaticHostBucket is not empty
+#   - HasPostDeployBuildSpecS3Location: PostDeployBuildSpec is an S3 location
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::IAM::Role
+Condition: IsPostDeployEnabledAndNotDev
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PostDeployServiceRole"
+  Description: "Service Role to access resources during the application infrastructure PostDeploy phase of AWS CodePipeline. Only created when PostDeployStageEnabled is true. Provides similar permissions to CodeBuildServiceRole for consistent execution environment."
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: AWS::NoValue
+  ManagedPolicyArns:
+    Fn::If:
+      - HasManagedPoliciesForPostDeploySvcRole
+      - Ref: PostDeploySvcRoleIncludeManagedPolicyArns
+      - Ref: AWS::NoValue
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: "PostDeployTrustPolicy"
+        Effect: Allow
+        Action: sts:AssumeRole
+        Principal:
+          Service: codebuild.amazonaws.com
+  Policies:
+    - PolicyName:
+        Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PostDeployServicePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowPostDeployToManageItsLogs"
+            Effect: Allow
+            Action:
+              - logs:*
+            Resource:
+              Fn::Sub: "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-PostDeploy:*"
+
+          - Sid: "AllowPostDeployToManageItsArtifacts"
+            Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:List*
+              - s3:PutObject
+            Resource:
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}"
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/*"
+
+          - Sid: "SsmAccessDuringPostDeploy"
+            Action:
+              - ssm:PutParameter
+              - ssm:AddTagsToResource
+              - ssm:GetParameters
+              - ssm:GetParameter
+              - ssm:GetParametersByPath
+              - ssm:ListTagsForResource
+            Effect: Allow
+            Resource:
+              Fn::Sub: "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*"
+
+          - Sid: "SsmAwsPublicParameterReadOnly"
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              Fn::Sub: "arn:aws:ssm:${AWS::Region}::parameter/aws/service/*"
+
+          - Sid: "AllowListBuckets"
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - "arn:aws:s3:::*"
+
+          - Sid: CopyAssetsToS3DuringPostDeployByPath
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}-${ProjectId}/${StageId}/*"
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}-${ProjectId}-${StageId}/*"
+              - Fn::Sub: "arn:aws:s3:::*/${Prefix}/${ProjectId}/${StageId}/*"
+
+          - Sid: CopyAssetsToS3DuringPostDeployByBucketApplicationTag
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              Fn::Sub:
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-*/${StageId}/*"
+                - OrgPrefix:
+                    Fn::If:
+                      - UseS3BucketNameOrgPrefix
+                      - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+                      - ""
+
+          - Sid: CopyAssetsToS3DuringPostDeployByBucketApplicationDeploymentTag
+            Action:
+              - s3:PutObject
+              - s3:Get*
+              - s3:List*
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              Fn::Sub:
+                - "arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*"
+                - OrgPrefix:
+                    Fn::If:
+                      - UseS3BucketNameOrgPrefix
+                      - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+                      - ""
+
+          - Fn::If:
+              - HasPostDeployS3StaticHostBucket
+              - Sid: CopyAssetsToS3HostBucketDuringPostDeploy
+                Action:
+                  - s3:PutObject
+                  - s3:Get*
+                  - s3:List*
+                  - s3:DeleteObject
+                Effect: Allow
+                Resource:
+                  - Fn::Sub: "arn:aws:s3:::${PostDeployS3StaticHostBucket}"
+                  - Fn::Sub: "arn:aws:s3:::${PostDeployS3StaticHostBucket}/*"
+              - Ref: AWS::NoValue
+
+          - Fn::If:
+              - HasPostDeployBuildSpecS3Location
+              - Sid: CopyPostDeploySpecFromS3ForBuild
+                Action:
+                  - s3:Get*
+                  - s3:List*
+                Effect: Allow
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:s3:::"
+                        - Fn::Select:
+                            - 0
+                            - Fn::Split:
+                                - "/"
+                                - Fn::Select:
+                                    - 1
+                                    - Fn::Split:
+                                        - "s3://"
+                                        - Ref: PostDeployBuildSpec
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:s3:::"
+                        - Fn::Select:
+                            - 1
+                            - Fn::Split:
+                                - "s3://"
+                                - Ref: PostDeployBuildSpec
+              - Ref: AWS::NoValue
+
+          - Sid: "ReadStackDetailsAfterDeployment"
+            Action:
+              - cloudformation:Describe*
+              - cloudformation:Get*
+              - cloudformation:List*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*"
+
+          - Sid: "ReadApiGatewayInfoForExport"
+            Action:
+              - apigateway:Get*
+              - apigateway:List*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/restapis/*"
+              - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/restapis/*/stages/*"
+              - Fn::Sub: "arn:aws:apigateway:${AWS::Region}::/restapis/*/deployments/*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId":
+                  Fn::Sub: "${Prefix}-${ProjectId}-${StageId}"

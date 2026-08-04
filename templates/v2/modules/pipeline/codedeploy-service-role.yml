@@ -1,0 +1,34 @@
+# -- CodeDeploy Service Role --
+# Parent template must define parameters: Prefix, ProjectId, StageId, RolePath, PermissionsBoundaryArn
+# Parent template must define conditions: HasPermissionsBoundaryArn
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, !If, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, Fn::If, etc.)
+#
+# Creates an IAM role for CodeDeploy to manage Lambda function deployments.
+# This role is passed to application infrastructure templates to enable
+# Lambda function deployment via CodeDeploy with gradual traffic shifting.
+# Uses the AWS managed policy AWSCodeDeployRoleForLambda.
+
+Type: AWS::IAM::Role
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-CodeDeployServiceRole"
+  Description: "Service Role passed to application infrastructure to deploy a Lambda function"
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: "AWS::NoValue"
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: "CodeDeployTrustPolicy"
+        Action: sts:AssumeRole
+        Effect: Allow
+        Principal:
+          Service:
+            - codedeploy.amazonaws.com
+  ManagedPolicyArns:
+    - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda'

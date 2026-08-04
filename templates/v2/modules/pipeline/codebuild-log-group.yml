@@ -1,0 +1,18 @@
+# -- CodeBuild Log Group --
+# Parent template must define parameters: Prefix, ProjectId, StageId
+# Parent template must define conditions: IsNotDevelopment
+#
+# Creates a CloudWatch Logs log group for the CodeBuild project with a 90-day
+# retention policy. This resource is only created when IsNotDevelopment is true.
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::Logs::LogGroup
+Condition: IsNotDevelopment
+DeletionPolicy: Delete
+UpdateReplacePolicy: Retain
+Properties:
+  LogGroupName:
+    Fn::Sub: "/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Build"
+  RetentionInDays: 90

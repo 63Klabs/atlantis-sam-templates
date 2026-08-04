@@ -1,0 +1,18 @@
+# -- PostDeploy Log Group --
+# Parent template must define parameters: Prefix, ProjectId, StageId
+# Parent template must define conditions: IsPostDeployEnabledAndNotDev
+#
+# Creates a CloudWatch Logs log group for the PostDeploy CodeBuild project with a 90-day
+# retention policy. This resource is only created when IsPostDeployEnabledAndNotDev is true.
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::Logs::LogGroup
+Condition: IsPostDeployEnabledAndNotDev
+DeletionPolicy: Delete
+UpdateReplacePolicy: Retain
+Properties:
+  LogGroupName:
+    Fn::Sub: "/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-PostDeploy"
+  RetentionInDays: 90

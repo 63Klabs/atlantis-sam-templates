@@ -1,0 +1,129 @@
+# -- CodeBuild Project Module --
+# This module defines the AWS::CodeBuild::Project resource for building application infrastructure.
+# The parent template must define the following prerequisites.
+#
+# Parent template must define parameters:
+#   - Prefix
+#   - ProjectId
+#   - StageId
+#   - S3ArtifactsBucket
+#   - S3BucketNameOrgPrefix
+#   - Repository
+#   - RepositoryBranch
+#   - ParameterStoreHierarchy
+#   - DeployEnvironment
+#   - AlarmNotificationEmail
+#   - S3StaticHostBucket
+#   - RolePath
+#   - PermissionsBoundaryArn
+#   - BuildSpec
+#
+# Parent template must define conditions:
+#   - IsNotDevelopment
+#   - UseS3BucketNameOrgPrefix
+#   - HasS3BuildSpecLocation
+#   - UseDefaultBuildSpecLocation
+#
+# Parent must name the CodeBuild service role resource 'CodeBuildServiceRole'
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, !If, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, Fn::If, etc.)
+#
+# INTENTIONAL BEHAVIOR CHANGE: This module standardizes the container image to
+# aws/codebuild/amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023, Node 22, Python 3.13, Java Corretto 21)
+# across all three pipeline templates. This is an upgrade for template-pipeline-github.yml
+# and template-pipeline-build-only.yml from Amazon Linux 2.
+
+Type: AWS::CodeBuild::Project
+Condition: IsNotDevelopment
+Properties:
+  Name:
+    Fn::Sub: '${Prefix}-${ProjectId}-${StageId}-Build'
+  Description:
+    Fn::Sub: "CodeBuild Project for ${Prefix}-${ProjectId}-${StageId}"
+  ServiceRole:
+    Fn::GetAtt:
+      - CodeBuildServiceRole
+      - Arn
+  Artifacts:
+    Packaging: ZIP
+    Type: CODEPIPELINE
+  Cache:
+    Type: LOCAL
+    Modes:
+      - LOCAL_CUSTOM_CACHE
+  Environment:
+    ComputeType: BUILD_GENERAL1_SMALL
+    Type: LINUX_CONTAINER
+    Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+    EnvironmentVariables:
+      - Name: AWS_PARTITION
+        Value:
+          Ref: AWS::Partition
+      - Name: AWS_REGION
+        Value:
+          Ref: AWS::Region
+      - Name: AWS_ACCOUNT
+        Value:
+          Ref: AWS::AccountId
+      - Name: S3_ARTIFACTS_BUCKET
+        Value:
+          Ref: S3ArtifactsBucket
+      - Name: PREFIX
+        Value:
+          Ref: Prefix
+      - Name: PROJECT_ID
+        Value:
+          Ref: ProjectId
+      - Name: STAGE_ID
+        Value:
+          Ref: StageId
+      - Name: S3_BUCKET_NAME_ORG_PREFIX
+        Value:
+          Fn::If:
+            - UseS3BucketNameOrgPrefix
+            - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+            - ""
+      - Name: REPOSITORY
+        Value:
+          Ref: Repository
+      - Name: REPOSITORY_BRANCH
+        Value:
+          Ref: RepositoryBranch
+      - Name: PARAM_STORE_HIERARCHY
+        Value:
+          Fn::Sub: '${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/'
+      - Name: DEPLOY_ENVIRONMENT
+        Value:
+          Ref: DeployEnvironment
+      - Name: ALARM_NOTIFICATION_EMAIL
+        Value:
+          Ref: AlarmNotificationEmail
+      - Name: S3_STATIC_HOST_BUCKET
+        Value:
+          Ref: S3StaticHostBucket
+      - Name: ROLE_PATH
+        Value:
+          Ref: RolePath
+      - Name: PERMISSIONS_BOUNDARY_ARN
+        Value:
+          Ref: PermissionsBoundaryArn
+      - Name: NODE_ENV
+        Value: "production"
+  Source:
+    Type: CODEPIPELINE
+    BuildSpec:
+      Fn::If:
+        - HasS3BuildSpecLocation
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - Fn::Select:
+                  - 1
+                  - Fn::Split:
+                      - "s3://"
+                      - Ref: BuildSpec
+        - Fn::If:
+            - UseDefaultBuildSpecLocation
+            - "buildspec.yml"
+            - Ref: BuildSpec

@@ -2,7 +2,7 @@
 
 Full-featured AWS CodePipeline for automated SAM deployments from AWS CodeCommit with optional PostDeploy stage.
 
-**Version:** v2.0.20  
+**Version:** v2.0.21  
 **Last Updated:** 2026-03-26  
 **Template:** [templates/v2/pipeline/template-pipeline.yml](../../../../templates/v2/pipeline/template-pipeline.yml)
 
@@ -27,6 +27,7 @@ This template creates a complete CI/CD pipeline for AWS SAM applications using A
 - **Security**: Least-privilege IAM roles with permissions boundary support
 - **Multi-Environment**: Supports DEV, TEST, and PROD deployment environments
 - **Lambda Layers**: Automatic access to AWS Lambda Insights and Parameters/Secrets extensions
+- **Modular Architecture**: 15 pipeline resources provided via AWS::Include modules for maintainability
 
 ### Use Cases
 
@@ -56,6 +57,13 @@ Parameters for naming and organizing pipeline resources.
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [RolePath](#rolepath)
 - [PermissionsBoundaryArn](#permissionsboundaryarn)
+
+### Module Source
+
+Parameters for locating AWS::Include modules in S3.
+
+- [S3ModuleLocation](#s3modulelocation)
+- [S3ModuleNamespace](#s3modulenamespace)
 
 #### Prefix
 
@@ -140,6 +148,32 @@ Optional IAM Permissions Boundary policy ARN.
 | Constraint Description | Must be empty or a valid IAM Policy ARN in the format: arn:aws:iam::{account_id}:policy/{policy_name} |
 
 Permissions Boundary is a policy attached to a role to further restrict the role's permissions. Your organization may or may not require boundaries.
+
+#### S3ModuleLocation
+
+S3 bucket name where AWS::Include modules are stored.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | None (required) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 bucket name. May only contain lowercase alphanumeric characters and dashes. |
+
+This template uses AWS::Include to reference modular CloudFormation resources stored in S3. The S3ModuleLocation specifies the bucket name where these modules are located. The deploying role must have `s3:GetObject` permission on this bucket.
+
+#### S3ModuleNamespace
+
+Namespace prefix for module paths in S3.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | atlantis |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 path prefix. May only contain lowercase alphanumeric characters and dashes. |
+
+Modules are resolved from `s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/<module-name>.yml`. The default namespace is "atlantis".
 
 ### Deployment Environment Information
 

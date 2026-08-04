@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 Released versions are available from the public S3 bucket `63klabs`
 
+## v0.0.39 (unreleased)
+
+### Added
+- **Pipeline Modules** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Created 15 reusable pipeline modules in templates/v2/modules/pipeline/ for shared pipeline infrastructure components
+  - Modules: pipeline-notification-topic.yml - SNS topic for pipeline state notifications
+  - Modules: pipeline-notification-started-rule.yml - EventBridge rule for STARTED pipeline state
+  - Modules: pipeline-notification-succeeded-rule.yml - EventBridge rule for SUCCEEDED pipeline state
+  - Modules: pipeline-notification-failed-rule.yml - EventBridge rule for FAILED pipeline state
+  - Modules: pipeline-notification-topic-policy.yml - SNS topic policy allowing EventBridge to publish notifications
+  - Modules: source-event-service-role.yml - IAM role for CodeCommit source event triggers
+  - Modules: source-event-rule.yml - EventBridge rule for CodeCommit repository changes
+  - Modules: codebuild-log-group.yml - CloudWatch log group for CodeBuild projects
+  - Modules: codebuild-service-role.yml - IAM role for CodeBuild projects with reconciled permissions
+  - Modules: codebuild-project.yml - CodeBuild project with standardized container image
+  - Modules: cloudformation-svc-role.yml - IAM role for CloudFormation deployments
+  - Modules: codedeploy-service-role.yml - IAM role for CodeDeploy operations
+  - Modules: postdeploy-service-role.yml - IAM role for post-deployment validation
+  - Modules: postdeploy-project.yml - CodeBuild project for post-deployment tasks
+  - Modules: postdeploy-log-group.yml - CloudWatch log group for post-deployment builds
+
+### Changed
+- **Pipeline: template-pipeline.yml v2.0.21** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 15 pipeline modules via AWS::Include, replacing inline resource definitions with shared module references
+- **Pipeline: template-pipeline-github.yml v2.0.4** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 14 pipeline modules via AWS::Include (excludes source-event-rule which is CodeCommit-specific)
+- **Pipeline: template-pipeline-build-only.yml v2.0.6** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 10 pipeline modules via AWS::Include (excludes CloudFormation/CodeDeploy/PostDeploy modules)
+- **CodeBuild Container Image Standardization** - CodeBuild image standardized to aws/codebuild/amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023 with Node 22 / Python 3.13) across all pipeline templates for consistency
+  - Pipeline: template-pipeline-github.yml - Upgraded from amazonlinux2-x86_64-standard:5.0 (Amazon Linux 2)
+  - Pipeline: template-pipeline-build-only.yml - Upgraded from amazonlinux2-x86_64-standard:5.0 (Amazon Linux 2)
+- **CodeBuild IAM Permissions Reconciliation** - Added s3:GetBucketLocation permission to CodeBuildServiceRole for reconciled IAM policies across all pipeline templates
+  - Pipeline: template-pipeline.yml - Gained s3:GetBucketLocation read-only permission
+  - Pipeline: template-pipeline-github.yml - Gained s3:GetBucketLocation read-only permission
+
 ## v0.0.38 (2026-06-12)
 
 ### Fixed

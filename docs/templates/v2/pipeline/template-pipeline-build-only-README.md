@@ -2,7 +2,7 @@
 
 Simplified AWS CodePipeline with only Source and Build stages (no CloudFormation deployment).
 
-**Version:** v2.0.5  
+**Version:** v2.0.6  
 **Last Updated:** 2026-03-26  
 **Template:** [templates/v2/pipeline/template-pipeline-build-only.yml](../../../../templates/v2/pipeline/template-pipeline-build-only.yml)
 
@@ -20,11 +20,13 @@ This template creates a simplified CI/CD pipeline for build-and-copy workflows u
 - **Simplified Workflow**: Only Source and Build stages - no CloudFormation deployment
 - **Automated Triggers**: EventBridge rule automatically triggers pipeline on repository changes
 - **Build Caching**: Local caching in CodeBuild for faster subsequent builds
+- **Modern Build Environment**: CodeBuild image upgraded to amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023)
 - **Flexible Buildspec**: Supports local or S3-hosted buildspec files
 - **Comprehensive Notifications**: Email notifications for pipeline start, success, and failure
 - **Security**: Least-privilege IAM roles with permissions boundary support
 - **Multi-Environment**: Supports DEV, TEST, and PROD deployment environments
 - **S3 Integration**: Built-in support for copying build artifacts to S3 buckets
+- **Modular Architecture**: 10 pipeline resources provided via AWS::Include modules for maintainability
 
 ### Use Cases
 
@@ -56,6 +58,13 @@ Parameters for naming and organizing pipeline resources.
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [RolePath](#rolepath)
 - [PermissionsBoundaryArn](#permissionsboundaryarn)
+
+### Module Source
+
+Parameters for locating AWS::Include modules in S3.
+
+- [S3ModuleLocation](#s3modulelocation)
+- [S3ModuleNamespace](#s3modulenamespace)
 
 #### Prefix
 
@@ -128,6 +137,32 @@ Optional IAM Permissions Boundary policy ARN.
 | Default | "" (empty) |
 | Allowed Pattern | `^$\|^arn:aws:iam::\\d{12}:policy\\/[\\w+=,.@\\-\\/]*[\\w+=,.@\\-]+$` |
 | Constraint Description | Must be empty or a valid IAM Policy ARN |
+
+#### S3ModuleLocation
+
+S3 bucket name where AWS::Include modules are stored.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | None (required) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 bucket name. May only contain lowercase alphanumeric characters and dashes. |
+
+This template uses AWS::Include to reference modular CloudFormation resources stored in S3. The S3ModuleLocation specifies the bucket name where these modules are located. The deploying role must have `s3:GetObject` permission on this bucket.
+
+#### S3ModuleNamespace
+
+Namespace prefix for module paths in S3.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | atlantis |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 path prefix. May only contain lowercase alphanumeric characters and dashes. |
+
+Modules are resolved from `s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/<module-name>.yml`. The default namespace is "atlantis".
 
 ### Deployment Environment Information
 
@@ -344,7 +379,7 @@ CodeBuild project for building and copying artifacts.
 
 **Key Properties:**
 - **Compute**: BUILD_GENERAL1_SMALL Linux container
-- **Image**: aws/codebuild/amazonlinux2-x86_64-standard:5.0 (Node 20, Python 3.12)
+- **Image**: aws/codebuild/amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023 with Node 22, Python 3.13, Java corretto21)
 - **Caching**: Local custom cache for faster builds
 - **Artifacts**: Packaged as ZIP from CodePipeline
 - **Environment Variables**: AWS_REGION, PREFIX, PROJECT_ID, STAGE_ID, DEPLOY_ENVIRONMENT, S3_STATIC_HOST_BUCKET, etc.

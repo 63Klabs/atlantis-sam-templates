@@ -1,0 +1,335 @@
+# -- CloudFormation Service Role --
+# Parent template must define parameters: Prefix, ProjectId, StageId, RolePath, PermissionsBoundaryArn, S3ArtifactsBucket, S3BucketNameOrgPrefix, ParameterStoreHierarchy, DeployEnvironment, CloudFormationSvcRoleIncludeManagedPolicyArns
+# Parent template must define conditions: HasPermissionsBoundaryArn, HasManagedPoliciesForCloudFormationSvcRole, UseS3BucketNameOrgPrefix
+# Parent template must define mappings: LambdaInsightsAccountId, LambdaParamSecretsAccountId
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::IAM::Role
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-CloudFormationSvcRole"
+  Description: Creating service role in IAM for AWS CloudFormation
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: AWS::NoValue
+  ManagedPolicyArns:
+    Fn::If:
+      - HasManagedPoliciesForCloudFormationSvcRole
+      - Ref: CloudFormationSvcRoleIncludeManagedPolicyArns
+      - Ref: AWS::NoValue
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: CloudFormationTrustPolicy
+        Effect: Allow
+        Action: sts:AssumeRole
+        Principal:
+          Service:
+            - cloudformation.amazonaws.com
+  Policies:
+    - PolicyName: CloudFormationRolePolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: IAMCRUDWorkerThisDeploymentOnly
+            Action:
+              - iam:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-Worker-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:role${RolePath}${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy${RolePath}${Prefix}-Worker-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy${RolePath}${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: IAMGetAndListReadOnlyAll
+            Action:
+              - iam:Get*
+              - iam:List*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/*
+              - Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy/*
+          - Sid: CloudFormationCRUD
+            Action:
+              - cloudformation:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*
+          - Sid: AllowTransformOperations
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:GetTemplateSummary
+              - cloudformation:DescribeChangeSet
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackEvents
+            Effect: Allow
+            Resource:
+              - arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31
+              - arn:aws:cloudformation:*:aws:transform/LanguageExtensions
+              - arn:aws:cloudformation:*:aws:transform/Include
+          - Sid: CodeDeployCRUDThisDeploymentOnly
+            Action:
+              - codedeploy:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${Prefix}-${ProjectId}-${StageId}-application-*
+              - Fn::Sub: arn:aws:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentgroup:${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:codedeploy:${AWS::Region}:${AWS::AccountId}:deployment:*
+          - Sid: CodeDeployGetAndListReadOnlyAll
+            Action:
+              - codedeploy:Get*
+              - codedeploy:List*
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentconfig:*
+          - Sid: ManageArtifactsInS3
+            Action:
+              - s3:Get*
+              - s3:List*
+              - s3:PutObject
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:s3:::${S3ArtifactsBucket}
+              - Fn::Sub: arn:aws:s3:::${S3ArtifactsBucket}/*
+          - Sid: APIGateWayCRUD
+            Action:
+              - apigateway:*
+            Effect: Allow
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:ResourceTag/atlantis:ApplicationDeploymentId:
+                  Fn::Sub: ${Prefix}-${ProjectId}-${StageId}
+          - Sid: APIGatewayFallbackForUntaggedResources
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/*/deployments/*
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/*/stages/*
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/*/models/*
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/*/requestvalidators/*
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/restapis/*/documentation/*
+            Condition:
+              StringLike:
+                aws:ResourceTag/aws:cloudformation:stack-name:
+                  Fn::Sub: ${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: APIGatewayFallbackForTags
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:apigateway:${AWS::Region}::/tags/*
+          - Sid: AllowCreateServiceLinkedRoleForAPIGateway
+            Effect: Allow
+            Action:
+              - iam:CreateServiceLinkedRole
+            Resource: arn:aws:iam::*:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway
+            Condition:
+              StringEquals:
+                iam:AWSServiceName: ops.apigateway.amazonaws.com
+          - Sid: EventsCRUDThisDeploymentOnly
+            Action:
+              - events:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: EventBridgeSchedulerCRUDThisDeploymentOnly
+            Action:
+              - scheduler:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: SQSCRUDThisDeploymentOnly
+            Action:
+              - sqs:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: SNSCRUDThisDeploymentOnly
+            Action:
+              - sns:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: StateMachineCRUDThisDeploymentOnly
+            Action:
+              - states:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: S3CRUDThisDeploymentOnly
+            Action:
+              - s3:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub:
+                  - arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}
+                  - OrgPrefix:
+                      Fn::If:
+                        - UseS3BucketNameOrgPrefix
+                        - Fn::Sub: ${S3BucketNameOrgPrefix}-
+                        - ''
+              - Fn::Sub:
+                  - arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}/*
+                  - OrgPrefix:
+                      Fn::If:
+                        - UseS3BucketNameOrgPrefix
+                        - Fn::Sub: ${S3BucketNameOrgPrefix}-
+                        - ''
+              - Fn::Sub:
+                  - arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*
+                  - OrgPrefix:
+                      Fn::If:
+                        - UseS3BucketNameOrgPrefix
+                        - Fn::Sub: ${S3BucketNameOrgPrefix}-
+                        - ''
+              - Fn::Sub:
+                  - arn:aws:s3:::${OrgPrefix}${Prefix}-${ProjectId}-${StageId}-*/*
+                  - OrgPrefix:
+                      Fn::If:
+                        - UseS3BucketNameOrgPrefix
+                        - Fn::Sub: ${S3BucketNameOrgPrefix}-
+                        - ''
+          - Sid: LambdaCRUDThisDeploymentOnly
+            Action:
+              - lambda:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-${ProjectId}-${StageId}-*:*
+              - Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:${Prefix}-${ProjectId}-${StageId}*
+              - Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:event-source-mapping:*
+          - Sid: DynamoDbCRUDThisDeploymentOnly
+            Action:
+              - dynamodb:*
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: SsmParameterCRUDThisDeploymentOnly
+            Action:
+              - ssm:PutParameter
+              - ssm:DeleteParameter
+              - ssm:AddTagsToResource
+              - ssm:RemoveTagsFromResource
+              - ssm:GetParameters
+              - ssm:GetParameter
+              - ssm:GetParametersByPath
+              - ssm:ListTagsForResource
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/app-stack/*
+          - Sid: CloudWatchDashboardLimitedCRUDThisDeploymentOnly
+            Action:
+              - cloudwatch:GetDashboard
+              - cloudwatch:DeleteDashboards
+              - cloudwatch:PutDashboard
+              - cloudwatch:TagResource
+              - cloudwatch:UntagResource
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:cloudwatch::${AWS::AccountId}:dashboard/${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: CloudWatchAlarmsLimitedCRUDThisDeploymentOnly
+            Action:
+              - cloudwatch:PutMetricAlarm
+              - cloudwatch:DeleteAlarm*
+              - cloudwatch:TagResource
+              - cloudwatch:UntagResource
+              - cloudwatch:DescribeAlarms
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${Prefix}-${ProjectId}-${StageId}-*
+          - Sid: LogGroupsLimitedCRUDThisDeploymentOnly
+            Action:
+              - logs:DeleteLogGroup
+              - logs:DeleteRetentionPolicy
+              - logs:PutRetentionPolicy
+              - logs:CreateLogGroup
+              - logs:TagLogGroup
+              - logs:UntagLogGroup
+              - logs:TagResource
+              - logs:UntagResource
+              - logs:ListTagsForResource
+              - logs:DescribeLogGroups
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/apigateway/${Prefix}-${ProjectId}-${StageId}-*
+              - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:API-Gateway-Execution-Logs_*
+          - Sid: LogGroupsListAll
+            Action:
+              - logs:DescribeLogGroups
+              - logs:ListTagsLogGroup
+              - logs:ListTagsForResource
+            Effect: Allow
+            Resource:
+              - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+          - Sid: SSMParameterStoreReadThisDeploymentOnly
+            Action:
+              - ssm:GetParameters
+              - ssm:GetParameter
+              - ssm:GetParametersByPath
+              - ssm:ListTagsForResource
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*
+          - Sid: SsmAwsPublicParameterReadOnly
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:ssm:${AWS::Region}::parameter/aws/service/*
+          - Sid: LambdaLayersGetLayerForLambdaInsightsFromAWS
+            Action:
+              - lambda:GetLayerVersion
+            Effect: Allow
+            Resource:
+              - Fn::Sub:
+                  - arn:aws:lambda:${AWS::Region}:${AccountId}:layer:LambdaInsightsExtension:*
+                  - AccountId:
+                      Fn::FindInMap:
+                        - LambdaInsightsAccountId
+                        - Ref: AWS::Region
+                        - AccountId
+              - Fn::Sub:
+                  - arn:aws:lambda:${AWS::Region}:${AccountId}:layer:LambdaInsightsExtension-Arm64:*
+                  - AccountId:
+                      Fn::FindInMap:
+                        - LambdaInsightsAccountId
+                        - Ref: AWS::Region
+                        - AccountId
+          - Sid: LambdaLayersGetLayerForParametersAndSecretsFromAWS
+            Action:
+              - lambda:GetLayerVersion
+            Effect: Allow
+            Resource:
+              - Fn::Sub:
+                  - arn:aws:lambda:${AWS::Region}:${AccountId}:layer:AWS-Parameters-and-Secrets-Lambda-Extension:*
+                  - AccountId:
+                      Fn::FindInMap:
+                        - LambdaParamSecretsAccountId
+                        - Ref: AWS::Region
+                        - AccountId
+              - Fn::Sub:
+                  - arn:aws:lambda:${AWS::Region}:${AccountId}:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:*
+                  - AccountId:
+                      Fn::FindInMap:
+                        - LambdaParamSecretsAccountId
+                        - Ref: AWS::Region
+                        - AccountId

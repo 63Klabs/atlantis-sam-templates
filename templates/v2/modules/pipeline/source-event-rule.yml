@@ -1,0 +1,52 @@
+# -- EventBridge Rule for CodeCommit Source Changes --
+# This module defines an EventBridge rule that detects changes to a CodeCommit
+# repository and triggers the pipeline execution. Only created when
+# DeployEnvironment is not DEV.
+#
+# PARENT PREREQUISITES:
+# The parent template must define the following parameters:
+#   - Prefix: Team/org namespace identifier
+#   - ProjectId: Project/application identifier
+#   - StageId: Deployment stage/branch alias
+#   - Repository: CodeCommit repository name
+#   - RepositoryBranch: Branch name to monitor
+#
+# The parent template must define the following conditions:
+#   - IsNotDevelopment: Condition to create resource only when not in DEV
+#
+# The parent template must name the source event service role resource:
+#   - SourceEventServiceRole: IAM role for EventBridge to invoke CodePipeline
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, !GetAtt, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, Fn::GetAtt, etc.)
+
+Type: AWS::Events::Rule
+Condition: IsNotDevelopment
+Properties:
+  Name:
+    Fn::Sub: "${Prefix}-${ProjectId}-${StageId}-SourceEvent"
+  Description: Rule for Amazon CloudWatch Events to detect changes to the source repository and trigger pipeline execution
+  EventPattern:
+    detail:
+      event:
+      - referenceCreated
+      - referenceUpdated
+      referenceName: 
+      - Ref: RepositoryBranch
+      referenceType:
+      - branch
+    detail-type:
+    - CodeCommit Repository State Change
+    resources:
+    - Fn::Sub: 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${Repository}'
+    source:
+    - aws.codecommit
+  State: ENABLED
+  Targets:
+  - Arn:
+      Fn::Sub: 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Prefix}-${ProjectId}-${StageId}-Pipeline'
+    Id: ProjectPipelineTarget
+    RoleArn:
+      Fn::GetAtt:
+      - SourceEventServiceRole
+      - Arn

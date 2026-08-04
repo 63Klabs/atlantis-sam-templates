@@ -1,0 +1,24 @@
+# -- Pipeline Notification SNS Topic Policy --
+# Parent template must name the topic resource 'PipelineNotificationTopic'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# Creates the SNS topic policy that allows EventBridge to publish pipeline
+# execution state notifications to the PipelineNotificationTopic. This policy
+# is required for the EventBridge rules (started, succeeded, failed) to
+# successfully publish messages to the SNS topic.
+
+Type: AWS::SNS::TopicPolicy
+Properties:
+  PolicyDocument:
+    Version: '2012-10-17'
+    Statement:
+      - Sid: AllowEventBridgeToPublishEvents
+        Effect: Allow
+        Principal:
+          Service: events.amazonaws.com
+        Action: sns:Publish
+        Resource:
+          Ref: PipelineNotificationTopic
+  Topics:
+    - Ref: PipelineNotificationTopic

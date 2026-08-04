@@ -2,7 +2,7 @@
 
 AWS CodePipeline for automated SAM deployments from GitHub repositories using AWS CodeConnections.
 
-**Version:** v2.0.3  
+**Version:** v2.0.4  
 **Last Updated:** 2026-03-26  
 **Template:** [templates/v2/pipeline/template-pipeline-github.yml](../../../../templates/v2/pipeline/template-pipeline-github.yml)
 
@@ -21,11 +21,13 @@ This template creates a complete CI/CD pipeline for AWS SAM applications using G
 - **GitHub Integration**: Direct integration with GitHub repositories via AWS CodeConnections
 - **Automated Triggers**: Pipeline automatically triggers on GitHub commits
 - **Build Caching**: Local caching in CodeBuild for faster subsequent builds
+- **Modern Build Environment**: CodeBuild image upgraded to amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023)
 - **Flexible Buildspec**: Supports local or S3-hosted buildspec files
 - **Comprehensive Notifications**: Email notifications for pipeline start, success, and failure
 - **Security**: Least-privilege IAM roles with permissions boundary support
 - **Multi-Environment**: Supports DEV, TEST, and PROD deployment environments
 - **Lambda Layers**: Automatic access to AWS Lambda Insights and Parameters/Secrets extensions
+- **Modular Architecture**: 14 pipeline resources provided via AWS::Include modules for maintainability
 
 ### Use Cases
 
@@ -58,6 +60,13 @@ Parameters for naming and organizing pipeline resources.
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [RolePath](#rolepath)
 - [PermissionsBoundaryArn](#permissionsboundaryarn)
+
+### Module Source
+
+Parameters for locating AWS::Include modules in S3.
+
+- [S3ModuleLocation](#s3modulelocation)
+- [S3ModuleNamespace](#s3modulenamespace)
 
 #### Prefix
 
@@ -142,6 +151,32 @@ Optional IAM Permissions Boundary policy ARN.
 | Constraint Description | Must be empty or a valid IAM Policy ARN in the format: arn:aws:iam::{account_id}:policy/{policy_name} |
 
 Permissions Boundary is a policy attached to a role to further restrict the role's permissions.
+
+#### S3ModuleLocation
+
+S3 bucket name where AWS::Include modules are stored.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | None (required) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 bucket name. May only contain lowercase alphanumeric characters and dashes. |
+
+This template uses AWS::Include to reference modular CloudFormation resources stored in S3. The S3ModuleLocation specifies the bucket name where these modules are located. The deploying role must have `s3:GetObject` permission on this bucket.
+
+#### S3ModuleNamespace
+
+Namespace prefix for module paths in S3.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | atlantis |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
+| Constraint Description | Must be a valid S3 path prefix. May only contain lowercase alphanumeric characters and dashes. |
+
+Modules are resolved from `s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/<module-name>.yml`. The default namespace is "atlantis".
 
 ### Deployment Environment Information
 
@@ -421,7 +456,7 @@ CodeBuild project for building and packaging the SAM application.
 
 **Key Properties:**
 - **Compute**: BUILD_GENERAL1_SMALL Linux container
-- **Image**: aws/codebuild/amazonlinux2-x86_64-standard:5.0 (Node 20, Python 3.12)
+- **Image**: aws/codebuild/amazonlinux-x86_64-standard:5.0 (Amazon Linux 2023 with Node 22, Python 3.13, Java corretto21)
 - **Caching**: Local custom cache for faster builds
 - **Artifacts**: Packaged as ZIP from CodePipeline
 - **Environment Variables**: Comprehensive set including AWS_REGION, PREFIX, PROJECT_ID, STAGE_ID, DEPLOY_ENVIRONMENT, etc.

@@ -1,0 +1,19 @@
+# -- Pipeline Notification SNS Topic --
+# Parent template must define parameters: AlarmNotificationEmail
+# Parent template must define pseudo-parameters: AWS::StackName
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# Creates the SNS Topic used to publish CodePipeline execution state
+# notifications (Started, Succeeded, Failed). Subscribes AlarmNotificationEmail
+# via email. Parent must name this resource 'PipelineNotificationTopic' since
+# the notification rule and topic policy modules reference it by that logical ID.
+
+Type: AWS::SNS::Topic
+Properties:
+  TopicName:
+    Fn::Sub: "${AWS::StackName}-pipeline-notifications"
+  Subscription:
+    - Protocol: email
+      Endpoint:
+        Ref: AlarmNotificationEmail
