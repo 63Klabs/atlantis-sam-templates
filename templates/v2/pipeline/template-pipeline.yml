@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from repository - Deployed 
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.21/2026-08-04
+# Version: v2.0.22/2026-08-05
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/

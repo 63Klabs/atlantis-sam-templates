@@ -266,6 +266,9 @@ Properties:
               - logs:UntagResource
               - logs:ListTagsForResource
               - logs:DescribeLogGroups
+              - logs:DescribeMetricFilters
+              - logs:PutMetricFilter
+              - logs:DeleteMetricFilter
             Effect: Allow
             Resource:
               - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Prefix}-${ProjectId}-${StageId}-*
