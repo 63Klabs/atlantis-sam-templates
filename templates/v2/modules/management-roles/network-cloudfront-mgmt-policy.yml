@@ -1,6 +1,6 @@
 # -- Prefix-based Policy: Network CloudFront Management --
 # Parent template must define parameters:
-#   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath
+#   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath, S3ModuleLocation, S3ModuleNamespace
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
@@ -189,3 +189,21 @@ Properties:
           - acm:GetCertificate
           - acm:ListTagsForCertificate
         Resource: "*"
+
+      # ------------------------------------------------------------------
+      # S3 Module Bucket Read (for CloudFormation AWS::Include transform)
+      # ------------------------------------------------------------------
+
+      - Sid: S3ModuleBucketReadOnly
+        Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:ListBucket
+        Resource:
+          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}"
+          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}/${S3ModuleNamespace}/*"
+        Condition:
+          StringLike:
+            s3:prefix:
+              - Fn::Sub: "${S3ModuleNamespace}/*"

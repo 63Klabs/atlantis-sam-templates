@@ -1,7 +1,8 @@
 # -- Prefix-based CloudFormation Service Role for Pipeline Management --
 # Parent template must define parameters:
 #   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath, RolePath,
-#   PermissionsBoundaryArn, GroupNames, RoleNames, UserNames
+#   PermissionsBoundaryArn, GroupNames, RoleNames, UserNames,
+#   S3ModuleLocation, S3ModuleNamespace
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix, HasPermissionsBoundaryArn,
 #   HasGroupNames, HasRoleNames, HasUserNames
@@ -219,3 +220,17 @@ Properties:
         - iam:ListAttachedRolePolicies
         Resource:
           Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${ServiceRolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
+
+      - Sid: S3ModuleBucketReadOnly
+        Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:ListBucket
+        Resource:
+          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}"
+          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}/${S3ModuleNamespace}/*"
+        Condition:
+          StringLike:
+            s3:prefix:
+              - Fn::Sub: "${S3ModuleNamespace}/*"

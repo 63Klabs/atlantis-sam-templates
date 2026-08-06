@@ -34,6 +34,10 @@ Released versions are available from the public S3 bucket `63klabs`
 - **CodeBuild IAM Permissions Reconciliation** - Added s3:GetBucketLocation permission to CodeBuildServiceRole for reconciled IAM policies across all pipeline templates
   - Pipeline: template-pipeline.yml - Gained s3:GetBucketLocation read-only permission
   - Pipeline: template-pipeline-github.yml - Gained s3:GetBucketLocation read-only permission
+- **Management Roles: S3 Module Bucket Read Access** [Spec: 0-0-39-mgmt-roles-s3module-access](.kiro/specs/0-0-39-mgmt-roles-s3module-access/) - Added S3ModuleBucketReadOnly IAM policy statement to enable CloudFormation AWS::Include transform to access module snippets from S3
+  - Modules: pipeline-mgmt-role.yml - Added read-only S3 permissions scoped to module bucket and namespace
+  - Modules: storage-mgmt-role.yml - Added read-only S3 permissions scoped to module bucket and namespace
+  - Modules: network-cloudfront-mgmt-policy.yml - Added read-only S3 permissions scoped to module bucket and namespace
 
 ## v0.0.38 (2026-06-12)
 
