@@ -221,15 +221,20 @@ Properties:
         Resource:
           Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${ServiceRolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
 
-      - Sid: S3ModuleBucketReadOnly
+      - Sid: S3ModuleBucketGetObject
         Effect: Allow
         Action:
           - s3:GetObject
           - s3:GetObjectVersion
+        Resource:
+          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}/${S3ModuleNamespace}/*"
+
+      - Sid: S3ModuleBucketListByNamespace
+        Effect: Allow
+        Action:
           - s3:ListBucket
         Resource:
           - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}"
-          - Fn::Sub: "arn:aws:s3:::${S3ModuleLocation}/${S3ModuleNamespace}/*"
         Condition:
           StringLike:
             s3:prefix:
