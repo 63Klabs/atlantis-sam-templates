@@ -2,7 +2,7 @@
 # Parent template must define parameters:
 #   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath, RolePath,
 #   PermissionsBoundaryArn, GroupNames, RoleNames, UserNames,
-#   S3ModuleLocation, S3ModuleNamespace
+#   S3ModuleLocation, S3ModuleNamespace, S3ArtifactsBucket
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix, HasPermissionsBoundaryArn,
 #   HasGroupNames, HasRoleNames, HasUserNames
@@ -227,6 +227,14 @@ Properties:
         - iam:ListAttachedRolePolicies
         Resource:
           Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${ServiceRolePath}${PrefixUpper}-CloudFormation-Service-Role-*"
+
+      - Sid: ArtifactBucketGetObjectForManagedStacks
+        Effect: Allow
+        Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+        Resource:
+          Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/${Prefix}-*"
 
       - Sid: S3ModuleBucketGetObject
         Effect: Allow
