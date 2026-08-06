@@ -293,18 +293,6 @@ Outputs:
     Export:
       Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-Role-Name"
 
-  PipelineMgmtManagedPolicyArn:
-    Description: "The ARN of the Pipeline Management Managed Policy"
-    Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Arn"
-
-  PipelineMgmtManagedPolicyName:
-    Description: "The Name of the Pipeline Management Managed Policy"
-    Value: !Ref PrefixBasedPipelineMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Pipeline-Mgmt-Service-ManagedPolicy-Name"
-
   # ---------------------------------------------------------------------------
   # Storage Management
 
@@ -319,18 +307,6 @@ Outputs:
     Value: !Ref PrefixBasedCloudFormationStorageMgmtServiceRole
     Export:
       Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-Role-Name"
-
-  StorageMgmtManagedPolicyArn:
-    Description: "The ARN of the Storage Management Managed Policy"
-    Value: !Ref PrefixBasedStorageMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Arn"
-
-  StorageMgmtManagedPolicyName:
-    Description: "The Name of the Storage Management Managed Policy"
-    Value: !Ref PrefixBasedStorageMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Storage-Mgmt-Service-ManagedPolicy-Name"
 
   # ---------------------------------------------------------------------------
   # Network CloudFront Management (Developer)
@@ -347,12 +323,6 @@ Outputs:
     Export:
       Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-Service-Role-Name"
 
-  NetworkCloudFrontMgmtManagedPolicyArn:
-    Description: "The ARN of the Network CloudFront Management Managed Policy"
-    Value: !Ref PrefixBasedNetworkCloudFrontMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Network-CloudFront-Mgmt-ManagedPolicy-Arn"
-
   # ---------------------------------------------------------------------------
   # Full Network Management (CloudFront + Route53)
 
@@ -367,20 +337,3 @@ Outputs:
     Value: !Ref PrefixBasedCloudFormationNetworkFullMgmtServiceRole
     Export:
       Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Name"
-
-  NetworkFullMgmtManagedPolicyArn:
-    Description: "The ARN of the Full Network Management Managed Policy"
-    Value: !Ref PrefixBasedNetworkFullMgmtManagedPolicy
-    Export:
-      Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-ManagedPolicy-Arn"
-
-  # ---------------------------------------------------------------------------
-  # Console Links
-
-  IamRolesConsole:
-    Description: "IAM Roles in AWS Console"
-    Value: !Sub "https://console.aws.amazon.com/iam/home#/roles"
-
-  IamPoliciesConsole:
-    Description: "IAM Policies in AWS Console"
-    Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"
