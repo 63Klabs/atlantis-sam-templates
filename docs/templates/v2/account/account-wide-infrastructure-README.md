@@ -1,13 +1,13 @@
 # account-wide-infrastructure
 
-Account-wide resources: ABAC-scoped managed policies, shared connections, and optional S3 artifacts bucket — Assembled from reusable modules.
+Account-wide resources: ABAC-scoped managed policies, shared connections, optional S3 artifacts bucket, and optional shared S3 access log bucket — Assembled from reusable modules.
 
 **Version:** v0.0.0/2026-04-28  
 **Template:** [templates/v2/account/account-wide-infrastructure.yml](../../../../templates/v2/account/account-wide-infrastructure.yml)
 
 ## Overview
 
-This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, shared GitHub connections, optional API Gateway CloudWatch logging, and an optional shared S3 artifacts bucket.
+This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, shared GitHub connections, optional API Gateway CloudWatch logging, an optional shared S3 artifacts bucket, and an optional shared S3 access log bucket.
 
 ### Use Cases
 
@@ -15,12 +15,13 @@ This template creates account-wide infrastructure for the Atlantis DevOps Platfo
 - Create a shared GitHub connection for all pipeline templates in the account
 - Enable account-level API Gateway CloudWatch logging (one-time per-region setup)
 - Provision a shared S3 artifacts bucket accessible by all pipeline roles
+- Provision a shared S3 access log bucket that receives server access logs (and optionally legacy CloudFront standard logs) — used automatically as the artifacts bucket's log destination
 
 ### Prerequisites
 
 - S3 bucket containing the Atlantis module snippets (provided by 63klabs regional buckets or your own)
 - IAM permissions to create managed policies, IAM roles, CodeConnections, and S3 buckets
-- (Optional) Existing S3 access log bucket if enabling artifacts bucket logging
+- (Optional) An existing external S3 access log bucket if you prefer to override the shared access log bucket via `S3LogBucketName`
 
 ### Important Notes
 
@@ -63,6 +64,14 @@ Optional shared S3 artifacts bucket for pipeline build artifacts.
 - [EnableS3ArtifactsBucket](#enables3artifactsbucket)
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [S3LogBucketName](#s3logbucketname)
+
+### S3 Access Log Bucket
+
+Optional shared S3 access log bucket for storing S3 server access logs (and optionally legacy CloudFront standard logs).
+
+- [EnableS3AccessLogBucket](#enables3accesslogbucket)
+- [LogExpirationInDays](#logexpirationindays)
+- [AllowLegacyCloudFrontLogs](#allowlegacycloudfrontlogs)
 
 ### Module Source
 
@@ -147,7 +156,7 @@ Optional lowercase organization prefix prepended to the S3 artifacts bucket name
 
 #### S3LogBucketName
 
-Optional S3 bucket name for server access logging of the artifacts bucket. Leave empty to disable logging.
+Optional S3 bucket name for server access logging of the artifacts bucket. When set, this bucket takes precedence over the account-wide access log bucket. Leave empty to fall back to the access log bucket (when `EnableS3AccessLogBucket` is `'true'`), or to disable logging entirely (when `EnableS3AccessLogBucket` is `'false'`).
 
 | Attribute | Setting |
 |-----------|---------|
@@ -156,7 +165,47 @@ Optional S3 bucket name for server access logging of the artifacts bucket. Leave
 | Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$\|^$` |
 | Constraint Description | Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number. |
 
-> **Important:** The log bucket must already exist before deploying this template with logging enabled. The log bucket should have appropriate permissions to receive S3 server access logs.
+> **Important:** If you supply `S3LogBucketName`, that external log bucket must already exist before deploying this template and must have appropriate permissions to receive S3 server access logs. If you instead rely on the shared access log bucket (`EnableS3AccessLogBucket=true`), the log bucket and its delivery policy are created for you by this template.
+
+> **Precedence:** An explicitly supplied `S3LogBucketName` always wins. When both `S3LogBucketName` is set and `EnableS3AccessLogBucket=true`, the access log bucket is still created but the artifacts bucket logs to `S3LogBucketName`; the redundant value is silently ignored.
+
+#### EnableS3AccessLogBucket
+
+Set to 'true' to create a shared, account-wide S3 bucket for storing S3 server access logs. When enabled, the account-wide artifacts bucket logs to this bucket unless `S3LogBucketName` is set (an explicitly supplied `S3LogBucketName` always takes precedence).
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | false |
+| Allowed Values | true, false |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Note:** The bucket name follows the pattern `[S3BucketNameOrgPrefix-]access-logs-{AccountId}-{Region}-an` (no Prefix/ProjectId, since this is account-wide). It uses `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain` so logs are preserved if the stack is deleted or the bucket is replaced.
+
+#### LogExpirationInDays
+
+The number of days to keep logs in the access log bucket. Default is 90 days, max is 365. Consider exporting for longer retention. Only applies when `EnableS3AccessLogBucket` is `'true'`.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | Number |
+| Default | 90 |
+| Min Value | 1 |
+| Max Value | 365 |
+| Constraint Description | Must be between 1 and 365 days. |
+
+#### AllowLegacyCloudFrontLogs
+
+Set to 'true' to enable legacy CloudFront standard logging support on the access log bucket. When enabled, `BlockPublicAcls` is set to false, `ObjectOwnership` is set to `BucketOwnerPreferred`, and a bucket policy statement is added for the CloudFront log delivery service (`delivery.logs.amazonaws.com`). Default is 'false' to maintain the secure configuration. Only applies when `EnableS3AccessLogBucket` is `'true'`.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | false |
+| Allowed Values | true, false |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Security Note:** Enabling legacy CloudFront logging relaxes the bucket's ACL and ownership controls (`BlockPublicAcls: false`, `ObjectOwnership: BucketOwnerPreferred`) to satisfy the legacy CloudFront log delivery mechanism. Leave this `false` unless you specifically need legacy CloudFront standard logging into this bucket.
 
 #### S3ModuleLocation
 
@@ -199,6 +248,8 @@ Namespace prefix within the S3 module bucket. This is the path prefix where modu
 - [GitHubConnection](#githubconnection) - AWS::CodeStarConnections::Connection (Conditional: HasGitHubOrg, via AWS::Include)
 - [ApiGatewayCloudWatchLogsRole](#apigatewaycloudwatchlogsrole) - AWS::IAM::Role (Conditional: EnableApiGatewayLogging, via AWS::Include)
 - [ApiGatewayAccount](#apigatewayaccount) - AWS::ApiGateway::Account (Conditional: EnableApiGatewayLogging, via AWS::Include)
+- [AccessLogBucketRegional](#accesslogbucketregional) - AWS::S3::Bucket (Conditional: EnableS3AccessLogBucket, via AWS::Include)
+- [AccessLogBucketPolicy](#accesslogbucketpolicy) - AWS::S3::BucketPolicy (Conditional: EnableS3AccessLogBucket, via AWS::Include)
 - [S3ArtifactsBucketRegional](#s3artifactsbucketregional) - AWS::S3::Bucket (Conditional: EnableS3ArtifactsBucket, via AWS::Include)
 - [S3ArtifactBucketPolicy](#s3artifactbucketpolicy) - AWS::S3::BucketPolicy (Conditional: EnableS3ArtifactsBucket, via AWS::Include)
 
@@ -248,6 +299,42 @@ Configures the API Gateway account settings to use the CloudWatch logging role. 
 
 **Module Source:** `templates/v2/modules/account-wide/apigw-cloudwatch-account.yml`
 
+### AccessLogBucketRegional
+
+Type: AWS::S3::Bucket (via AWS::Include)  
+Condition: EnableS3AccessLogBucket
+
+Creates a shared, account-wide S3 bucket for storing S3 server access logs (and optionally legacy CloudFront standard logs). Unlike the standalone `template-storage-s3-access-logs.yml`, this bucket drops the Prefix and ProjectId naming tokens, yielding one shared access log bucket per account/region.
+
+**Key Configuration:**
+- **Bucket Name:** `[S3BucketNameOrgPrefix-]access-logs-{AccountId}-{Region}-an`
+- **DeletionPolicy / UpdateReplacePolicy:** Retain (logs preserved if the stack is deleted or the bucket replaced)
+- **Versioning:** Suspended
+- **Encryption:** AES256 server-side encryption with S3 Bucket Keys enabled
+- **Public Access:** Blocked (`BlockPublicAcls` is relaxed to `false` only when `AllowLegacyCloudFrontLogs=true`)
+- **Lifecycle:** `DeleteOldLogs` rule expires objects after `LogExpirationInDays` days
+- **Ownership Controls:** `BucketOwnerPreferred` set only when `AllowLegacyCloudFrontLogs=true`
+
+**Module Source:** `templates/v2/modules/s3-access-logs/s3-access-log-bucket.yml`
+
+> **Keep in sync:** This module is the account-wide counterpart of the standalone `template-storage-s3-access-logs.yml`. See `.kiro/steering/s3-access-logs-module-sync.md`.
+
+### AccessLogBucketPolicy
+
+Type: AWS::S3::BucketPolicy (via AWS::Include)  
+Condition: EnableS3AccessLogBucket
+
+Bucket policy for the shared access log bucket. Enforces HTTPS-only access, grants the S3 log delivery service permission to write logs, and (optionally) grants the CloudFront log delivery service.
+
+**Policy Statements:**
+| Statement | Effect | Principal | Condition | Actions |
+|-----------|--------|-----------|-----------|---------|
+| DenyNonSecureTransportAccess | Deny | * | SecureTransport=false | s3:* |
+| AllowS3LogDelivery | Allow | logging.s3.amazonaws.com | aws:SourceAccount = {AccountId} | s3:PutObject |
+| AllowCloudFrontLogDelivery (Conditional: EnableLegacyCloudFrontLogs) | Allow | delivery.logs.amazonaws.com | s3:x-amz-acl = bucket-owner-full-control | s3:PutObject |
+
+**Module Source:** `templates/v2/modules/s3-access-logs/s3-access-log-bucket-policy.yml`
+
 ### S3ArtifactsBucketRegional
 
 Type: AWS::S3::Bucket (via AWS::Include)  
@@ -262,9 +349,11 @@ Creates a shared S3 artifacts bucket for pipeline build artifacts. The bucket is
 - **Encryption:** AES256 server-side encryption
 - **Public Access:** Fully blocked (all four public access blocks enabled)
 - **Lifecycle:** Objects expire after 395 days, noncurrent versions after 30 days, incomplete multipart uploads abort after 1 day
-- **Logging:** Conditional on S3LogBucketName parameter
+- **Logging:** Server access logging destination follows this precedence — (1) an explicit `S3LogBucketName` wins; (2) otherwise the account-wide access log bucket (`AccessLogBucketRegional`) when `EnableS3AccessLogBucket=true`; (3) otherwise no logging. Logs are written under the `cf-artifacts/` prefix.
 
 **Module Source:** `templates/v2/modules/account-wide/s3-artifacts-bucket.yml`
+
+> **Ordering:** When the artifacts bucket logs to the account-wide access log bucket, the `Ref: AccessLogBucketRegional` in its logging configuration creates an implicit dependency so the log bucket is created first. That reference exists only in that branch, so with the feature off there is no dependency on the (uncreated) log resources.
 
 ### S3ArtifactBucketPolicy
 
@@ -394,6 +483,38 @@ S3 console link for the artifacts bucket.
 |-----------|-------|
 | Example Value | `https://s3.console.aws.amazon.com/s3/buckets/acme-cf-artifacts-123456789012-us-east-1-an` |
 
+### S3AccessLogBucketName
+
+Condition: EnableS3AccessLogBucket
+
+Name of the account-wide S3 access log bucket.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-S3-AccessLog-Bucket-Name` |
+| Example Value | `acme-access-logs-123456789012-us-east-1-an` |
+
+### S3AccessLogBucketArn
+
+Condition: EnableS3AccessLogBucket
+
+ARN of the account-wide S3 access log bucket.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-S3-AccessLog-Bucket-Arn` |
+| Example Value | `arn:aws:s3:::acme-access-logs-123456789012-us-east-1-an` |
+
+### S3AccessLogBucketConsole
+
+Condition: EnableS3AccessLogBucket
+
+S3 console link for the access log bucket.
+
+| Attribute | Value |
+|-----------|-------|
+| Example Value | `https://s3.console.aws.amazon.com/s3/buckets/acme-access-logs-123456789012-us-east-1-an` |
+
 ### IamPoliciesConsole
 
 IAM Policies console link for quick access to view created policies.
@@ -409,8 +530,10 @@ IAM Policies console link for quick access to view created policies.
 | HasGitHubOrg | GitHubOrg ≠ "" | Controls GitHub connection creation |
 | EnableApiGatewayLogging | EnableApiGwCloudWatchLogs = "true" | Controls API Gateway CloudWatch role and account configuration |
 | EnableS3ArtifactsBucket | EnableS3ArtifactsBucket = "true" | Controls S3 artifacts bucket and policy creation |
-| UseS3BucketNameOrgPrefix | S3BucketNameOrgPrefix ≠ "" | Determines if org prefix is prepended to bucket name |
-| HasLoggingBucket | S3LogBucketName ≠ "" | Determines if S3 server access logging is enabled |
+| UseS3BucketNameOrgPrefix | S3BucketNameOrgPrefix ≠ "" | Determines if org prefix is prepended to bucket names |
+| HasLoggingBucket | S3LogBucketName ≠ "" | Determines if an explicit external log bucket overrides the shared access log bucket |
+| EnableS3AccessLogBucket | EnableS3AccessLogBucket = "true" | Controls access log bucket and policy creation |
+| EnableLegacyCloudFrontLogs | AllowLegacyCloudFrontLogs = "true" | Enables legacy CloudFront logging support on the access log bucket |
 
 ## Examples
 
@@ -436,10 +559,29 @@ GitHubOrg: my-github-org
 EnableApiGwCloudWatchLogs: true
 EnableS3ArtifactsBucket: true
 S3BucketNameOrgPrefix: acme
-S3LogBucketName: acme-access-logs-123456789012-us-east-1-an
+EnableS3AccessLogBucket: true
+LogExpirationInDays: 90
+AllowLegacyCloudFrontLogs: false
 S3ModuleLocation: 63klabs-atlas-us-east-1
 S3ModuleNamespace: atlantis
 ```
+
+This creates the artifacts bucket `acme-cf-artifacts-123456789012-us-east-1-an` and the access log bucket `acme-access-logs-123456789012-us-east-1-an`, and the artifacts bucket automatically logs to the access log bucket (under the `cf-artifacts/` prefix). To instead send artifacts logs to a pre-existing external bucket, set `S3LogBucketName` (which takes precedence) and leave `EnableS3AccessLogBucket` as needed.
+
+### S3 Access Log Bucket Only
+
+Enable just the shared access log bucket (for example, to reference it from other stacks via its exports):
+
+```
+OrgPrefix: ACME
+RolePath: /
+EnableS3AccessLogBucket: true
+S3BucketNameOrgPrefix: acme
+S3ModuleLocation: 63klabs-atlas-us-east-1
+S3ModuleNamespace: atlantis
+```
+
+This creates: `acme-access-logs-123456789012-us-east-1-an`
 
 ### S3 Artifacts Bucket Only
 
@@ -459,6 +601,7 @@ This creates: `acme-cf-artifacts-123456789012-us-east-1-an`
 ## Related Templates
 
 - **[template-storage-s3-artifacts](../storage/template-storage-s3-artifacts-README.md)**: Per-project, prefix-scoped S3 artifacts bucket (alternative to the account-wide bucket)
+- **[template-storage-s3-access-logs](../storage/template-storage-s3-access-logs-README.md)**: The standalone, prefix + project scoped S3 access-logs template. It is the canonical reference for the access-log resource definitions and remains unchanged; the modules consumed here are its account-wide, condition-aware counterparts
 - **[template-service-role-pipeline](../service-role/template-service-role-pipeline-README.md)**: Per-project service roles that use the managed policies exported by this template
 - **[template-pipeline-github](../pipeline/template-pipeline-github-README.md)**: CI/CD pipeline that references the GitHub connection and managed policy exports
 

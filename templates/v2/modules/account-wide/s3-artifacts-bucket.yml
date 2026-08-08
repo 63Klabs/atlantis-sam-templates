@@ -1,10 +1,18 @@
 # -- S3 Artifacts Bucket (Account-Wide) --
 # Parent template must define parameters: S3BucketNameOrgPrefix, S3LogBucketName
-# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket
+# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket, EnableS3AccessLogBucket
+# Parent must name the access log bucket resource 'AccessLogBucketRegional' (when EnableS3AccessLogBucket)
 #
 # Creates an account-wide S3 bucket for pipeline build artifacts.
 # Unlike the per-project storage template, this bucket is shared across
 # all projects in the account without prefix or project scoping.
+#
+# Server access logging destination precedence:
+#   1. HasLoggingBucket (S3LogBucketName not empty) -> log to S3LogBucketName
+#      (an explicitly supplied log bucket always wins)
+#   2. else EnableS3AccessLogBucket=true -> log to the account-wide AccessLogBucketRegional
+#   3. else -> no logging configured
+# Logs are written under the "cf-artifacts/" prefix in the destination bucket.
 
 Type: AWS::S3::Bucket
 Condition: EnableS3ArtifactsBucket
@@ -40,4 +48,10 @@ Properties:
       - HasLoggingBucket
       - DestinationBucketName:
           Ref: S3LogBucketName
-      - Ref: "AWS::NoValue"
+        LogFilePrefix: "cf-artifacts/"
+      - Fn::If:
+          - EnableS3AccessLogBucket
+          - DestinationBucketName:
+              Ref: AccessLogBucketRegional
+            LogFilePrefix: "cf-artifacts/"
+          - Ref: "AWS::NoValue"

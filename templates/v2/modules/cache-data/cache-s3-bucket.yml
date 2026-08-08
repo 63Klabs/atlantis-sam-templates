@@ -1,0 +1,36 @@
+# -- Cache-Data S3 Bucket --
+# From: https://www.npmjs.com/package/@63klabs/cache-data
+# Parent template must define parameters: Prefix, S3BucketNameOrgPrefix, CacheDataPurgeAgeOfCachedBucketObjInDays
+# Parent template must define conditions: UseS3BucketNameOrgPrefix, CreateCacheData
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-cache-data.yml
+Type: AWS::S3::Bucket
+Condition: CreateCacheData
+Properties:
+  BucketName: # Preferred as it aligns with regional bucket naming
+    Fn::If:
+      - UseS3BucketNameOrgPrefix
+      - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}-cache-data-${AWS::AccountId}-${AWS::Region}-an"
+      - Fn::Sub: "${Prefix}-cache-data-${AWS::AccountId}-${AWS::Region}-an"
+  BucketNamespace: "account-regional"
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  BucketEncryption:
+    ServerSideEncryptionConfiguration:
+      - ServerSideEncryptionByDefault:
+          SSEAlgorithm: AES256
+  LifecycleConfiguration:
+    Rules:
+      - Id: "ExpireObjects"
+        AbortIncompleteMultipartUpload:
+          DaysAfterInitiation: 1
+        ExpirationInDays:
+          Ref: CacheDataPurgeAgeOfCachedBucketObjInDays
+        Prefix: "cache" # this will limit this policy to YOURBUCKETNAME/cache/*
+        NoncurrentVersionExpirationInDays:
+          Ref: CacheDataPurgeAgeOfCachedBucketObjInDays
+        Status: "Enabled" # Enable only if you are going to use this LifecycleConfiguration

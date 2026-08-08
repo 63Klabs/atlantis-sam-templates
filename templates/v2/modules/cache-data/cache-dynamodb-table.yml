@@ -1,0 +1,24 @@
+# -- Cache-Data DynamoDb Table --
+# From: https://www.npmjs.com/package/@63klabs/cache-data
+# Parent template must define parameters: Prefix
+# Parent template must define conditions: CreateCacheData
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-cache-data.yml
+Type: AWS::DynamoDB::Table
+Condition: CreateCacheData
+UpdateReplacePolicy: Retain
+DeletionPolicy: Delete # Since this is cache data that can be regenerated, Delete is suitable for the deletion policy.
+Properties:
+  TableName:
+    Fn::Sub: "${Prefix}-cache-data-CacheData"
+  AttributeDefinitions:
+    - AttributeName: "id_hash"
+      AttributeType: "S"
+  KeySchema:
+    - AttributeName: "id_hash"
+      KeyType: "HASH"
+  TimeToLiveSpecification:
+    AttributeName: "purge_ts"
+    Enabled: true
+  BillingMode: "PAY_PER_REQUEST" # Use PAY_PER_REQUEST for spikey Web Service Traffic

@@ -1,0 +1,55 @@
+# -- Managed Policy for Lambda Execution Roles accessing Cache-Data --
+# From: https://www.npmjs.com/package/@63klabs/cache-data
+# Parent template must define parameters: Prefix, RolePath
+# Parent template must define conditions: CreateCacheDataManagedPolicy
+# Parent must name resources 'CacheDataS3BucketRegional' and 'CacheDataDynamoDbTable'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-cache-data.yml
+Type: AWS::IAM::ManagedPolicy
+Condition: CreateCacheDataManagedPolicy
+Properties:
+  ManagedPolicyName:
+    Fn::Sub: "${Prefix}-cache-data-ManagedLambdaExecutionRolePolicy"
+  Description: "Standard permissions for Managing permissions to access Cache-Data in a Lambda Execution role"
+  Path:
+    Ref: RolePath
+  PolicyDocument:
+    Version: '2012-10-17'
+    Statement:
+
+      - Sid: LambdaAccessToS3BucketCacheData
+        Action:
+        - s3:PutObject
+        - s3:GetObject
+        - s3:GetObjectVersion
+        Effect: Allow
+        Resource:
+          Fn::Sub: 'arn:aws:s3:::${CacheDataS3BucketRegional}/cache/*'
+
+      - Sid: LambdaAccessToS3ListBucket
+        Action:
+        - s3:ListBucket
+        Effect: Allow
+        Resource:
+          Fn::Sub: 'arn:aws:s3:::${CacheDataS3BucketRegional}'
+        # Condition: # will be enabled in future if after further testing
+        #   StringLike:
+        #     s3:prefix:
+        #       - 'cache'
+
+      - Sid: LambdaAccessToDynamoDBTableCacheData
+        Action:
+        - dynamodb:GetItem
+        - dynamodb:Scan
+        - dynamodb:Query
+        - dynamodb:BatchGetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:BatchWriteItem
+        Effect: Allow
+        Resource:
+          Fn::Sub:
+            - 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}'
+            - TableName:
+                Ref: CacheDataDynamoDbTable

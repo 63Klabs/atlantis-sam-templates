@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-Released versions are available from the public S3 bucket `63klabs`
+Released versions are freely available for your use from the public S3 bucket `63klabs` and mirrored for deployment in US regions:
+
+- `63klabs` (us-east-2)
+- `63klabs-atlas-us-east-1`
+- `63klabs-zenith-us-east-2`
+- `63klabs-fabric-us-west-1`
+- `63klabs-orbit-us-west-2`
+
+When deploying to other regions you may need to [self-host under certain deployment scenerios](https://github.com/63Klabs/atlantis-platform-admin).
+
+The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
 ## v0.0.39 (unreleased)
 
@@ -23,8 +33,19 @@ Released versions are available from the public S3 bucket `63klabs`
   - Modules: postdeploy-service-role.yml - IAM role for post-deployment validation
   - Modules: postdeploy-project.yml - CodeBuild project for post-deployment tasks
   - Modules: postdeploy-log-group.yml - CloudWatch log group for post-deployment builds
+- **Cache-Data Modules** [Spec: 0-0-39-cache-data-modularization](.kiro/specs/0-0-39-cache-data-modularization/) - Created four reusable cache-data modules in templates/v2/modules/cache-data/ for shared, prefix-wide Cache-Data infrastructure consumed by prefix-based-infrastructure.yml
+  - Modules: cache-dynamodb-table.yml - DynamoDB cache table with TTL (purge_ts) and PAY_PER_REQUEST billing
+  - Modules: cache-s3-bucket.yml - Regional S3 cache bucket with AES256 encryption and lifecycle expiration of cache objects
+  - Modules: cache-s3-bucket-policy.yml - S3 bucket policy enforcing secure transport and scoped Lambda read/write/delete access
+  - Modules: cache-managed-lambda-policy.yml - Managed IAM policy granting Lambda execution roles scoped access to the cache-data S3 bucket and DynamoDB table
+- **S3 Access-Logs Modules** - Created two reusable s3-access-logs modules in templates/v2/modules/s3-access-logs/ for a shared, account-wide S3 server access log bucket consumed by account-wide-infrastructure.yml
+  - Modules: s3-access-log-bucket.yml - Account-wide regional S3 access log bucket with AES256 encryption, retention, lifecycle expiration, and optional legacy CloudFront ownership controls (Prefix/ProjectId naming tokens dropped)
+  - Modules: s3-access-log-bucket-policy.yml - S3 bucket policy enforcing secure transport and granting the S3 (and optional CloudFront) log delivery service write access
+  - Steering: Added .kiro/steering/s3-access-logs-module-sync.md to keep the modules in sync with the standalone template-storage-s3-access-logs.yml
 
 ### Changed
+- **Account: account-wide-infrastructure.yml v0.0.0** - Added opt-in account-wide S3 access log bucket via the EnableS3AccessLogBucket parameter (with LogExpirationInDays and AllowLegacyCloudFrontLogs), consuming the two s3-access-logs modules through AWS::Include with conditional resources and outputs. When enabled, the account-wide artifacts bucket logs to this bucket unless an explicit S3LogBucketName is supplied (which takes precedence)
+- **Modules: s3-artifacts-bucket.yml** - Updated server access logging destination precedence to prefer an explicitly supplied S3LogBucketName, falling back to the account-wide access log bucket (AccessLogBucketRegional) when EnableS3AccessLogBucket is true, then to no logging; logs are written under the cf-artifacts/ prefix (backward compatible; default behavior unchanged)
 - **Pipeline: template-pipeline.yml v2.0.21** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 15 pipeline modules via AWS::Include, replacing inline resource definitions with shared module references
 - **Pipeline: template-pipeline-github.yml v2.0.4** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 14 pipeline modules via AWS::Include (excludes source-event-rule which is CodeCommit-specific)
 - **Pipeline: template-pipeline-build-only.yml v2.0.6** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Refactored to consume 10 pipeline modules via AWS::Include (excludes CloudFormation/CodeDeploy/PostDeploy modules)
@@ -38,6 +59,7 @@ Released versions are available from the public S3 bucket `63klabs`
   - Modules: pipeline-mgmt-role.yml - Added read-only S3 permissions scoped to module bucket and namespace
   - Modules: storage-mgmt-role.yml - Added read-only S3 permissions scoped to module bucket and namespace
   - Modules: network-cloudfront-mgmt-policy.yml - Added read-only S3 permissions scoped to module bucket and namespace
+- **Account: prefix-based-infrastructure.yml v0.0.0** [Spec: 0-0-39-cache-data-modularization](.kiro/specs/0-0-39-cache-data-modularization/) - Added opt-in Cache-Data support via the EnableCacheData parameter, consuming the four cache-data modules through AWS::Include with conditional resources and outputs (export names preserved from template-storage-cache-data.yml)
 
 ## v0.0.38 (2026-06-12)
 

@@ -341,6 +341,9 @@ This template is designed to work with:
 - **Application Templates**: Lambda functions that use the @63klabs/cache-data package
 - **Service Role Templates**: IAM roles for CloudFormation deployments
   - `template-service-role-storage.yml`
+- **[prefix-based-infrastructure](../account/prefix-based-infrastructure-README.md)**: Provisions the same Cache-Data resources as an optional, shared, prefix-wide resource set (gated by `EnableCacheData`). It consumes reusable `AWS::Include` modules under `templates/v2/modules/cache-data/` that mirror this template's resources.
+
+> **Note:** This standalone template is the canonical, prefix + project scoped reference implementation and remains unchanged. The `templates/v2/modules/cache-data/` modules are its condition-aware counterparts (with the `${ProjectId}` token replaced by the literal `cache-data`, long-form intrinsics, and embedded conditions). The two MUST be kept in sync — see `.kiro/steering/cache-data-module-sync.md`.
 
 ## Additional Resources
 

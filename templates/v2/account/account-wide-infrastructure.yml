@@ -69,6 +69,13 @@ Metadata:
           - S3LogBucketName
       -
         Label:
+          default: "S3 Access Log Bucket"
+        Parameters:
+          - EnableS3AccessLogBucket
+          - LogExpirationInDays
+          - AllowLegacyCloudFrontLogs
+      -
+        Label:
           default: "Module Source"
         Parameters:
           - S3ModuleLocation
@@ -88,7 +95,6 @@ Parameters:
   OrgPrefix:
     Type: String
     Description: "Organization-level prefix prepended to managed policy names for identification and grouping. For example, 'ACME' would produce policy names like 'ACME-ProjectPipeline-CodeBuildCrud'."
-    Default: "ACME"
     AllowedPattern: "^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$"
     MinLength: 2
     MaxLength: 20
@@ -161,10 +167,35 @@ Parameters:
 
   S3LogBucketName:
     Type: String
-    Description: "Optional S3 bucket name for server access logging of the artifacts bucket. Leave empty to disable logging."
+    Description: "Optional S3 bucket name for server access logging of the artifacts bucket. When set, this bucket takes precedence over the account-wide access log bucket. Leave empty to fall back to the access log bucket (when EnableS3AccessLogBucket is 'true'), or to disable logging entirely (when EnableS3AccessLogBucket is 'false')."
     Default: ""
     AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$|^$"
     ConstraintDescription: "Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
+  # ---------------------------------------------------------------------------
+  # S3 Access Log Bucket
+
+  EnableS3AccessLogBucket:
+    Type: String
+    Description: "Set to 'true' to create a shared, account-wide S3 bucket for storing S3 server access logs. When enabled, the account-wide artifacts bucket logs to this bucket unless S3LogBucketName is set (an explicitly supplied S3LogBucketName always takes precedence)."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
+
+  LogExpirationInDays:
+    Type: Number
+    Description: "The number of days to keep logs in the access log bucket. Default is 90 days, max is 365. Consider exporting for longer retention. Only applies when EnableS3AccessLogBucket is 'true'."
+    Default: 90
+    MinValue: 1
+    MaxValue: 365
+    ConstraintDescription: "Must be between 1 and 365 days."
+
+  AllowLegacyCloudFrontLogs:
+    Type: String
+    Description: "Set to 'true' to enable legacy CloudFront standard logging support on the access log bucket. When enabled, BlockPublicAcls is set to false, ObjectOwnership is set to BucketOwnerPreferred, and a bucket policy statement is added for the CloudFront log delivery service (delivery.logs.amazonaws.com). Default is 'false' to maintain the secure configuration. Only applies when EnableS3AccessLogBucket is 'true'."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
 
 # =============================================================================
 # CONDITIONS
@@ -178,6 +209,8 @@ Conditions:
   EnableS3ArtifactsBucket: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
+  EnableS3AccessLogBucket: !Equals [!Ref EnableS3AccessLogBucket, "true"]
+  EnableLegacyCloudFrontLogs: !Equals [!Ref AllowLegacyCloudFrontLogs, "true"]
 
 # =============================================================================
 # RESOURCES
@@ -223,7 +256,27 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/account-wide/apigw-cloudwatch-account.yml"
 
+  # -- S3 Access Log Bucket (Conditional) --
+  AccessLogBucketRegional:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/s3-access-logs/s3-access-log-bucket.yml"
+
+  # -- S3 Access Log Bucket Policy (Conditional) --
+  AccessLogBucketPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/s3-access-logs/s3-access-log-bucket-policy.yml"
+
   # -- S3 Artifacts Bucket (Conditional) --
+  # No explicit DependsOn on the access log resources: when the artifacts bucket logs to
+  # the account-wide access log bucket (EnableS3AccessLogBucket 'true' and S3LogBucketName
+  # empty), its LoggingConfiguration uses Ref AccessLogBucketRegional, which creates an
+  # implicit dependency so the log bucket is created first. That Ref only exists in that
+  # branch of the Fn::If, so otherwise there is no reference to the (uncreated) log
+  # resources and nothing to order.
   S3ArtifactsBucketRegional:
     Fn::Transform:
       Name: AWS::Include
@@ -318,6 +371,28 @@ Outputs:
     Condition: EnableS3ArtifactsBucket
     Description: "S3 console link for the artifacts bucket"
     Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${S3ArtifactsBucketRegional}"
+
+  # ---------------------------------------------------------------------------
+  # S3 Access Log Bucket
+
+  S3AccessLogBucketName:
+    Condition: EnableS3AccessLogBucket
+    Description: "Name of the account-wide S3 access log bucket"
+    Value: !Ref AccessLogBucketRegional
+    Export:
+      Name: !Sub "${OrgPrefix}-S3-AccessLog-Bucket-Name"
+
+  S3AccessLogBucketArn:
+    Condition: EnableS3AccessLogBucket
+    Description: "ARN of the account-wide S3 access log bucket"
+    Value: !GetAtt AccessLogBucketRegional.Arn
+    Export:
+      Name: !Sub "${OrgPrefix}-S3-AccessLog-Bucket-Arn"
+
+  S3AccessLogBucketConsole:
+    Condition: EnableS3AccessLogBucket
+    Description: "S3 console link for the access log bucket"
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${AccessLogBucketRegional}"
 
   # ---------------------------------------------------------------------------
   # Console Links

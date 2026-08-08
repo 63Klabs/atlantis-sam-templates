@@ -1,0 +1,49 @@
+# -- S3 Access Log Bucket (Account-Wide) --
+# Parent template must define parameters:
+#   S3BucketNameOrgPrefix, LogExpirationInDays, AllowLegacyCloudFrontLogs
+# Parent template must define conditions:
+#   UseS3BucketNameOrgPrefix, EnableS3AccessLogBucket, EnableLegacyCloudFrontLogs
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-s3-access-logs.yml
+#   (see .kiro/steering/s3-access-logs-module-sync.md)
+#
+# Creates an account-wide S3 bucket for storing S3 server access logs.
+# Unlike the standalone storage template, this bucket is shared across the
+# account without Prefix or ProjectId scoping.
+Type: AWS::S3::Bucket
+Condition: EnableS3AccessLogBucket
+DeletionPolicy: Retain
+UpdateReplacePolicy: Retain
+Properties:
+  BucketName: # Preferred as it aligns with regional bucket naming
+    Fn::If:
+      - UseS3BucketNameOrgPrefix
+      - Fn::Sub: "${S3BucketNameOrgPrefix}-access-logs-${AWS::AccountId}-${AWS::Region}-an"
+      - Fn::Sub: "access-logs-${AWS::AccountId}-${AWS::Region}-an"
+  BucketNamespace: "account-regional"
+  VersioningConfiguration:
+    Status: Suspended
+  BucketEncryption:
+    ServerSideEncryptionConfiguration:
+      - BucketKeyEnabled: true
+        ServerSideEncryptionByDefault:
+          SSEAlgorithm: AES256
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls:
+      Fn::If: [EnableLegacyCloudFrontLogs, false, true]
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  LifecycleConfiguration:
+    Rules:
+      - Id: DeleteOldLogs
+        Status: Enabled
+        ExpirationInDays:
+          Ref: LogExpirationInDays
+  OwnershipControls:
+    Fn::If:
+      - EnableLegacyCloudFrontLogs
+      - Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      - Ref: "AWS::NoValue"

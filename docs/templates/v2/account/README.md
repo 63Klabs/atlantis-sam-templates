@@ -12,13 +12,14 @@ These templates use a modular architecture — individual resources are defined 
 
 ### [account-wide-infrastructure](./account-wide-infrastructure-README.md)
 
-Account-wide resources: ABAC-scoped managed policies, shared connections, and optional S3 artifacts bucket — Assembled from reusable modules.
+Account-wide resources: ABAC-scoped managed policies, shared connections, optional S3 artifacts bucket, and optional shared S3 access log bucket — Assembled from reusable modules.
 
 **Use Cases:**
 - ABAC-scoped managed policies for CloudFormation service roles (CodeBuild CRUD, Cognito CRUD)
 - Shared GitHub connections via AWS CodeConnections
 - Account-level API Gateway CloudWatch logging configuration
 - Shared S3 artifacts bucket for all pipeline roles in the account
+- Shared S3 access log bucket used as the artifacts bucket's log destination (with optional legacy CloudFront logging support)
 
 **Key Features:**
 - Modular architecture using `AWS::Include` transforms for flexible resource assembly
@@ -31,6 +32,25 @@ Account-wide resources: ABAC-scoped managed policies, shared connections, and op
 - S3 bucket containing module snippets (S3ModuleLocation parameter)
 - IAM permissions to create managed policies, connections, and S3 buckets
 - (Optional) Existing S3 log bucket for artifacts bucket logging
+
+### [prefix-based-infrastructure](./prefix-based-infrastructure-README.md)
+
+Combined prefix-based CloudFormation service roles and managed policies for pipeline, storage, and network management, plus optional shared Cache-Data resources — Assembled from reusable modules.
+
+**Use Cases:**
+- Deploy the pipeline, storage, and network management service roles for a Prefix in a single stack
+- Grant `iam:PassRole` for those service roles via prefix-scoped managed policies
+- Optionally provision shared Cache-Data infrastructure (DynamoDB table, S3 bucket, bucket policy, and managed Lambda execution policy) for Lambda applications using [@63klabs/cache-data](https://www.npmjs.com/package/@63klabs/cache-data)
+
+**Key Features:**
+- Modular architecture using `AWS::Include` transforms for flexible resource assembly
+- Prefix-scoped service roles restricting actions to resources named with the given Prefix
+- Optional, opt-in Cache-Data resource set (gated by `EnableCacheData`, default `false`) with export names identical to the standalone `template-storage-cache-data.yml`
+
+**Prerequisites:**
+- S3 bucket containing module snippets (S3ModuleLocation parameter)
+- IAM permissions to create IAM roles, managed policies, and (when Cache-Data is enabled) DynamoDB tables and S3 buckets
+- An existing S3 artifacts bucket referenced by `S3ArtifactsBucket`
 
 ## Common Use Cases
 
@@ -63,6 +83,9 @@ account-wide-infrastructure.yml
 │   ├── apigw-cloudwatch-account.yml (Conditional: EnableApiGatewayLogging)
 │   ├── s3-artifacts-bucket.yml (Conditional: EnableS3ArtifactsBucket)
 │   └── s3-artifacts-bucket-policy.yml (Conditional: EnableS3ArtifactsBucket)
+├── modules/s3-access-logs/
+│   ├── s3-access-log-bucket.yml (Conditional: EnableS3AccessLogBucket)
+│   └── s3-access-log-bucket-policy.yml (Conditional: EnableS3AccessLogBucket)
 ```
 
 ## Integration with Other Templates
@@ -97,6 +120,7 @@ Deploy this template once per AWS account per region. It creates account-level r
 All optional resources are disabled by default. Enable them by setting the corresponding parameter to "true":
 - `EnableApiGwCloudWatchLogs` → API Gateway CloudWatch role and account configuration
 - `EnableS3ArtifactsBucket` → Shared S3 artifacts bucket and bucket policy
+- `EnableS3AccessLogBucket` → Shared S3 access log bucket and bucket policy (used as the artifacts bucket's log destination)
 
 ## Additional Resources
 

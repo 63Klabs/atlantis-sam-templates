@@ -1,0 +1,59 @@
+# -- S3 Access Log Bucket Policy (Account-Wide) --
+# Parent template must define parameters: (none)
+# Parent template must define conditions:
+#   EnableS3AccessLogBucket, EnableLegacyCloudFrontLogs
+#   Pseudo-parameters: AWS::AccountId
+# Parent must name the bucket resource 'AccessLogBucketRegional'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-s3-access-logs.yml
+#   (see .kiro/steering/s3-access-logs-module-sync.md)
+#
+# Grants the S3 log delivery service permission to write server access logs
+# to the account-wide access log bucket and denies non-secure transport.
+Type: AWS::S3::BucketPolicy
+Condition: EnableS3AccessLogBucket
+Properties:
+  Bucket:
+    Ref: AccessLogBucketRegional
+  PolicyDocument:
+    Version: "2012-10-17"
+    Statement:
+      - Sid: "DenyNonSecureTransportAccess"
+        Effect: Deny
+        Principal: "*"
+        Action: "s3:*"
+        Resource:
+          - Fn::GetAtt: [AccessLogBucketRegional, Arn]
+          - Fn::Join:
+              - "/"
+              - - Fn::GetAtt: [AccessLogBucketRegional, Arn]
+                - "*"
+        Condition:
+          Bool:
+            "aws:SecureTransport": false
+      - Sid: "AllowS3LogDelivery"
+        Effect: Allow
+        Principal:
+          Service: logging.s3.amazonaws.com
+        Action:
+          - "s3:PutObject"
+        Resource:
+          Fn::Sub: "${AccessLogBucketRegional.Arn}/*"
+        Condition:
+          StringEquals:
+            "aws:SourceAccount":
+              Ref: "AWS::AccountId"
+      - Fn::If:
+          - EnableLegacyCloudFrontLogs
+          - Sid: "AllowCloudFrontLogDelivery"
+            Effect: Allow
+            Principal:
+              Service: delivery.logs.amazonaws.com
+            Action: "s3:PutObject"
+            Resource:
+              Fn::Sub: "${AccessLogBucketRegional.Arn}/*"
+            Condition:
+              StringEquals:
+                "s3:x-amz-acl": "bucket-owner-full-control"
+          - Ref: "AWS::NoValue"

@@ -72,6 +72,13 @@ Metadata:
           - RoleNames
       -
         Label:
+          default: "Cache-Data"
+        Parameters:
+          - EnableCacheData
+          - CacheDataPurgeAgeOfCachedBucketObjInDays
+          - CreateManagedCacheDataLambdaExecutionRolePolicy
+      -
+        Label:
           default: "Module Source"
         Parameters:
           - S3ModuleLocation
@@ -170,6 +177,29 @@ Parameters:
     ConstraintDescription: "Must be empty or a comma delimited list of valid IAM User names."
 
   # ---------------------------------------------------------------------------
+  # Cache-Data
+
+  EnableCacheData:
+    Type: String
+    Description: "Set to 'true' to create the shared, prefix-wide Cache-Data resources (DynamoDB table, S3 bucket, bucket policy, and optional managed Lambda execution policy). See https://www.npmjs.com/package/@63klabs/cache-data"
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
+
+  CacheDataPurgeAgeOfCachedBucketObjInDays:
+    Type: Number
+    Description: "Similar to CacheData_PurgeExpiredCacheEntriesInHours, but for the S3 Bucket. S3 calculates from time object is created/last modified (not accessed). This should be longer than your longest cache expiration set in custom/policies. Keeping objects in S3 for too long increases storage costs. (30 is recommended)"
+    Default: 15
+    MinValue: 3
+    ConstraintDescription: "Choose a value of 3 days or greater. This should be slightly longer than the longest cache expiration expected"
+
+  CreateManagedCacheDataLambdaExecutionRolePolicy:
+    Type: String
+    Description: "Create a managed Lambda Execution Role Policy for accessing Cache-Data. Set to FALSE to supply your own policy for the Lambda Execution Role. Only applies when EnableCacheData is 'true'."
+    AllowedValues: ["TRUE", "FALSE"]
+    Default: "TRUE"
+
+  # ---------------------------------------------------------------------------
   # Module Source
 
   S3ModuleLocation:
@@ -201,6 +231,10 @@ Conditions:
   HasGroupNames: !Not [!Equals [!Join ["", !Ref GroupNames], ""]]
   HasRoleNames: !Not [!Equals [!Join ["", !Ref RoleNames], ""]]
   HasUserNames: !Not [!Equals [!Join ["", !Ref UserNames], ""]]
+  CreateCacheData: !Equals [!Ref EnableCacheData, "true"]
+  CreateCacheDataManagedPolicy: !And
+    - !Condition CreateCacheData
+    - !Equals [!Ref CreateManagedCacheDataLambdaExecutionRolePolicy, "TRUE"]
 
 # =============================================================================
 # RESOURCES
@@ -276,6 +310,34 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/management-roles/network-full-mgmt-passrole-policy.yml"
 
+  # -- Cache-Data DynamoDb Table (Conditional) --
+  CacheDataDynamoDbTable:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/cache-data/cache-dynamodb-table.yml"
+
+  # -- Cache-Data S3 Bucket (Conditional) --
+  CacheDataS3BucketRegional:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/cache-data/cache-s3-bucket.yml"
+
+  # -- Cache-Data S3 Bucket Policy (Conditional) --
+  CacheDataS3BucketPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/cache-data/cache-s3-bucket-policy.yml"
+
+  # -- Cache-Data Managed Lambda Execution Policy (Conditional) --
+  ManagedLambdaExecutionRolePolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/cache-data/cache-managed-lambda-policy.yml"
+
 # =============================================================================
 # OUTPUTS
 # -----------------------------------------------------------------------------
@@ -346,3 +408,50 @@ Outputs:
     Value: !Ref PrefixBasedCloudFormationNetworkFullMgmtServiceRole
     Export:
       Name: !Sub "${PrefixUpper}-CloudFormation-Network-Full-Mgmt-Service-Role-Name"
+  # ---------------------------------------------------------------------------
+  # Cache-Data
+
+  CacheDataDynamoDbWebConsole:
+    Condition: CreateCacheData
+    Description: "DynamoDb Table Web Console"
+    Value: !Sub "https://console.aws.amazon.com/dynamodbv2/home?region=${AWS::Region}#table?name=${CacheDataDynamoDbTable}&initialTableGroup=%23all"
+
+  CacheDataS3BucketWebConsole:
+    Condition: CreateCacheData
+    Description: "S3 Bucket Web Console"
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${CacheDataS3BucketRegional}?region=${AWS::Region}"
+
+  CacheDataDynamoDbTableExport:
+    Condition: CreateCacheData
+    Description: "DynamoDb Table Name"
+    Value: !Ref CacheDataDynamoDbTable
+    Export:
+      Name: !Sub '${Prefix}-CacheDataDynamoDbTable'
+
+  CacheDataS3BucketExport:
+    Condition: CreateCacheData
+    Description: "S3 Bucket Name"
+    Value: !Ref CacheDataS3BucketRegional
+    Export:
+      Name: !Sub '${Prefix}-CacheDataS3Bucket'
+
+  CacheDataS3BucketArnExport:
+    Condition: CreateCacheData
+    Description: "S3 Bucket ARN"
+    Value: !Sub "arn:aws:s3:::${CacheDataS3BucketRegional}"
+    Export:
+      Name: !Sub '${Prefix}-CacheDataS3BucketArn'
+
+  CacheDataDynamoDbTableArnExport:
+    Condition: CreateCacheData
+    Description: "DynamoDb Table ARN"
+    Value: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${CacheDataDynamoDbTable}"
+    Export:
+      Name: !Sub '${Prefix}-CacheDataDynamoDbTableArn'
+
+  CacheDataManagedLambdaExecutionRolePolicyArn:
+    Condition: CreateCacheDataManagedPolicy
+    Description: "Managed policy ARN for Lambda Execution Role to access Cache-Data resources"
+    Value: !Ref ManagedLambdaExecutionRolePolicy
+    Export:
+      Name: !Sub '${Prefix}-CacheDataManagedLambdaExecutionRolePolicy'

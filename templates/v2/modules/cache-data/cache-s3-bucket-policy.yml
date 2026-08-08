@@ -1,0 +1,42 @@
+# -- Cache-Data S3 Bucket Policy --
+# From: https://www.npmjs.com/package/@63klabs/cache-data
+# Parent template must define parameters: Prefix
+# Parent template must define conditions: CreateCacheData
+# Parent must name the bucket resource 'CacheDataS3BucketRegional'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+# KEEP IN SYNC with templates/v2/storage/template-storage-cache-data.yml
+Type: AWS::S3::BucketPolicy
+Condition: CreateCacheData
+Properties:
+  Bucket:
+    Ref: CacheDataS3BucketRegional
+  PolicyDocument:
+    Version: "2012-10-17"
+    Id: SecurityPolicy
+    Statement:
+      - Sid: "DenyNonSecureTransportAccess"
+        Effect: Deny
+        Principal: "*"
+        Action: "s3:*"
+        Resource:
+          - Fn::Sub: "arn:aws:s3:::${CacheDataS3BucketRegional}"
+          - Fn::Sub: "arn:aws:s3:::${CacheDataS3BucketRegional}/*"
+        Condition:
+          Bool:
+            "aws:SecureTransport": false
+
+      - Sid: AllowLambdaReadWriteDelete
+        Action:
+        - 's3:GetObject'
+        - 's3:PutObject'
+        - 's3:DeleteObject'
+        Effect: Allow
+        Principal:
+          Service: lambda.amazonaws.com
+        Resource:
+          Fn::Sub: "arn:aws:s3:::${CacheDataS3BucketRegional}/cache/*"
+        Condition:
+          StringLike:
+            "aws:SourceArn":
+              Fn::Sub: "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-*"
