@@ -6,6 +6,8 @@ Prefix-based IAM service role for deploying and managing storage infrastructure 
 **Last Updated:** 2026-03-29  
 **Template:** [templates/v2/service-role/template-service-role-storage.yml](../../../../templates/v2/service-role/template-service-role-storage.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying prefix-based infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates a prefix-based IAM service role and managed policy that enables CloudFormation to deploy and manage storage infrastructure including S3 buckets, DynamoDB tables, and related Lambda functions. The service role implements least-privilege permissions scoped to resources matching a specific prefix, enabling multi-team or multi-environment isolation.

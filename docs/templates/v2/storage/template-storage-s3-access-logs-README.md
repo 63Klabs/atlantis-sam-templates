@@ -5,6 +5,8 @@ S3 for storing s3 log files - Deployed using SAM
 **Version:** v0.0.2/2026-03-17  
 **Template:** [templates/v2/storage/template-storage-s3-access-logs.yml](../../../../templates/v2/storage/template-storage-s3-access-logs.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying account-wide during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates an S3 bucket specifically designed for storing S3 access logs from other buckets. The bucket is configured with encryption, lifecycle policies for automatic log deletion, and appropriate bucket policies to allow S3 log delivery service access.

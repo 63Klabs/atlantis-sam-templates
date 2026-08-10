@@ -6,6 +6,8 @@ Prefix-based IAM service role for deploying and managing CI/CD pipeline infrastr
 **Last Updated:** 2026-05-27  
 **Template:** [templates/v2/service-role/template-service-role-pipeline.yml](../../../../templates/v2/service-role/template-service-role-pipeline.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying prefix-based infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates a prefix-based IAM service role and managed policy that enables CloudFormation to deploy and manage CodePipeline infrastructure. The service role implements least-privilege permissions scoped to resources matching a specific prefix, enabling multi-team or multi-environment isolation.

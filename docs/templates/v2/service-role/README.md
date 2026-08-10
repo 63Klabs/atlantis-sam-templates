@@ -2,6 +2,8 @@
 
 IAM service role templates for CloudFormation deployments, API Gateway logging, and GitHub connections.
 
+> **NOTE:** These templates are deprecated in favor of deploying prefix-based infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 Service role templates create the IAM roles and policies required for CloudFormation to deploy and manage resources on your behalf. These roles implement the principle of least privilege, scoping permissions to specific resource prefixes and paths.

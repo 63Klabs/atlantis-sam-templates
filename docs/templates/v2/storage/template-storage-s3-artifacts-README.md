@@ -5,6 +5,8 @@ S3 for storing Artifacts for CodeBuild and CodeDeploy - Deployed using SAM
 **Version:** v0.0.1/2025-05-16  
 **Template:** [templates/v2/storage/template-storage-s3-artifacts.yml](../../../../templates/v2/storage/template-storage-s3-artifacts.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying account-wide during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates an S3 bucket for storing build artifacts from CodeBuild and deployment artifacts for CodeDeploy/CloudFormation. The bucket is configured with versioning, encryption, lifecycle policies, and appropriate access policies for CI/CD pipeline services.

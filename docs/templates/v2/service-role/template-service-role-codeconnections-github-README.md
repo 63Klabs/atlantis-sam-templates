@@ -6,6 +6,8 @@ GitHub connection for CodePipeline source integration via AWS CodeConnections.
 **Last Updated:** N/A  
 **Template:** [templates/v2/service-role/template-service-role-codeconnections-github.yml](../../../../templates/v2/service-role/template-service-role-codeconnections-github.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying account-wide infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates an AWS CodeConnections connection to GitHub, enabling CodePipeline to access GitHub repositories for automated deployments. The connection requires manual authorization in the AWS Console after deployment.

@@ -5,6 +5,8 @@ Shared storage for Lambda applications utilizing Cache-Data (S3/DynamoDb) - Depl
 **Version:** v0.0.14/2025-08-08  
 **Template:** [templates/v2/storage/template-storage-cache-data.yml](../../../../templates/v2/storage/template-storage-cache-data.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying prefix-based infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates shared storage infrastructure for Lambda applications using the [@63klabs/cache-data](https://www.npmjs.com/package/@63klabs/cache-data) npm package. It provisions a DynamoDB table for metadata and an S3 bucket for cached data objects, along with an optional managed IAM policy for Lambda execution roles to access these resources.

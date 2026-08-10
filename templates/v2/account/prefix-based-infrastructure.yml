@@ -4,34 +4,30 @@ Description: "Combined prefix-based IAM Service Roles and Managed Policies for P
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Prefix-Based Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.0/2026-04-28
+# Version: v0.0.1/2026-08-10
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/
 
-# This template combines Deploy Management service roles into a single stack. 
+# This template combines service roles and resources used for supporting applications
+# deployed using the 63Klabs Atlantis DevOps Platform into a single stack. 
 # It uses reusable modules (snippets) stored in S3 via AWS::Include.
-# These are the same modules used if each service-role was deployed independently 
-# using config.py/deploy.py service-role ${prefix} ${pipeline|storage|network}
-#
+# AWS::Include must point to a local file or an S3 bucket in the same region as stack deployment.
+# Use the regional bucket names listed below or provide your own local or hosted copy.
+
+# S3 Module Location (S3ModuleLocation):
+# 63klabs-atlas-us-east-1
+# 63klabs-atlas-us-east-2
+# 63klabs-atlas-us-west-1
+# 63klabs-atlas-us-west-2
+
 # Each module creates:
 #   - A CloudFormation service role (assumed by cloudformation.amazonaws.com)
 #   - A managed policy that grants iam:PassRole for that service role
+#   - Cache-Data storage infrastructure for the NPM @63klabs/cache-data package
 #
 # Both roles are prefix-scoped, restricting actions to resources named
 # with the given Prefix.
-
-# USE WITH:
-# - Pipeline: template-pipeline.yml
-#   - templates/v2/pipeline/template-pipeline.yml
-# - Pipeline (Build Only): template-pipeline-build-only.yml
-#   - templates/v2/pipeline/template-pipeline-build-only.yml
-# - Pipeline (GitHub): template-pipeline-github.yml
-#   - templates/v2/pipeline/template-pipeline-github.yml
-# - Storage templates (S3, DynamoDB, Cache-Data)
-#   - templates/v2/storage/
-# - Network templates (CloudFront, Route53)
-#   - templates/v2/network/
 
 # =============================================================================
 # META DATA

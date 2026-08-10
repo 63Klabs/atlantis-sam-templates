@@ -185,7 +185,7 @@ Parameters:
   LogExpirationInDays:
     Type: Number
     Description: "The number of days to keep logs in the access log bucket. Default is 90 days, max is 365. Consider exporting for longer retention. Only applies when EnableS3AccessLogBucket is 'true'."
-    Default: 90
+    Default: 180
     MinValue: 1
     MaxValue: 365
     ConstraintDescription: "Must be between 1 and 365 days."

@@ -6,6 +6,8 @@ Description: "Prefix-based IAM Role and Managed Policy for Atlantis Service Role
 # Author: Chad Kluck - 63klabs.net
 # Version: v0.0.0/2026-04-23
 
+# Deprecation Notice: It is recommended to instead deploy prefix-based-infrastructure at the account level. 
+
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-cfn-template-repo-for-serverless-deployments/
 

@@ -6,6 +6,8 @@ Account-level IAM role for API Gateway to write logs to CloudWatch.
 **Last Updated:** N/A  
 **Template:** [templates/v2/service-role/template-service-role-api-gateway-cloudwatch.yml](../../../../templates/v2/service-role/template-service-role-api-gateway-cloudwatch.yml)
 
+> **NOTE:** This template is deprecated in favor of deploying account-wide infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
+
 ## Overview
 
 This template creates an account-level IAM role that allows API Gateway to write logs to CloudWatch Logs. This is a one-time setup required per AWS account per region to enable CloudWatch logging for API Gateway REST APIs.
