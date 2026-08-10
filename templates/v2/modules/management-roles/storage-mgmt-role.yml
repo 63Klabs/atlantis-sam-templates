@@ -2,10 +2,10 @@
 # Parent template must define parameters:
 #   Prefix, PrefixUpper, S3BucketNameOrgPrefix, ServiceRolePath, RolePath,
 #   PermissionsBoundaryArn, GroupNames, RoleNames, UserNames,
-#   S3ModuleLocation, S3ModuleNamespace, S3ArtifactsBucket
+#   S3ModuleLocation, S3ModuleNamespace, S3ArtifactsBucket, OrgPrefix
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix, HasPermissionsBoundaryArn,
-#   HasGroupNames, HasRoleNames, HasUserNames
+#   HasGroupNames, HasRoleNames, HasUserNames, HasS3ArtifactsBucketOverride
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
 #       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
@@ -234,7 +234,14 @@ Properties:
           - s3:GetObject
           - s3:GetObjectVersion
         Resource:
-          Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/${Prefix}-*"
+          Fn::If:
+            - HasS3ArtifactsBucketOverride
+            - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/${Prefix}-*"
+            - Fn::Sub:
+                - "arn:aws:s3:::${ArtifactsBucketName}/${Prefix}-*"
+                - ArtifactsBucketName:
+                    Fn::ImportValue:
+                      Fn::Sub: "${OrgPrefix}-S3-Artifacts-Bucket-Name"
 
       - Sid: S3ModuleBucketGetObject
         Effect: Allow

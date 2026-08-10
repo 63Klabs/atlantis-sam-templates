@@ -2,8 +2,8 @@
 
 Prefix-based IAM service role for deploying and managing storage infrastructure (S3, DynamoDB).
 
-**Version:** v0.0.2  
-**Last Updated:** 2026-03-29  
+**Version:** v0.0.4  
+**Last Updated:** 2026-08-10  
 **Template:** [templates/v2/service-role/template-service-role-storage.yml](../../../../templates/v2/service-role/template-service-role-storage.yml)
 
 > **NOTE:** This template is deprecated in favor of deploying prefix-based infrastructure during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
@@ -48,6 +48,7 @@ Parameters for naming and organizing the service role.
 
 - [Prefix](#prefix)
 - [PrefixUpper](#prefixupper)
+- [OrgPrefix](#orgprefix)
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [ServiceRolePath](#servicerolepath)
 - [RolePath](#rolepath)
@@ -81,6 +82,22 @@ Prefix for service role name in uppercase.
 | Constraint Description | 2 to 8 characters. UPPER case alphanumeric and dashes. |
 
 Used for service role naming. Must match the Prefix parameter but in uppercase.
+
+#### OrgPrefix
+
+Organization-level prefix (UPPER CASE) used to resolve the account-wide S3 artifacts bucket export.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$\|^$` |
+| Max Length | 20 |
+| Constraint Description | May be empty, or 2 to 20 characters. UPPER case alphanumeric and dashes. Must start with a letter and end with a letter or number. |
+
+This prefix locates the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name` produced by `account-wide-infrastructure.yml`, so you do not have to look up and paste the artifacts bucket name. It is **distinct from `PrefixUpper`** (the team/namespace prefix) and is only needed when `S3ArtifactsBucket` is left empty and the bucket name is imported from the account-wide stack. Leave it empty if you supply `S3ArtifactsBucket` directly.
+
+> **Note:** No `MinLength` is enforced so the empty default is valid. To use the export path, deploy `account-wide-infrastructure.yml` first with `EnableS3ArtifactsBucket = "true"` and a matching `OrgPrefix`. If `OrgPrefix` is empty while the import path is taken, the export name resolves to `-S3-Artifacts-Bucket-Name` and deployment fails with CloudFormation's native "No export named" error.
 
 #### S3BucketNameOrgPrefix
 
@@ -123,9 +140,10 @@ Path used for IAM roles and policies created by storage stacks. Examples: `/ws-s
 
 ### External Resources
 
-Parameters for external security policies.
+Parameters for external security policies and shared resources.
 
 - [PermissionsBoundaryArn](#permissionsboundaryarn)
+- [S3ArtifactsBucket](#s3artifactsbucket)
 
 #### PermissionsBoundaryArn
 
@@ -139,6 +157,34 @@ Optional IAM Permissions Boundary policy ARN.
 | Constraint Description | Must be empty or a valid IAM Policy ARN |
 
 Permissions Boundary is a policy attached to roles to further restrict permissions. If specified, the service role will enforce this boundary when creating new IAM roles.
+
+#### S3ArtifactsBucket
+
+**DEPRECATED.** Name of the existing shared S3 artifacts bucket used by managed stacks.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$\|^$` |
+| Max Length | 63 |
+| Constraint Description | Must be empty or a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens. |
+
+The artifacts bucket name is now derived automatically from the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name`. Supplying this parameter (a non-empty value) **overrides** the export lookup and is retained only for backward compatibility. The service role is granted `s3:GetObject` and `s3:GetObjectVersion` on keys prefixed with `${Prefix}-*` within the resolved bucket.
+
+> **Note:** This parameter is defined so the standalone template matches its underlying management-role module, which references `${S3ArtifactsBucket}`. Earlier standalone versions did not declare it; it is now added as an optional, deprecated override.
+>
+> **Encouraged usage:** Leave this empty and set `OrgPrefix` so the bucket name is imported from `account-wide-infrastructure.yml`.
+
+##### Export-Based Fallback Behavior
+
+When `S3ArtifactsBucket` is empty, the management-role module resolves the artifacts bucket via `Fn::ImportValue` of the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name`. Because CloudFormation evaluates only the selected branch:
+
+- **`S3ArtifactsBucket` non-empty (override):** The role is scoped to the supplied bucket and **no** cross-stack dependency on the account-wide export is created.
+- **`S3ArtifactsBucket` empty (import):** The role is scoped to the imported bucket, and `Fn::ImportValue` creates a **hard cross-stack dependency** that prevents deletion or modification of the export while this stack references it.
+- **`S3ArtifactsBucket` empty and export missing** (including an empty `OrgPrefix`): Deployment fails with CloudFormation's native "No export named `${OrgPrefix}-S3-Artifacts-Bucket-Name` found" error. No custom guard masks this.
+
+> **Reminder:** This standalone template is deprecated in favor of prefix-based infrastructure deployed at the account level. See the deprecation note at the top of this document.
 
 ### Resources to Attach Managed Policy To
 

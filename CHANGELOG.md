@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.39 (unreleased)
+## v0.0.39 (2026-08-10)
 
 ### Added
 - **Pipeline Modules** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Created 15 reusable pipeline modules in templates/v2/modules/pipeline/ for shared pipeline infrastructure components
@@ -60,6 +60,11 @@ The Atlantis Templates Repository is free and open source. Templates and build/d
   - Modules: storage-mgmt-role.yml - Added read-only S3 permissions scoped to module bucket and namespace
   - Modules: network-cloudfront-mgmt-policy.yml - Added read-only S3 permissions scoped to module bucket and namespace
 - **Account: prefix-based-infrastructure.yml v0.0.0** [Spec: 0-0-39-cache-data-modularization](.kiro/specs/0-0-39-cache-data-modularization/) - Added opt-in Cache-Data support via the EnableCacheData parameter, consuming the four cache-data modules through AWS::Include with conditional resources and outputs (export names preserved from template-storage-cache-data.yml)
+- **Optional Shared S3 Artifacts Bucket Name** [Spec: 0-0-39-simplify-parameters-for-account-wide](.kiro/specs/0-0-39-simplify-parameters-for-account-wide/) - Made the shared S3 artifacts bucket name optional. Added an optional `OrgPrefix` parameter and made `S3ArtifactsBucket` optional and DEPRECATED. When `S3ArtifactsBucket` is empty, the bucket name is resolved at deploy time from the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name` via Fn::ImportValue, selected by a new `HasS3ArtifactsBucketOverride` condition. Backward compatible: no parameters removed/renamed, no required parameters added, no exports changed
+  - Account: prefix-based-infrastructure.yml v0.0.2 - Added optional `OrgPrefix` parameter and made `S3ArtifactsBucket` optional and DEPRECATED
+  - Service Role: template-service-role-pipeline.yml v0.0.19 - Added optional `OrgPrefix` parameter and made `S3ArtifactsBucket` optional and DEPRECATED
+  - Service Role: template-service-role-storage.yml v0.0.4 - Added optional `OrgPrefix` parameter and made `S3ArtifactsBucket` optional and DEPRECATED
+  - Modules: pipeline-mgmt-role.yml, storage-mgmt-role.yml - Gained an Fn::If export fallback that resolves the bucket name from `${OrgPrefix}-S3-Artifacts-Bucket-Name` when `S3ArtifactsBucket` is empty
 
 ## v0.0.38 (2026-06-12)
 

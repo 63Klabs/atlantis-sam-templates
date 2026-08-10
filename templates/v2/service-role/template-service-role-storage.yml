@@ -5,7 +5,7 @@ Description: "Prefix-based IAM Role and Managed Policy for Atlantis Service Role
 # Atlantis for AWS SAM Deployments
 # Service Role Infrastructure Template 
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.3/2026-06-01
+# Version: v0.0.4/2026-08-10
 
 # Deprecation Notice: It is recommended to instead deploy prefix-based-infrastructure at the account level. 
 
@@ -34,6 +34,7 @@ Metadata:
         Parameters:
           - Prefix
           - PrefixUpper
+          - OrgPrefix
           - S3BucketNameOrgPrefix
           - ServiceRolePath
           - RolePath
@@ -42,6 +43,7 @@ Metadata:
           default: "External Resources"
         Parameters:
           - PermissionsBoundaryArn
+          - S3ArtifactsBucket
       -
         Label:
           default: "Resources to Attach Managed Policy To"
@@ -83,6 +85,13 @@ Parameters:
     MinLength: 2
     MaxLength: 8
     ConstraintDescription: "2 to 8 characters. UPPER case alphanumeric and dashes. Must start with a letter and end with a letter or number."
+  OrgPrefix:
+    Type: String
+    Description: "Organization-level prefix (UPPER CASE) used to resolve the account-wide S3 artifacts bucket export '<OrgPrefix>-S3-Artifacts-Bucket-Name' from account-wide-infrastructure. This is DISTINCT from PrefixUpper (the team/namespace prefix). Only required when S3ArtifactsBucket is left empty so the bucket name is imported from the account-wide stack. Leave empty if you supply S3ArtifactsBucket directly."
+    Default: ""
+    AllowedPattern: "^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$|^$"
+    MaxLength: 20
+    ConstraintDescription: "May be empty, or 2 to 20 characters. UPPER case alphanumeric and dashes. Must start with a letter and end with a letter or number."
   S3BucketNameOrgPrefix:
     Type: String
     Description: "By default, to enforce uniqueness, buckets include account and region in the bucket name. However, due to character limits, you can specify your own S3 prefix (like an org code). This will be used in addition to the Prefix entered above. Note that this length is shared with the recommended length of 20 characters for Resource Identifiers. So if you have a 10 character S3BucketNameOrgPrefix, you are limited to 10 characters for your bucket name identifier in your templates. Buckets are named <Prefix>-<Region>-<AccountId>-<ProjectId>-<ResourceId> or <S3OrgPrefix>-<Prefix>-<ProjectId>-<ResourceId>"
@@ -111,6 +120,13 @@ Parameters:
     Default: ""
     AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[\\w+=,.@\\-\\/]*[\\w+=,.@\\-]+$"
     ConstraintDescription: "Must be empty or a valid IAM Policy ARN in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+  S3ArtifactsBucket:
+    Type: String
+    Description: "DEPRECATED: Name of the existing S3 artifacts bucket used by managed stacks. This value is now derived automatically from the account-wide export '<OrgPrefix>-S3-Artifacts-Bucket-Name'. Supplying it here overrides the export and is retained only for backward compatibility. Encouraged usage: leave empty and set OrgPrefix so the name is imported from account-wide-infrastructure. Service roles are granted s3:GetObject and s3:GetObjectVersion on keys prefixed with <Prefix>-* within this bucket."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$|^$"
+    MaxLength: 63
+    ConstraintDescription: "Must be empty or a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens."
 
   # ---------------------------------------------------------------------------
   # Resources to Attach Managed Policy To
@@ -166,6 +182,7 @@ Conditions:
   HasGroupNames: !Not [!Equals [!Join ["", !Ref GroupNames], ""]]
   HasRoleNames: !Not [!Equals [!Join ["", !Ref RoleNames], ""]]
   HasUserNames: !Not [!Equals [!Join ["", !Ref UserNames], ""]]
+  HasS3ArtifactsBucketOverride: !Not [!Equals [!Ref S3ArtifactsBucket, ""]]
 
 # =============================================================================
 # RESOURCES

@@ -50,7 +50,7 @@ Combined prefix-based CloudFormation service roles and managed policies for pipe
 **Prerequisites:**
 - S3 bucket containing module snippets (S3ModuleLocation parameter)
 - IAM permissions to create IAM roles, managed policies, and (when Cache-Data is enabled) DynamoDB tables and S3 buckets
-- An existing S3 artifacts bucket referenced by `S3ArtifactsBucket`
+- An existing S3 artifacts bucket — resolved automatically from the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name` (set the optional `OrgPrefix` parameter), or supplied directly via the now-deprecated `S3ArtifactsBucket` override
 
 ## Common Use Cases
 

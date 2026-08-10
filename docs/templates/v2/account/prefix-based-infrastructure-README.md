@@ -2,7 +2,7 @@
 
 Combined prefix-based IAM Service Roles and Managed Policies for Pipeline and Storage management, plus optional shared Cache-Data resources — Assembled from reusable modules.
 
-**Version:** v0.0.0/2026-04-28  
+**Version:** v0.0.2/2026-08-10  
 **Template:** [templates/v2/account/prefix-based-infrastructure.yml](../../../../templates/v2/account/prefix-based-infrastructure.yml)
 
 ## Overview
@@ -22,7 +22,9 @@ Each management module creates a CloudFormation service role (assumed by `cloudf
 
 - S3 bucket containing the Atlantis module snippets (provided by 63klabs regional buckets or your own) — see `S3ModuleLocation`
 - IAM permissions to create IAM roles, managed policies, and (when Cache-Data is enabled) DynamoDB tables and S3 buckets
-- An existing S3 artifacts bucket referenced by `S3ArtifactsBucket`
+- Access to the shared S3 artifacts bucket used by managed stacks. The bucket name is resolved one of two ways:
+  - **Encouraged:** the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name`. This requires [account-wide-infrastructure](./account-wide-infrastructure-README.md) to be deployed first with `EnableS3ArtifactsBucket = "true"` and a matching `OrgPrefix`. Leave `S3ArtifactsBucket` empty and set `OrgPrefix`.
+  - **Deprecated override:** supply the bucket name directly via `S3ArtifactsBucket`. Retained for backward compatibility.
 
 ### Important Notes
 
@@ -30,7 +32,9 @@ Each management module creates a CloudFormation service role (assumed by `cloudf
 - The Cache-Data resources are **disabled by default** — set `EnableCacheData` to `"true"` to create them
 - In the Cache-Data modules, the standalone template's `${ProjectId}` token is replaced with the literal `cache-data`, yielding **one shared Cache-Data resource set per Prefix**
 - Cache-Data export names are identical to the standalone `template-storage-cache-data.yml`; the `EnableCacheData` toggle ensures only one stack owns these resources per Prefix, avoiding export-name collisions
-- This template is in development mode (v0.0.0) and is edited in place without a version bump
+- The shared artifacts bucket name is now optional. When `S3ArtifactsBucket` is left empty, the management service roles import the bucket name from the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name` at deploy time. See [Artifacts Bucket Resolution](#artifacts-bucket-resolution) below
+
+> **DEPRECATED parameter:** `S3ArtifactsBucket` is deprecated but still supported. Leave it empty and set `OrgPrefix` to use the account-wide export (the encouraged path). Supplying it continues to work as an explicit override for backward compatibility.
 
 ## Parameters
 
@@ -40,6 +44,7 @@ Parameters that define the naming convention for all resources created by this t
 
 - [Prefix](#prefix)
 - [PrefixUpper](#prefixupper)
+- [OrgPrefix](#orgprefix)
 - [S3BucketNameOrgPrefix](#s3bucketnameorgprefix)
 - [ServiceRolePath](#servicerolepath)
 - [RolePath](#rolepath)
@@ -102,6 +107,22 @@ Prefix for Service Role in all UPPER CASE. Used in exported role names.
 | Max Length | 8 |
 | Constraint Description | 2 to 8 characters. UPPER case alphanumeric and dashes. Must start with a letter and end with a letter or number. |
 
+#### OrgPrefix
+
+Organization-level prefix (UPPER CASE) used to resolve the account-wide S3 artifacts bucket export `${OrgPrefix}-S3-Artifacts-Bucket-Name` from [account-wide-infrastructure](./account-wide-infrastructure-README.md). This is **distinct from `PrefixUpper`** (the team/namespace prefix). Only required when `S3ArtifactsBucket` is left empty so the bucket name is imported from the account-wide stack. Leave empty if you supply `S3ArtifactsBucket` directly.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$\|^$` |
+| Max Length | 20 |
+| Constraint Description | May be empty, or 2 to 20 characters. UPPER case alphanumeric and dashes. Must start with a letter and end with a letter or number. |
+
+> **Distinct from `PrefixUpper`:** `OrgPrefix` names the organization-wide export owner (set on the account-wide stack), while `PrefixUpper` names the team/namespace. They are usually different values. Setting `OrgPrefix` to your team prefix by mistake will resolve to a non-existent export.
+
+> **Only used on the import path:** `OrgPrefix` is consulted only when `S3ArtifactsBucket` is empty. If both are empty, the import name resolves to `-S3-Artifacts-Bucket-Name` and deployment fails natively with a "No export named" error. See [Artifacts Bucket Resolution](#artifacts-bucket-resolution).
+
 #### S3BucketNameOrgPrefix
 
 By default, to enforce uniqueness, buckets include account and region in the bucket name. However, due to character limits, you can specify your own S3 prefix (like an org code). This is used in addition to the Prefix.
@@ -150,16 +171,17 @@ Permissions Boundary is a policy attached to a role to further restrict the perm
 
 #### S3ArtifactsBucket
 
-Name of the existing S3 artifacts bucket used by managed stacks. Service roles will be granted `s3:GetObject` and `s3:GetObjectVersion` on keys prefixed with `<Prefix>-*` within this bucket.
+**DEPRECATED:** Name of the existing S3 artifacts bucket used by managed stacks. This value is now derived automatically from the account-wide export `${OrgPrefix}-S3-Artifacts-Bucket-Name`. Supplying it here overrides the export and is retained only for backward compatibility. Encouraged usage: leave empty and set `OrgPrefix` so the name is imported from [account-wide-infrastructure](./account-wide-infrastructure-README.md). Service roles are granted `s3:GetObject` and `s3:GetObjectVersion` on keys prefixed with `<Prefix>-*` within this bucket.
 
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | None (required) |
-| Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$` |
-| Min Length | 3 |
+| Default | "" (empty) |
+| Allowed Pattern | `^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$\|^$` |
 | Max Length | 63 |
-| Constraint Description | Must be a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens. |
+| Constraint Description | Must be empty or a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens. |
+
+> **DEPRECATED / optional:** Leave this empty and set `OrgPrefix` to import the bucket name from the account-wide export (the encouraged path). When non-empty, this value overrides the export and **no dependency on the account-wide export is created**. The parameter is not removed or renamed — existing stacks that still pass it behave exactly as before.
 
 #### GroupNames
 
@@ -439,10 +461,37 @@ Managed IAM policy granting Lambda execution roles scoped access to the Cache-Da
 | HasGroupNames | GroupNames ≠ "" | Controls whether managed policies attach to IAM groups |
 | HasRoleNames | RoleNames ≠ "" | Controls whether managed policies attach to IAM roles |
 | HasUserNames | UserNames ≠ "" | Controls whether managed policies attach to IAM users |
+| HasS3ArtifactsBucketOverride | S3ArtifactsBucket ≠ "" | Selects the explicit `S3ArtifactsBucket` override over the account-wide export in the management-role modules |
 | CreateCacheData | EnableCacheData = "true" | Gates creation of all four Cache-Data resources |
 | CreateCacheDataManagedPolicy | And(CreateCacheData, CreateManagedCacheDataLambdaExecutionRolePolicy = "TRUE") | Gates creation of the Cache-Data managed Lambda execution policy |
 
 > **One condition per resource:** CloudFormation allows a single `Condition` per resource. The managed policy therefore uses the combined `CreateCacheDataManagedPolicy` condition rather than nesting two conditions.
+
+## Artifacts Bucket Resolution
+
+The pipeline and storage management service roles grant `s3:GetObject` and `s3:GetObjectVersion` on keys prefixed with `<Prefix>-*` inside the shared artifacts bucket. The bucket name is resolved at deploy time inside the management-role modules (`pipeline-mgmt-role.yml`, `storage-mgmt-role.yml`) using the `HasS3ArtifactsBucketOverride` condition:
+
+| `S3ArtifactsBucket` | Resolution | Cross-stack dependency |
+|---------------------|------------|------------------------|
+| Non-empty (override) | `arn:aws:s3:::${S3ArtifactsBucket}/${Prefix}-*` — the value you supply is used directly | None. The account-wide export is **not** referenced. |
+| Empty (export path) | Bucket name imported via `Fn::ImportValue` of `${OrgPrefix}-S3-Artifacts-Bucket-Name`, producing `arn:aws:s3:::<imported-bucket>/${Prefix}-*` | Hard dependency on the account-wide export. |
+
+### Using the account-wide export (encouraged)
+
+To use the export path, leave `S3ArtifactsBucket` empty and set `OrgPrefix`. The [account-wide-infrastructure](./account-wide-infrastructure-README.md) stack must be **deployed first** with:
+
+- `EnableS3ArtifactsBucket = "true"` — so the shared artifacts bucket and its export are created
+- an `OrgPrefix` that **matches** the `OrgPrefix` you pass here — so the export name `${OrgPrefix}-S3-Artifacts-Bucket-Name` resolves
+
+> **Deploy order matters:** The account-wide stack must exist with the export in place before you deploy (or update) this stack on the export path. If the export does not yet exist, deployment fails (see below).
+
+### Cross-stack dependency (`Fn::ImportValue`)
+
+> **Hard cross-stack link:** On the export path, `Fn::ImportValue` creates a hard dependency between this stack and the account-wide stack. While this stack references the export, CloudFormation **prevents deletion or modification** of the `${OrgPrefix}-S3-Artifacts-Bucket-Name` export in the account-wide stack. To remove or change the export, first remove the dependency (delete this stack or switch it to the `S3ArtifactsBucket` override). Supplying `S3ArtifactsBucket` avoids creating this link entirely.
+
+### Failure mode: "No export named ... found"
+
+> **Fail-fast, no custom guard:** When `S3ArtifactsBucket` is empty and the export does not exist, deployment fails natively with CloudFormation's error `No export named ${OrgPrefix}-S3-Artifacts-Bucket-Name found`. This also happens in the degenerate case where `OrgPrefix` is also empty — the import name resolves to `-S3-Artifacts-Bucket-Name`, which will not exist. No custom validation masks this; the native error tells you the account-wide stack (with a matching `OrgPrefix`) has not been deployed with `EnableS3ArtifactsBucket = "true"`.
 
 ## Outputs
 
@@ -587,7 +636,19 @@ Managed policy ARN for Lambda execution roles to access the Cache-Data resources
 
 ## Examples
 
-### Management Roles Only (No Cache-Data)
+### Management Roles Only, Artifacts Bucket From Account-Wide Export (Encouraged)
+
+```
+Prefix: acme
+PrefixUpper: ACME
+OrgPrefix: ACMECORP
+S3ModuleLocation: 63klabs-atlas-us-east-1
+S3ModuleNamespace: atlantis
+```
+
+`S3ArtifactsBucket` is left empty, so the management roles import the bucket name from the account-wide export `ACMECORP-S3-Artifacts-Bucket-Name`. Requires [account-wide-infrastructure](./account-wide-infrastructure-README.md) deployed with `EnableS3ArtifactsBucket = "true"` and `OrgPrefix: ACMECORP`. Cache-Data resources are not created (`EnableCacheData` defaults to `false`).
+
+### Management Roles Only, Explicit Artifacts Bucket (Deprecated Override)
 
 ```
 Prefix: acme
@@ -597,7 +658,7 @@ S3ModuleLocation: 63klabs-atlas-us-east-1
 S3ModuleNamespace: atlantis
 ```
 
-Cache-Data resources are not created (`EnableCacheData` defaults to `false`).
+`S3ArtifactsBucket` is supplied directly (the deprecated override path), so no dependency on the account-wide export is created. `OrgPrefix` is not needed here. Cache-Data resources are not created (`EnableCacheData` defaults to `false`).
 
 ### With Shared Cache-Data Enabled
 
@@ -654,6 +715,19 @@ Creates the Cache-Data DynamoDB table, S3 bucket, and bucket policy without the 
 
 - Confirm `EnableCacheData` is set to `"true"`
 - The managed Lambda execution policy additionally requires `CreateManagedCacheDataLambdaExecutionRolePolicy` to be `TRUE`
+
+### "No export named `<OrgPrefix>-S3-Artifacts-Bucket-Name` found"
+
+- This occurs on the export path (when `S3ArtifactsBucket` is empty) and means the account-wide export could not be resolved
+- Deploy [account-wide-infrastructure](./account-wide-infrastructure-README.md) first with `EnableS3ArtifactsBucket = "true"` and an `OrgPrefix` that matches the `OrgPrefix` passed here
+- Verify `OrgPrefix` is not empty — an empty `OrgPrefix` resolves the import name to `-S3-Artifacts-Bucket-Name`, which will not exist
+- Confirm both stacks are in the **same region** (exports are region-scoped)
+- Alternatively, supply `S3ArtifactsBucket` directly to bypass the export lookup
+
+### Cannot Delete or Update the Account-Wide Artifacts Export
+
+- `Fn::ImportValue` creates a hard cross-stack dependency; the account-wide export cannot be removed or changed while this stack references it
+- Delete this stack, or switch it to the `S3ArtifactsBucket` override (which removes the import), before modifying the export
 
 ## Additional Resources
 
