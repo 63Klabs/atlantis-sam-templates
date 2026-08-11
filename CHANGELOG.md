@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.39 (2026-08-10)
+## v0.0.39 (2026-08-11)
 
 ### Added
 - **Pipeline Modules** [Spec: 0-0-39-pipeline-module-extraction](.kiro/specs/0-0-39-pipeline-module-extraction/) - Created 15 reusable pipeline modules in templates/v2/modules/pipeline/ for shared pipeline infrastructure components
