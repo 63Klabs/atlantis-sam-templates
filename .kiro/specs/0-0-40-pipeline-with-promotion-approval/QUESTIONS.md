@@ -20,15 +20,15 @@ Please focus first on the items marked **[BLOCKER]** — those change the shape 
 
 These findings ground the recommendations below. Correct me anywhere I misread the intent.
 
-1. **Pipelines are plain CloudFormation, not SAM.** All three pipeline templates (`template-pipeline.yml`, `template-pipeline-github.yml`, `template-pipeline-build-only.yml`) declare a single inline `AWS::CodePipeline::Pipeline` resource named `ProjectPipeline`. Only the supporting resources (roles, CodeBuild projects, log groups, event rules, SNS notification set) are pulled in as modules via `Fn::Transform: AWS::Include`. The pipeline **stages themselves are written inline**, not as modules.
+1. **Pipelines are plain CloudFormation, not SAM.** All three pipeline templates (`template-pipeline.yml`, `template-pipeline-github.yml`, `template-pipeline-build-only.yml`) declare a single inline `AWS::CodePipeline::Pipeline` resource named `ProjectPipeline`. Only the supporting resources (roles, CodeBuild projects, log groups, event rules, SNS notification set) are pulled in as modules via `Fn::Transform: AWS::Include`. The pipeline **stages themselves are written inline**, not as modules. **Answer:** Correct
 2. **Stage insertion already has a pattern.** The optional PostDeploy stage is inserted with `!If [IsPostDeployEnabled, {stage...}, !Ref 'AWS::NoValue']`. New Approval/Promote stages can follow the exact same conditional-inclusion pattern.
-3. **No manual approval exists anywhere today.** There are no `Provider: Manual` actions. This feature introduces the first ones.
-4. **No S3 source trigger exists.** `source-event-rule.yml` is CodeCommit-only (EventBridge on `aws.codecommit`). GitHub uses CodeConnections. An S3-object-arrival trigger is entirely new.
-5. **`StageId` and `DeployEnvironment` are decoupled and only `DEV` is hard-coded.** The single environment conditional is `IsNotDevelopment: !Not [!Equals [!Ref DeployEnvironment, "DEV"]]`. There is **no** `StageId → DeployEnvironment` mapping table. `"TEST"` / `"PROD"` literals do not appear in conditionals. This is good news for §13 (parameterized stages).
-6. **Naming convention** is `${Prefix}-${ProjectId}-${StageId}-<ResourceId>`; worker IAM roles use a `-Worker-` infix (e.g. `${Prefix}-Worker-${ProjectId}-${StageId}-CodePipelineServiceRole`). Pipeline artifacts drop the Prefix (`${ProjectId}-${StageId}-SourceArtifact`). 
-7. **Artifact buckets use SSE-S3 (AES256), not KMS.** This materially simplifies cross-account access (no KMS key-policy sharing needed).
-8. **The account-wide artifacts bucket is the natural promotion bucket.** `modules/account-wide/s3-artifacts-bucket.yml` + `-bucket-policy.yml` create a shared, account-regional bucket (`[org-]cf-artifacts-<acct>-<region>-an`) whose policy today only grants same-account `*-CodePipelineServiceRole` / `*-CodeBuildServiceRole` / `*-CloudFormationSvcRole`. Lifecycle: 395-day expiration, 30-day noncurrent version expiration.
-9. **Deployment permissions come from `prefix-based-infrastructure.yml`** via the `pipeline-mgmt-role.yml` module (the CloudFormation service role that deploys pipeline stacks). It is account- and prefix-scoped (`${Prefix}-*`) and already grants `events:*`, `codebuild:*`, `codepipeline:*`, `sns:*`, and worker-role `iam:*` on `${Prefix}-Worker-*`.
+3. **No manual approval exists anywhere today.** There are no `Provider: Manual` actions. This feature introduces the first ones. **Answer:** Correct
+4. **No S3 source trigger exists.** `source-event-rule.yml` is CodeCommit-only (EventBridge on `aws.codecommit`). GitHub uses CodeConnections. An S3-object-arrival trigger is entirely new. **Answer:** Correct
+5. **`StageId` and `DeployEnvironment` are decoupled and only `DEV` is hard-coded.** The single environment conditional is `IsNotDevelopment: !Not [!Equals [!Ref DeployEnvironment, "DEV"]]`. There is **no** `StageId → DeployEnvironment` mapping table. `"TEST"` / `"PROD"` literals do not appear in conditionals. This is good news for §13 (parameterized stages).  **Answer:** Correct
+6. **Naming convention** is `${Prefix}-${ProjectId}-${StageId}-<ResourceId>`; worker IAM roles use a `-Worker-` infix (e.g. `${Prefix}-Worker-${ProjectId}-${StageId}-CodePipelineServiceRole`). Pipeline artifacts drop the Prefix (`${ProjectId}-${StageId}-SourceArtifact`). **Answer:** Correct but I am concerned that the Pipeline artifact drops the prefix. Does this pose an issue as we promote? If it is okay and doesn't break anything if we fix this we should use `${Prefix}-${ProjectId}-${StageId}-SourceArtifact`
+7. **Artifact buckets use SSE-S3 (AES256), not KMS.** This materially simplifies cross-account access (no KMS key-policy sharing needed). **Answer:** Correct
+8. **The account-wide artifacts bucket is the natural promotion bucket.** `modules/account-wide/s3-artifacts-bucket.yml` + `-bucket-policy.yml` create a shared, account-regional bucket (`[org-]cf-artifacts-<acct>-<region>-an`) whose policy today only grants same-account `*-CodePipelineServiceRole` / `*-CodeBuildServiceRole` / `*-CloudFormationSvcRole`. Lifecycle: 395-day expiration, 30-day noncurrent version expiration. **Answer:** Correct
+9. **Deployment permissions come from `prefix-based-infrastructure.yml`** via the `pipeline-mgmt-role.yml` module (the CloudFormation service role that deploys pipeline stacks). It is account- and prefix-scoped (`${Prefix}-*`) and already grants `events:*`, `codebuild:*`, `codepipeline:*`, `sns:*`, and worker-role `iam:*` on `${Prefix}-Worker-*`. **Answer:** Correct
 
 ### Current versions (for the version-control plan)
 
@@ -69,8 +69,8 @@ That leaves us with a design choice. My analysis of the options:
 
 **My recommendation: Option A.** It satisfies "promote the commit," "identical build behavior," and "trivial rollback" with the least new machinery, and it reuses the existing account-wide artifacts bucket + EventBridge patterns already in the repo. The manifest still provides the full audit record §10 requires.
 
-- **Q1a:** Do you accept Option A, or do you require the literal SHA-keyed-archive-as-source behavior (Option B/C)?
-- **Q1b:** If Option A: is bucket **versioning** (already enabled) an acceptable mechanism for per-SHA history/rollback, given the 395-day lifecycle window? Or do we also need to keep the immutable per-SHA copy (`.../<sha>/source.zip`) in addition to the stable trigger key?
+- **Q1a:** Do you accept Option A, or do you require the literal SHA-keyed-archive-as-source behavior (Option B/C)? **Answer:** Use Option A
+- **Q1b:** If Option A: is bucket **versioning** (already enabled) an acceptable mechanism for per-SHA history/rollback, given the 395-day lifecycle window? Or do we also need to keep the immutable per-SHA copy (`.../<sha>/source.zip`) in addition to the stable trigger key? **Answer:** Bucket versioning is acceptable. we do not need to keep the immutable per-SHA copy
 
 ---
 
@@ -79,7 +79,7 @@ That leaves us with a design choice. My analysis of the options:
 **[BLOCKER] Q2 — S3 event detection method.**
 CodePipeline S3 sources detect changes via **EventBridge** (recommended, requires an `AWS::Events::Rule` and, for S3, either EventBridge notifications enabled on the bucket or a CloudTrail data event). The account-wide artifacts bucket does **not** currently enable EventBridge notifications.
 - **Recommendation:** Add an optional `EventBridgeConfiguration` (or notification config) to the account-wide artifacts bucket module, gated behind a new opt-in parameter so existing deployments are unaffected. Trigger via a new `modules/pipeline/promotion-source-event-rule.yml` + service role, mirroring the existing `source-event-rule.yml`/`source-event-service-role.yml` pair.
-- **Q2a:** OK to enable EventBridge notifications on the account-wide artifacts bucket (opt-in), rather than per-object S3 notification configurations or CloudTrail?
+- **Q2a:** OK to enable EventBridge notifications on the account-wide artifacts bucket (opt-in), rather than per-object S3 notification configurations or CloudTrail? **Answer:** Yes, enable EventBridge on the account-wide artifacts.
 
 **Q3 — Trigger key / object-key convention.**
 For Option A I propose the watched key:
@@ -88,12 +88,12 @@ promotions/<prefix>-<projectId>/<targetStageId>/source.zip
 promotions/<prefix>-<projectId>/<targetStageId>/promote.json   (manifest, audit)
 ```
 Both the sending pipeline and receiving pipeline can compute this from their own parameters (target stage on the sender, own stage on the receiver).
-- **Q3a:** Does this key convention work for you, and should it include the `S3BucketNameOrgPrefix` / region anywhere, or is the bucket name itself sufficient scoping?
-- **Q3b:** The preliminary example used the reverse (`{prefix}-{project}/{sha}/...`). Confirm we're moving the SHA out of the trigger key (per Q1) and into the manifest + object version.
+- **Q3a:** Does this key convention work for you, and should it include the `S3BucketNameOrgPrefix` / region anywhere, or is the bucket name itself sufficient scoping? **Answer:** The bucket name is sufficient for scoping
+- **Q3b:** The preliminary example used the reverse (`{prefix}-{project}/{sha}/...`). Confirm we're moving the SHA out of the trigger key (per Q1) and into the manifest + object version. **Answer:** Yes we are moving sha out of the trigger key
 
 **Q4 — Same Prefix/ProjectId across accounts?**
 Promotion assumes the receiving pipeline is `${Prefix}-${ProjectId}-${TargetStageId}-Pipeline` and that the key convention is derivable on both sides. This requires **`Prefix` and `ProjectId` to be identical in the sending and receiving accounts** (only `StageId`/account differ).
-- **Q4a:** Confirm Prefix + ProjectId are always identical across the promotion path. If not, we need explicit target-naming parameters on the sender.
+- **Q4a:** Confirm Prefix + ProjectId are always identical across the promotion path. If not, we need explicit target-naming parameters on the sender. **Answer:** Yes they are always identical across accounts
 
 ---
 
@@ -102,18 +102,18 @@ Promotion assumes the receiving pipeline is `${Prefix}-${ProjectId}-${TargetStag
 **Q5 — What does "SHA hashing" mean here, concretely?**
 My reading: we simply capture the resolved source commit ID rather than compute a new hash. In CodeBuild the resolved commit is available as `CODEBUILD_RESOLVED_SOURCE_VERSION`; CodePipeline also exposes source revision metadata.
 - **Recommendation:** Use the resolved commit SHA as the promotion identifier. Store the **full 40-char SHA** in the manifest and object metadata for uniqueness; display the **short 7-char** form in notifications.
-- **Q5a:** Is "resolved source commit SHA" the correct interpretation, or did you intend an independently computed content hash of the archive (e.g. to dedupe identical trees across commits)?
-- **Q5b:** For the GitHub pipeline, the CodeConnections source revision is likewise a commit SHA — treat identically?
+- **Q5a:** Is "resolved source commit SHA" the correct interpretation, or did you intend an independently computed content hash of the archive (e.g. to dedupe identical trees across commits)? **Answer:** Commit sha is sufficient
+- **Q5b:** For the GitHub pipeline, the CodeConnections source revision is likewise a commit SHA — treat identically? **Answer:** Yes, treat identically
 
 **Q6 — How is `source.zip` produced in the Promote stage?**
 The CodePipeline **SourceArtifact is already a zip of the repo at the built commit**. The Promote CodeBuild action receives it as an input artifact, so it can simply re-upload that artifact to the cross-account bucket without re-cloning.
 - **Recommendation:** Reuse the existing SourceArtifact as the promotion `source.zip` (no `git archive`, no `codecommit:GitPull`). This also sidesteps the confusing §8.1 line about "`s3:GetObject` on the source CodeCommit repository."
-- **Q6a:** Acceptable to promote the pipeline's SourceArtifact directly? (If you specifically need a clean `git archive` — e.g. to exclude CI artifacts or include submodules — say so, as that changes the Promote stage's permissions and logic.)
+- **Q6a:** Acceptable to promote the pipeline's SourceArtifact directly? (If you specifically need a clean `git archive` — e.g. to exclude CI artifacts or include submodules — say so, as that changes the Promote stage's permissions and logic.) **Answer:** Yes, reuse the existing SourceArtifact
 
 **Q7 — Where does the Promote logic (buildspec) live?**
 Existing app buildspecs live in the app repo. Promotion is framework-level plumbing that should not require every app team to add a buildspec.
 - **Recommendation:** Provide the promote logic as an **inline `BuildSpec` string** inside the Promote CodeBuild project module (so nothing is required in the app repo). App-repo override optional but not required.
-- **Q7a:** Agree with inline framework-owned buildspec for Promote (and for the receiving-side "release" if any)? Or must it be overridable per project like the other buildspecs?
+- **Q7a:** Agree with inline framework-owned buildspec for Promote (and for the receiving-side "release" if any)? Or must it be overridable per project like the other buildspecs? **Answer:** I agree with inline and we do not want to provide an app-repo override
 
 ---
 
@@ -128,24 +128,24 @@ Combining §6, §7, and §12, I read the model as **two independent, optional ap
 | Promoted-artifact (new template, e.g. `beta`) | S3 | ✓ | ✓ | opt | **opt (new)** | **opt (new)** | **opt (new)** |
 | Promoted-artifact (new template, `prod`) | S3 | ✓ | ✓ | opt | – | – | **opt (new)** |
 
-- **Q8a:** Is that the correct matrix? Specifically, are **both** the "Approve-to-Promote" gate (§7, before Promote) and the "Approve-Release" gate (§12, after Source, before Build) present and **independently toggleable** on the new template?
-- **Q8b:** For the origin templates, the Promote/Approve stages come **after** Deploy/PostDeploy. Confirm ordering: `... → PostDeploy → Approve-to-Promote → Promote`.
+- **Q8a:** Is that the correct matrix? Specifically, are **both** the "Approve-to-Promote" gate (§7, before Promote) and the "Approve-Release" gate (§12, after Source, before Build) present and **independently toggleable** on the new template? **Answer:** Yes, both are available and independently toggleable. 
+- **Q8b:** For the origin templates, the Promote/Approve stages come **after** Deploy/PostDeploy. Confirm ordering: `... → PostDeploy → Approve-to-Promote → Promote`. **Answer:** Yes, that is the correct order
 
 **Q9 — Does `template-pipeline-build-only.yml` participate?**
 §6.1 lists all three existing templates, but build-only has **no Deploy/PostDeploy stage** — there is nothing validated to gate on. Promoting an unbuilt/undeployed commit is unusual.
 - **Recommendation:** Add Promote/Approve only to `template-pipeline.yml` and `template-pipeline-github.yml`; **exclude** build-only (or treat "promote after build" as a distinct, explicitly-requested case).
-- **Q9a:** Exclude build-only, or is there a real use case for promoting straight after a build with no deploy?
+- **Q9a:** Exclude build-only, or is there a real use case for promoting straight after a build with no deploy? **Answer:** Yes there is a use case as the Build Only is for CDK, Python Scripts, and CLI commands (copy to S3) which may not need a deploy stage (since there is no deploy, any Post Deploy can take place in the same CodeBuild container). Include build-only pipeline
 
 **Q10 — Approval notifications.**
 §7 wants project/prefix/stage/SHA/execution-id/link in the approval notice; §Q3(answered) chose CodePipeline native email. CodePipeline Manual Approval actions publish to an **SNS topic**, and the repo already has `PipelineNotificationTopic` + email subscription.
 - **Recommendation:** Reuse the existing `PipelineNotificationTopic` for approval notifications (single email list per pipeline). The approval action's custom message can carry the required fields; the SHA comes from the source revision.
-- **Q10a:** Reuse the existing notification topic/email, or do approvers need a **separate** SNS topic / distinct email list from the build-failure notifications?
-- **Q10b:** CodePipeline native approvals don't natively deep-link to a specific commit diff; a console link to the execution is the standard. Is the execution link sufficient, or do you want a constructed CodeCommit/GitHub compare URL in the message?
+- **Q10a:** Reuse the existing notification topic/email, or do approvers need a **separate** SNS topic / distinct email list from the build-failure notifications? **Answer:** Reuse existing notification email
+- **Q10b:** CodePipeline native approvals don't natively deep-link to a specific commit diff; a console link to the execution is the standard. Is the execution link sufficient, or do you want a constructed CodeCommit/GitHub compare URL in the message? **Answer:** Execution link is sufficient.
 
 **Q11 — Same-account ("versatile", §13) differences.**
 For a single account holding DEV/TEST/PROD, the mechanism is identical except no cross-account principals are needed.
 - **Recommendation:** Drive cross-account behavior purely from parameters (target account ID; when target account == current account, skip cross-account grants). No separate template.
-- **Q11a:** Confirm one template covers both cross-account and same-account by parameterization (no `-cross-account` vs `-same-account` variants).
+- **Q11a:** Confirm one template covers both cross-account and same-account by parameterization (no `-cross-account` vs `-same-account` variants). **Answer:** Yes, one template covers both (you could even have it if there is no target account provided as a parameter, keep it in the same account)
 
 ---
 
@@ -154,19 +154,19 @@ For a single account holding DEV/TEST/PROD, the mechanism is identical except no
 **Q12 — Per-account model & the receiving bucket policy.**
 Per your §15 answers, the receiving account owns the promotion bucket (its account-wide artifacts bucket), and the sender writes cross-account into it.
 - **Recommendation:** Add an **optional** parameter to `account-wide-infrastructure.yml` / the `s3-artifacts-bucket-policy.yml` module, e.g. `PromotionSourceAccountId` (or a list), that appends a policy statement allowing that account's `*-CodeBuildServiceRole` (or `*-CodePipelineServiceRole`) to `s3:PutObject` (and read-back) **only under the `promotions/*` prefix**. Default empty = no cross-account access = fully backward compatible.
-- **Q12a:** Scope the grant to a **specific role ARN pattern** in the sending account (`arn:aws:iam::<sendAcct>:role<RolePath>*-CodeBuildServiceRole`), or to the sending **account root** (simpler, broader)? I recommend the role-pattern scoping.
-- **Q12b:** Restrict the cross-account write to the `promotions/*` key prefix (recommended), or the whole bucket?
-- **Q12c:** Single sending account per bucket (§Q1-answered "per-account") or should the parameter accept a **list** of source accounts?
-- **Q12d:** Should the sender also need cross-account **read** (e.g. to check for an existing archive), or is write-only sufficient?
+- **Q12a:** Scope the grant to a **specific role ARN pattern** in the sending account (`arn:aws:iam::<sendAcct>:role<RolePath>*-CodeBuildServiceRole`), or to the sending **account root** (simpler, broader)? I recommend the role-pattern scoping. **Answer** Scope to the role pattern. I think this receives it's own Service Role though, doesn't CodeBuildServiceRole and PostDeployServiceRole get their own? I don't want the codebuild stages to submit artifacts, only the promote stage. 
+- **Q12b:** Restrict the cross-account write to the `promotions/*` key prefix (recommended), or the whole bucket? **Answer:** Yes, restrict to promotions/*
+- **Q12c:** Single sending account per bucket (§Q1-answered "per-account") or should the parameter accept a **list** of source accounts? **Answer:** I would prefer a list **but** is there a consistent way to iterate over a list in an IAM policy definition in CloudFormation? I've had issues in the past. Otherwise a single account is fine.
+- **Q12d:** Should the sender also need cross-account **read** (e.g. to check for an existing archive), or is write-only sufficient? **Answer:** Read should be allowed as long as it is scoped.
 
 **Q13 — Retention / rollback window.**
 §Q2(answered) reuses the existing lifecycle (395-day object expiration, 30-day noncurrent). Under Option A, rollback depends on **noncurrent versions** of the stable key — currently expired after **30 days**.
-- **[Potential conflict] Q13a:** A 30-day noncurrent-version expiry gives only a ~30-day rollback window for prior SHAs via versioning. Is that acceptable, or should the promotion prefix have a **longer noncurrent-version retention** (e.g. keep last N versions / 395 days)? This may warrant a dedicated lifecycle rule on `promotions/*`.
+- **[Potential conflict] Q13a:** A 30-day noncurrent-version expiry gives only a ~30-day rollback window for prior SHAs via versioning. Is that acceptable, or should the promotion prefix have a **longer noncurrent-version retention** (e.g. keep last N versions / 395 days)? This may warrant a dedicated lifecycle rule on `promotions/*`. **Answer:** since we are using promotions/ use a separate lifecycle policy
 
 **Q14 — Cross-region.**
 `AWS::Include` modules must load from a same-region bucket, but promotion could target another region.
 - **Recommendation:** Scope v1 to **same-region** promotion; expose a `TargetRegion` param but validate/require it equals the current region for now.
-- **Q14a:** Is same-region-only acceptable for the initial release?
+- **Q14a:** Is same-region-only acceptable for the initial release? **Answer:** we can use TargetRegion with a default value of "" which will then just have a conditional to use the current region. Each pipeline is in its own region, so the receiving bucket will be serviced by a pipeline that uses the correct region for the includes.
 
 ---
 
