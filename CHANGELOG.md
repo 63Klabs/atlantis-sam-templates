@@ -10,7 +10,7 @@ Released versions are freely available for your use from the public S3 bucket `6
 - `63klabs-fabric-us-west-1`
 - `63klabs-orbit-us-west-2`
 
-When deploying to other regions you may need to [self-host under certain deployment scenerios](https://github.com/63Klabs/atlantis-platform-admin).
+When deploying to other regions you may need to [self-host under certain deployment scenarios](https://github.com/63Klabs/atlantis-platform-admin).
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
