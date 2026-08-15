@@ -24,7 +24,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 - **Trigger model (Option A):** The Promote stage writes `source.zip` to a **stable, per-target key** the downstream pipeline watches. Because the account-wide bucket is versioned, overwriting that key fires an EventBridge event that starts the receiving pipeline, whose S3 Source action emits `source.zip` as its SourceArtifact. The build then behaves identically to a normal build. The commit SHA is carried in the **audit manifest and S3 object version**, not in the object key. Rollback is achieved by re-writing a prior archive to the stable key (via bucket versioning).
 - **Manifest:** `promote.json` is **write-only audit** — nothing reads it at runtime. One rolling file per target key; history preserved by S3 versioning.
 - **Per-account buckets:** The receiving account owns the promotion bucket (its account-wide artifacts bucket), the receiving pipeline, all worker roles, and the CloudFormation service role. The sender writes cross-account into the receiver's bucket under `promotions/*`.
-- **Same-region for v1.** `PromoteTargetRegion` is exposed but defaults to the current region.
+- **Cross-region capable.** `PromoteTargetRegion` selects the target region (defaults to the current region). The only cross-region operation is the sender's S3 write into the receiving-region bucket; the receiving pipeline, its S3 source, and the EventBridge trigger live entirely in the target region.
 
 ### Templates and Modules Affected
 
@@ -188,8 +188,8 @@ The design is additive and backward compatible: all new behavior is disabled by 
 1. The system SHALL add these parameters to the sending templates (and to the new template for chained promotion): `PromoteTargetStageId`, `PromoteTargetAccountId`, `PromoteTargetRegion`, `PromoteTargetBucket`, `PromoteApprovalRequired`.
 2. The system SHALL NOT add a `PromoteTargetDeployEnvironment` parameter; the receiving stack's own `DeployEnvironment` is authoritative, and `target_deploy_env` SHALL be omitted from the manifest.
 3. WHERE `PromoteTargetAccountId` is empty, the system SHALL treat the promotion as same-account (target account = current account).
-4. WHERE `PromoteTargetRegion` is empty, the system SHALL use the current region.
-5. WHERE `PromoteTargetBucket` is empty, the system SHALL derive the bucket name as `<S3BucketNameOrgPrefix->cf-artifacts-<PromoteTargetAccountId>-<PromoteTargetRegion>-an`, using the current template's `S3BucketNameOrgPrefix` and the resolved target account/region.
+4. WHERE `PromoteTargetRegion` is empty, the system SHALL use the current region; WHERE non-empty, the system SHALL target the specified region (enabling cross-region promotion).
+5. WHERE `PromoteTargetBucket` is empty, the system SHALL derive the bucket name as `<S3BucketNameOrgPrefix->cf-artifacts-<PromoteTargetAccountId>-<PromoteTargetRegion>-an`, using the current template's `S3BucketNameOrgPrefix` (identical across accounts per Assumption 1) and the resolved target account/region.
 6. The promotion parameters SHALL be grouped in an `AWS::CloudFormation::Interface` metadata group positioned after the Post Deploy parameter group.
 7. Promotion SHALL assume identical `Prefix` and `ProjectId` across the sending and receiving accounts; the sender's `PromoteTargetStageId` SHALL equal the receiver's `StageId`.
 
@@ -240,7 +240,8 @@ The design is additive and backward compatible: all new behavior is disabled by 
    3. Pipelines matching either condition.
 3. The commands SHALL detect state by inspecting deployed pipeline structure via `aws codepipeline list-pipelines` and `aws codepipeline get-pipeline` (detection method A), keying on the presence/absence of the named `Manual` approval actions.
 4. Command 1 SHALL flag only pipelines that actually contain a Promote stage; pipelines that do not promote SHALL NOT be flagged.
-5. The commands SHALL restrict matches to Atlantis pipelines (via naming convention and/or an identifying marker) to avoid false positives from unrelated pipelines.
+5. The commands SHALL restrict matches to Atlantis pipelines by filtering on the resource tag `Atlantis=pipeline-infrastructure` (applied to all deployed Atlantis pipelines via stack-tag propagation), to avoid false positives from unrelated pipelines.
+6. The design SHALL confirm the `Atlantis=pipeline-infrastructure` tag is queryable on deployed pipelines (e.g., via `aws codepipeline list-tags-for-resource` or the Resource Groups Tagging API) and use that mechanism to enumerate candidate pipelines.
 
 ### Requirement 15: Modularity and non-breaking composition
 
@@ -308,7 +309,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 1. **Backward compatibility:** With all promotion parameters at defaults, existing pipelines SHALL deploy and behave exactly as before this feature.
 2. **Least privilege:** All new IAM permissions SHALL be scoped by action, resource ARN (naming convention), and (for cross-account) the `promotions/*` prefix and `*-PromoteServiceRole` principal pattern. No AWS managed full-access policies SHALL be used.
 3. **Encryption:** The design SHALL preserve the existing SSE-S3 (AES256) encryption on the artifacts bucket; no KMS key sharing SHALL be introduced.
-4. **Region:** v1 SHALL support same-region promotion only; `PromoteTargetRegion` is exposed but the current release requires it to resolve to the current region.
+4. **Region:** Promotion SHALL support both same-region and cross-region targets. WHERE `PromoteTargetRegion` is non-empty, the system SHALL target that region; WHERE empty, it SHALL use the current region. Cross-region requires no additional components because the only region boundary is the sender's S3 write into the receiving-region bucket; the receiving pipeline, its S3 source, and the EventBridge trigger are wholly within the target region. The design SHALL confirm cross-region S3 writes (sender → receiving-region bucket) and same-region EventBridge delivery behave as expected.
 5. **Naming conventions:** All resources SHALL follow `${Prefix}-${ProjectId}-${StageId}-<ResourceId>` and worker roles the `-Worker-` infix, per repository standards.
 6. **Parameterized stages:** No stage identifiers SHALL be hard-coded in conditionals; DEV/TEST/PROD remain the only environment classifications, and promotion targets SHALL be driven by parameters.
 7. **Module authoring:** All new/modified modules SHALL use long-form intrinsic functions and omit logical IDs, per module standards.
@@ -318,7 +319,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 ## 4. Out of Scope
 
 1. Renaming existing pipeline artifact names to include the `Prefix` (tracked separately; excluded per R6a).
-2. Cross-region promotion (beyond exposing `PromoteTargetRegion`).
+2. Automatic provisioning of the receiving-region account-wide bucket or module bucket (operators must ensure the regional prerequisites exist in the target region for cross-region promotion).
 3. A Lambda-based trigger or manifest-driven runtime configuration (Options B/C were rejected in favor of Option A).
 4. Automated cross-account integration testing in CI (documented manual procedure instead).
 5. External/automated audit processing of the manifest (may be added by a future external process; the manifest is write-only audit here).
@@ -329,7 +330,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 
 ## 5. Assumptions
 
-1. `Prefix` and `ProjectId` are identical across the sending and receiving accounts for a given project.
+1. `Prefix`, `ProjectId`, and `S3BucketNameOrgPrefix` are identical across the sending and receiving accounts for a given project.
 2. The receiving account's account-wide artifacts bucket exists (deployed via `account-wide-infrastructure.yml`) and is versioned.
 3. The receiving account hosts the promoted-artifact pipeline, its worker roles, and its CloudFormation service role.
 4. Operators deploy these pipelines via the Atlantis `config.py`/`deploy.py` scripts (template instantiation itself is out of scope).
