@@ -183,13 +183,19 @@ Pending your answers, I expect these **new, optional, default-off** parameters (
 - `PromoteTargetBucket` — receiving artifacts bucket name (or derive from a target OrgPrefix export? see Q15).
 - `PromoteTargetRegion` (default = current region).
 
+**CLARIFICATION** Some enablements should speak for themselves. Promote approval and Promote Stage are inclusive. They go together. They should also be under a meta data group after Post Deploy options. I recommend:
+- `PromoteTargetStageId` — receiving `StageId`. (a non empty string should enable approval and promote)
+- `PromoteTargetAccountId` (empty ⇒ same-account promotion).
+- `PromoteTargetRegion` (empty ⇒ current region).
+- `PromoteTargetBucket` — receiving artifacts bucket name as an override to creating the bucket name from <S3BucketNameOrgPrefix>-cf-artifacts-<TargetAccountId>-<TargetRegion>-an (use current template's S3BucketNameOrgPrefix)
+
 **On the new promoted-artifact template (adds, beyond the standard set):**
 - `ReleaseApprovalEnabled` (`true`/`false`, default `false`) — the §12 receiving gate.
-- Source-object convention params (or derived from Prefix/ProjectId/StageId per Q3).
-- Plus its own `PromoteEnabled`/`PromoteTarget*` for chained promotion (`beta → prod`).
+- Source-object convention params (or derived from Prefix/ProjectId/StageId per Q3). **CLARIFICATION** Derive
+- Plus its own `PromoteTarget*` for chained promotion (`beta → prod`).
 
-- **Q15:** For `PromoteTargetBucket`, prefer an **explicit bucket-name parameter**, or resolve it from a cross-account convention (e.g. the sender is told the receiver's `OrgPrefix` and reconstructs `[org-]cf-artifacts-<targetAcct>-<region>-an`)? Explicit is simpler and less magic; derived is less error-prone for operators. Your call.
-- **Q16:** Any objection to the `Promote*` / `Release*` naming, or do you have a preferred vocabulary (e.g. `Handoff`, `Downstream`)?
+- **Q15:** For `PromoteTargetBucket`, prefer an **explicit bucket-name parameter**, or resolve it from a cross-account convention (e.g. the sender is told the receiver's `OrgPrefix` and reconstructs `[org-]cf-artifacts-<targetAcct>-<region>-an`)? Explicit is simpler and less magic; derived is less error-prone for operators. Your call. **Answer:** if PromoteTargetBucket is empty, Derive from <S3BucketNameOrgPrefix>-cf-artifacts-<TargetAccountId>-<TargetRegion>-an (use current template's S3BucketNameOrgPrefix) if a PromoteTargetBucket is blank.
+- **Q16:** Any objection to the `Promote*` / `Release*` naming, or do you have a preferred vocabulary (e.g. `Handoff`, `Downstream`)? **Answer:** current naming is fine
 
 ---
 
@@ -208,8 +214,8 @@ And a modification to `templates/v2/modules/account-wide/s3-artifacts-bucket-pol
 
 New parent template (name TBD — see Q17): composed the same way as the existing pipelines.
 
-- **Q17 — New template filename.** The preliminary uses `pipeline-promoted-artifact` (§6.2) while the spec is `pipeline-with-promotion-approval`. I recommend the file `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (starting at **v0.0.0**, development mode). Confirm the filename.
-- **Q18 — Modules are unversioned today; the changed `s3-artifacts-bucket-policy.yml` is consumed by `account-wide-infrastructure.yml` (v0.0.0, dev mode).** Adding an optional statement there is non-breaking. Confirm you're fine modifying that module in place (no module versioning exists yet).
+- **Q17 — New template filename.** The preliminary uses `pipeline-promoted-artifact` (§6.2) while the spec is `pipeline-with-promotion-approval`. I recommend the file `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (starting at **v0.0.0**, development mode). Confirm the filename. **Answer:** template-pipeline-promoted-artifact.yml
+- **Q18 — Modules are unversioned today; the changed `s3-artifacts-bucket-policy.yml` is consumed by `account-wide-infrastructure.yml` (v0.0.0, dev mode).** Adding an optional statement there is non-breaking. Confirm you're fine modifying that module in place (no module versioning exists yet). **Answer:** Yes, modify in place
 
 ---
 
@@ -218,14 +224,14 @@ New parent template (name TBD — see Q17): composed the same way as the existin
 **Q19 — `pipeline-mgmt-role.yml` (the CFN service role that deploys pipeline stacks).**
 It already permits `events:*`, `codebuild:*`, `codepipeline:*`, `sns:*` on `${Prefix}-*` and worker-role IAM on `${Prefix}-Worker-*`, plus `s3:*` on prefix-scoped buckets. Creating the new Promote CodeBuild project, its worker role (with a cross-account PutObject inline policy), the S3 source event rule, and the release-approval action should **already be covered** by these existing grants.
 - **Potential gaps I want to confirm with you rather than assume:**
-  - **Q19a:** Creating a worker role whose **inline policy references a bucket in another account** is still just `iam:CreateRole`/`iam:PutRolePolicy` on `${Prefix}-Worker-*` — no new mgmt permission needed. Agree?
-  - **Q19b:** Does the mgmt role need anything for **enabling EventBridge notifications on the account-wide bucket** (Q2)? That bucket is managed by `account-wide-infrastructure.yml` (admin-deployed), not by the pipeline mgmt role — so I believe **no** change to `pipeline-mgmt-role` is required for the bucket itself. Confirm the split of responsibility (admin owns the bucket + its cross-account policy; pipeline mgmt role owns the pipeline stack).
-  - **Q19c:** The receiving-account `pipeline-mgmt-role` deploys the new promoted-artifact pipeline — same permission set, so likely no change. Confirm.
+  - **Q19a:** Creating a worker role whose **inline policy references a bucket in another account** is still just `iam:CreateRole`/`iam:PutRolePolicy` on `${Prefix}-Worker-*` — no new mgmt permission needed. Agree? **Answer:** I agree
+  - **Q19b:** Does the mgmt role need anything for **enabling EventBridge notifications on the account-wide bucket** (Q2)? That bucket is managed by `account-wide-infrastructure.yml` (admin-deployed), not by the pipeline mgmt role — so I believe **no** change to `pipeline-mgmt-role` is required for the bucket itself. Confirm the split of responsibility (admin owns the bucket + its cross-account policy; pipeline mgmt role owns the pipeline stack). **Answer:** No change to the mgmt role as the admin owns the bucket.
+  - **Q19c:** The receiving-account `pipeline-mgmt-role` deploys the new promoted-artifact pipeline — same permission set, so likely no change. Confirm. **Answer:** Confirmed
 
 **Q20 — Worker role runtime permissions (created by the pipeline template, not mgmt).**
 - Sending `CodeBuildServiceRole` (Promote): needs cross-account `s3:PutObject` on `arn:aws:s3:::<targetBucket>/promotions/*`. New statement in `promote-service-role.yml`.
 - Receiving `CodePipelineServiceRole`: needs `s3:GetObject`/`GetObjectVersion` on the promotion prefix of its own account-wide bucket (already broadly granted via the bucket policy + role, but confirm the pipeline role's own inline policy covers the account-wide bucket, since today `ArtifactStore` uses the per-pipeline `S3ArtifactsBucket`).
-- **Q20a:** Is the receiving pipeline's `ArtifactStore` the **same** account-wide artifacts bucket that receives promotions, or a **different** per-pipeline bucket? This affects whether the S3 Source action and the pipeline artifact store are the same bucket and whether extra read grants are needed.
+- **Q20a:** Is the receiving pipeline's `ArtifactStore` the **same** account-wide artifacts bucket that receives promotions, or a **different** per-pipeline bucket? This affects whether the S3 Source action and the pipeline artifact store are the same bucket and whether extra read grants are needed. **CLARIFICATION NEEDED** The target account should have the roles and the pipeline that deploys the promoted artifact. Is that correct? Once an artifact is promoted, the other account has all the roles and pipelines to proceed, right? That is the intention, that the receiving account has ownership of the artifact and pipeline after promotion. The receiving bucket will contain both the promotion and artifacts for it's own pipelines, with promotions under the promotions/* prefix.
 
 ---
 
@@ -233,11 +239,11 @@ It already permits `events:*`, `codebuild:*`, `codepipeline:*`, `sns:*` on `${Pr
 
 **Q21 — Manifest schema.**
 The §5.2 schema is a good base. Given Option A, I'd adjust: `source_archive_key` becomes the stable trigger key; add `target_account_id`, `target_region`, `target_bucket`, `source_account_id`, and `commit_sha_full` vs `commit_sha_short`. `post_deploy_passed` is only meaningful when PostDeploy ran.
-- **Q21a:** Any required fields beyond §5.2 (e.g. pipeline ARN, approver identity, approval comment)? Note: capturing the **approver's identity** programmatically into the manifest is non-trivial with native approvals — is "approval recorded in CodePipeline history" sufficient, with the manifest capturing only `promoted_by` if/when available?
+- **Q21a:** Any required fields beyond §5.2 (e.g. pipeline ARN, approver identity, approval comment)? Note: capturing the **approver's identity** programmatically into the manifest is non-trivial with native approvals — is "approval recorded in CodePipeline history" sufficient, with the manifest capturing only `promoted_by` if/when available? **Answer:** Yes it is sufficient
 
 **Q22 — Is the manifest consumed by anything, or purely audit?**
 Under Option A nothing reads it at runtime. Confirming it is **write-only audit** (satisfying §10) keeps the design simple.
-- **Q22a:** Confirm no downstream automation must parse the manifest (if something does, that pushes us toward Option B/C).
+- **Q22a:** Confirm no downstream automation must parse the manifest (if something does, that pushes us toward Option B/C). **Answer:** It is pure audit only. We may have an automated audit process external from the pipeline in the future.
 
 ---
 
@@ -250,8 +256,8 @@ Per the repo steering, I expect the following in `requirements.md`/`tasks.md`. F
 - **Tests:** `cfn-lint` validation for all changed/added templates; unit-style checks favored over property-based per testing guidelines. Cross-account behavior itself can't be unit-tested in CI — I'll propose a documented manual integration test (two accounts) as a separate, non-CI task.
 - **Docs:** per the documentation steering, add `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md` and update the pipeline category README + the modified templates' docs as the final task.
 
-- **Q23:** Do you agree there are **no breaking changes** (everything additive/default-off), so we stay on PATCH increments + one new v0.0.0 file — i.e. **no** new `-v2-1.yml` files needed? If you foresee a breaking change I've missed, flag it now.
-- **Q24:** Should the two-account manual integration test be part of this spec's tasks (documented procedure only), or tracked separately?
+- **Q23:** Do you agree there are **no breaking changes** (everything additive/default-off), so we stay on PATCH increments + one new v0.0.0 file — i.e. **no** new `-v2-1.yml` files needed? If you foresee a breaking change I've missed, flag it now. **Answer:** I agree there are no breaking changes
+- **Q24:** Should the two-account manual integration test be part of this spec's tasks (documented procedure only), or tracked separately? **Answer:** manual integration test should be documented under docs/maintainer
 
 ---
 
