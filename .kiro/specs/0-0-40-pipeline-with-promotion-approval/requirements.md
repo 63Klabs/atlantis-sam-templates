@@ -211,10 +211,13 @@ The design is additive and backward compatible: all new behavior is disabled by 
 
 #### Acceptance Criteria
 
-1. The system SHALL apply a dedicated lifecycle rule scoped to the `promotions/*` prefix on the account-wide artifacts bucket.
-2. The current version of objects under `promotions/*` (`source.zip` and `promote.json`) SHALL NOT expire.
-3. Noncurrent versions of objects under `promotions/*` SHALL expire 365 days after becoming noncurrent.
-4. The `promotions/*` lifecycle rule SHALL apply equally to `source.zip` and `promote.json`.
+> **Design note (S3 limitation):** S3 resolves overlapping lifecycle rules in favor of the shorter/expiration action and cannot exclude a prefix from a whole-bucket rule, so a `promotions/*`-scoped rule cannot lengthen retention beyond the existing whole-bucket rule. This feature therefore adjusts the whole-bucket rule (Option 3). The full analysis and future alternatives are recorded in [`.kiro/specs/future-s3-artifact-lifecycles/note.md`](../future-s3-artifact-lifecycles/note.md).
+
+1. The system SHALL raise the account-wide artifacts bucket's existing `NoncurrentVersionExpirationInDays` from 30 to 365 (bucket-wide), giving promoted archives a 365-day rollback window via S3 object versioning.
+2. The system SHALL retain the documented intent that current promotion objects (`source.zip` and `promote.json`) are not expired; it is ACKNOWLEDGED that the existing bucket-wide 395-day current-version expiration (`ExpirationInDays: 395`) remains in effect and overrides this intent (current promotion objects expire at 395 days). This limitation SHALL be documented for future resolution in `.kiro/specs/future-s3-artifact-lifecycles/note.md`.
+3. The bucket-wide 365-day noncurrent-version retention SHALL apply to all objects in the bucket, including `source.zip` and `promote.json`.
+4. The system SHALL NOT add a separate `promotions/*`-scoped lifecycle rule (it cannot achieve the intended retention; see the design note above).
+5. The lifecycle change SHALL be additive to `account-wide-infrastructure.yml` (which remains in development mode, v0.0.0); the storage-cost tradeoff of retaining all noncurrent artifact versions for 365 days is accepted for this release.
 
 ### Requirement 13: Approval notifications
 
