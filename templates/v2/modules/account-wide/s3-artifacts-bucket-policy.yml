@@ -1,13 +1,22 @@
 # -- S3 Artifacts Bucket Policy --
 # Parent template must define:
-#   Parameters: RolePath
-#   Conditions: EnableS3ArtifactsBucket
+#   Parameters: RolePath, PromotionSourceAccountIds (CommaDelimitedList)
+#   Conditions: EnableS3ArtifactsBucket, HasPromotionSourceAccounts
 #   Pseudo-parameters: AWS::AccountId
 #   Bucket resource logical name: S3ArtifactsBucketRegional
 #
 # This policy grants access to ALL pipeline service roles in the account
 # regardless of prefix. It denies non-secure transport and whitelists
 # Get/Put operations for CodePipeline, CodeBuild, and CloudFormation roles.
+#
+# When HasPromotionSourceAccounts is true, it also adds an optional
+# cross-account statement (AllowCrossAccountPromotionWrite) that permits the
+# listed source accounts' *-PromoteServiceRole roles to write/read promotion
+# artifacts under the promotions/* prefix only. When the condition is false,
+# the statement resolves to AWS::NoValue, preserving existing behavior exactly.
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
 Type: AWS::S3::BucketPolicy
 Condition: EnableS3ArtifactsBucket
@@ -69,3 +78,24 @@ Properties:
             "aws:PrincipalArn":
               - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodePipelineServiceRole"
               - Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role${RolePath}*-CodeBuildServiceRole"
+
+      # Optional cross-account promotion write access. Present only when
+      # PromotionSourceAccountIds is non-empty (HasPromotionSourceAccounts).
+      # Scoped to the promotions/* prefix and *-PromoteServiceRole principals.
+      - Fn::If:
+          - HasPromotionSourceAccounts
+          - Sid: "AllowCrossAccountPromotionWrite"
+            Effect: Allow
+            Principal:
+              AWS:
+                Ref: PromotionSourceAccountIds
+            Action:
+              - "s3:PutObject"
+              - "s3:GetObject"
+              - "s3:GetObjectVersion"
+            Resource:
+              - Fn::Sub: "${S3ArtifactsBucketRegional.Arn}/promotions/*"
+            Condition:
+              StringLike:
+                "aws:PrincipalArn": "arn:aws:iam::*:role/*-PromoteServiceRole"
+          - Ref: "AWS::NoValue"

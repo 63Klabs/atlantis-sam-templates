@@ -4,7 +4,7 @@ Description: "CodePipeline for Automated Deployments from repository - Deployed 
 # Atlantis for AWS SAM Deployments
 # Pipeline Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.22/2026-08-05
+# Version: v2.0.23/2026-08-15
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -24,6 +24,7 @@ Metadata:
       ignore_checks:
         - E1010 # GetAtt references to resources defined in AWS::Include modules
         - E1019 # Ref/GetAtt references to resources defined in AWS::Include modules
+        - E1020 # Ref to a resource (e.g. PipelineNotificationTopic) defined in an AWS::Include module
         - E3001 # Resource Type property is defined inside AWS::Include modules
         - E3005 # Resource names resolved at deploy time via AWS::Include transforms
         - E3703 # Resources referenced in Outputs are defined in AWS::Include modules
@@ -58,6 +59,15 @@ Metadata:
           - PostDeployStageEnabled
           - PostDeployS3StaticHostBucket
           - PostDeployBuildSpec
+      -
+        Label:
+          default: "Promotion (Send to Next Stage)"
+        Parameters:
+          - PromoteTargetStageId
+          - PromoteApprovalRequired
+          - PromoteTargetAccountId
+          - PromoteTargetRegion
+          - PromoteTargetBucket
       -
         Label:
           default: "External Resources"
@@ -222,6 +232,50 @@ Parameters:
     ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec-postdeploy.yml'. For example, 'buildspec-postdeploy.yml', 'application-infrastructure/buildspec-postdeploy.yml' or 's3://mybucket/buildspec-postdeploy.yml'. May not be empty."
 
   # ---------------------------------------------------------------------------
+  # Promotion (Send to Next Stage)
+  #
+  # Additive, default-off promotion capability. When PromoteTargetStageId is
+  # non-empty, the pipeline gains an optional Approve-to-Promote gate and a
+  # Promote stage that hands the built commit to the next stage (same or
+  # cross account/region) via the receiving account's S3 promotions area.
+  # With all of these at their defaults, the pipeline is unchanged.
+
+  PromoteTargetStageId:
+    Type: String
+    Description: "The receiving stage's StageId (the target of promotion). A non-empty value ENABLES the Promote stage (and the Approve-to-Promote gate unless PromoteApprovalRequired is false); empty (default) disables promotion entirely. Must equal the receiving pipeline's StageId. Promotions are written to promotions/<Prefix>-<ProjectId>/<PromoteTargetStageId>/source.zip in the target bucket."
+    Default: ""
+    AllowedPattern: "^$|^[a-z][a-z0-9-]{0,6}[a-z0-9]$"
+    ConstraintDescription: "May be empty (promotion disabled) or 2 to 8 characters. Lower case alphanumeric and dashes. Must start with a letter and end with a letter or number."
+
+  PromoteApprovalRequired:
+    Type: String
+    Description: "Controls whether a manual Approve-to-Promote gate (the 'ApproveToPromote' approval action) is inserted immediately before the Promote stage. WARNING: setting this to 'false' removes the human gate and promotes automatically; if the receiving pipeline also has ReleaseApprovalRequired=false, the artifact will build and deploy into the target environment with no human review at any point, INCLUDING into PROD stages. Only takes effect when PromoteTargetStageId is non-empty."
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  PromoteTargetAccountId:
+    Type: String
+    Description: "The AWS account ID of the promotion target. Leave empty (default) for same-account promotion (the target account is the current account). When non-empty, promotion writes cross-account into the target account's artifacts bucket and that account must allow this account in its PromotionSourceAccountIds."
+    Default: ""
+    AllowedPattern: "^$|^\\d{12}$"
+    ConstraintDescription: "Must be empty or a 12-digit AWS account ID."
+
+  PromoteTargetRegion:
+    Type: String
+    Description: "The AWS region of the promotion target. Leave empty (default) to use the current region. When non-empty, promotion targets the specified region (cross-region promotion); the only cross-region operation is the S3 write into the receiving-region bucket."
+    Default: ""
+    AllowedPattern: "^$|^[a-z]{2}-[a-z]+-\\d$"
+    ConstraintDescription: "Must be empty or a valid AWS region name (e.g., us-east-1)."
+
+  PromoteTargetBucket:
+    Type: String
+    Description: "Explicit name of the target account-wide artifacts bucket to write promotions into. Leave empty (default) to derive it as <S3BucketNameOrgPrefix->cf-artifacts-<targetAccount>-<targetRegion>-an from the resolved target account/region and this template's S3BucketNameOrgPrefix. Set only when the derived name does not match the target bucket."
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+    ConstraintDescription: "Must be empty or a valid S3 bucket name between 3 and 63 characters. Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
+  # ---------------------------------------------------------------------------
   # External Resources and Alarm Notifications
 
   ParameterStoreHierarchy:
@@ -347,6 +401,18 @@ Conditions:
   # Combined conditions for resource creation
   IsPostDeployEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPostDeployEnabled]
 
+  # Promotion (Send to Next Stage) Conditional Logic
+  # These conditions control when the Promote stage, Approve-to-Promote gate, and
+  # promote modules (PromoteServiceRole, PromoteProject, PromoteLogGroup) are included.
+  # Promotion is disabled by default (PromoteTargetStageId empty).
+  IsPromoteEnabled: !Not [!Equals [!Ref PromoteTargetStageId, ""]]
+  IsPromoteApprovalRequired: !Equals [!Ref PromoteApprovalRequired, "true"]
+  IsPromoteEnabledAndApprovalRequired: !And [!Condition IsPromoteEnabled, !Condition IsPromoteApprovalRequired]
+  IsPromoteEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPromoteEnabled]
+  HasPromoteTargetAccount: !Not [!Equals [!Ref PromoteTargetAccountId, ""]]
+  HasPromoteTargetRegion: !Not [!Equals [!Ref PromoteTargetRegion, ""]]
+  HasPromoteTargetBucket: !Not [!Equals [!Ref PromoteTargetBucket, ""]]
+
 # =============================================================================
 # RESOURCES
 # -----------------------------------------------------------------------------
@@ -419,6 +485,7 @@ Resources:
             Resource: 
             - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-Build"
             - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-PostDeploy"
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-Promote"
 
           - Sid: CodeBuildReportGroup
             Action:
@@ -584,6 +651,46 @@ Resources:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/postdeploy-log-group.yml"
 
   # ---------------------------------------------------------------------------
+  # -- Promotion (Send to Next Stage) Resources --
+  #
+  # CONDITIONAL RESOURCES: Only created when promotion is enabled and not DEV
+  # (condition IsPromoteEnabledAndNotDev, i.e. PromoteTargetStageId is non-empty).
+  # With promotion disabled (the default), none of these resources are created
+  # and the pipeline is structurally unchanged.
+  #
+  # These modules implement the "send" side of stage-to-stage promotion:
+  # - PromoteServiceRole: the SOLE cross-account writer; reads the local
+  #   SourceArtifact and writes source.zip + promote.json into the receiving
+  #   account's artifacts bucket under promotions/* only.
+  # - PromoteProject: framework-owned CodeBuild project (inline buildspec) that
+  #   re-uploads the SourceArtifact and writes the audit manifest.
+  # - PromoteLogGroup: dedicated CloudWatch log group for the Promote project.
+
+  # -- Promote Service Role --
+
+  PromoteServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-service-role.yml"
+
+  # -- Promote CodeBuild Project --
+
+  PromoteProject:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-project.yml"
+
+  # -- Promote Log Group --
+
+  PromoteLogGroup:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-log-group.yml"
+
+  # ---------------------------------------------------------------------------
   # -- ProjectPipeline --
   # 
   # CONDITIONAL PIPELINE STRUCTURE:
@@ -715,6 +822,38 @@ Resources:
               - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
               OutputArtifacts:
               - Name: !Sub "${ProjectId}-${StageId}-PostDeployArtifact"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+        - !If
+          - IsPromoteEnabledAndApprovalRequired
+          - Name: ApproveToPromote
+            Actions:
+            - Name: ApproveToPromote
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                NotificationArn: !Ref PipelineNotificationTopic
+                CustomData: !Sub "Approve promotion of ${Prefix}-${ProjectId}-${StageId} to stage '${PromoteTargetStageId}'. Review the execution before approving."
+                ExternalEntityLink: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+        - !If
+          - IsPromoteEnabled
+          - Name: Promote
+            Actions:
+            - Name: Promote
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Sub "${Prefix}-${ProjectId}-${StageId}-Promote"
+              InputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
               RunOrder: 1
           - !Ref 'AWS::NoValue'
           

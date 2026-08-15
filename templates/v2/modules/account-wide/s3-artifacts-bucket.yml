@@ -1,6 +1,6 @@
 # -- S3 Artifacts Bucket (Account-Wide) --
 # Parent template must define parameters: S3BucketNameOrgPrefix, S3LogBucketName
-# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket, EnableS3AccessLogBucket
+# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket, EnableS3AccessLogBucket, EnableArtifactsBucketEventBridge
 # Parent must name the access log bucket resource 'AccessLogBucketRegional' (when EnableS3AccessLogBucket)
 #
 # Creates an account-wide S3 bucket for pipeline build artifacts.
@@ -31,6 +31,9 @@ Properties:
     BlockPublicPolicy: true
     IgnorePublicAcls: true
     RestrictPublicBuckets: true
+  OwnershipControls:
+    Rules:
+      - ObjectOwnership: BucketOwnerEnforced
   BucketEncryption:
     ServerSideEncryptionConfiguration:
       - ServerSideEncryptionByDefault:
@@ -41,7 +44,7 @@ Properties:
         AbortIncompleteMultipartUpload:
           DaysAfterInitiation: 1
         ExpirationInDays: 395
-        NoncurrentVersionExpirationInDays: 30
+        NoncurrentVersionExpirationInDays: 365
         Status: "Enabled"
   LoggingConfiguration:
     Fn::If:
@@ -55,3 +58,8 @@ Properties:
               Ref: AccessLogBucketRegional
             LogFilePrefix: "cf-artifacts/"
           - Ref: "AWS::NoValue"
+  NotificationConfiguration:
+    Fn::If:
+      - EnableArtifactsBucketEventBridge
+      - EventBridgeConfiguration: {}
+      - Ref: "AWS::NoValue"

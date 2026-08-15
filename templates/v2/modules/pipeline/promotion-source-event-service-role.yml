@@ -1,0 +1,46 @@
+# -- Promotion Source Event Service Role --
+# Parent template must define parameters: Prefix, ProjectId, StageId, RolePath, PermissionsBoundaryArn
+# Parent template must define conditions: IsNotDevelopment, HasPermissionsBoundaryArn
+#
+# Creates an IAM role that allows EventBridge (CloudWatch Events) to trigger
+# CodePipeline execution. This role is used by the PromotionSourceEvent rule to
+# start the receiving pipeline when a promotion artifact (source.zip) arrives in
+# the account-wide artifacts bucket. Used by the receiving template
+# (template-pipeline-promoted-artifact.yml) only.
+# This resource is only created when IsNotDevelopment is true (TEST and PROD).
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::IAM::Role
+Condition: IsNotDevelopment
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromotionSourceEventServiceRole"
+  Description: "Service Role to allow Events to trigger AWS CodePipeline execution for promoted artifacts"
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: AWS::NoValue
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: "EventTrustPolicy"
+        Effect: Allow
+        Action: sts:AssumeRole
+        Principal:
+          Service:
+            - events.amazonaws.com
+  Policies:
+    - PolicyName:
+        Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromotionSourceEventServicePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - codepipeline:StartPipelineExecution
+            Effect: Allow
+            Resource:
+              - Fn::Sub: "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Prefix}-${ProjectId}-${StageId}-Pipeline"

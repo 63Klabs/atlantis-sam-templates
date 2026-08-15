@@ -76,6 +76,12 @@ Metadata:
           - AllowLegacyCloudFrontLogs
       -
         Label:
+          default: "Promotion"
+        Parameters:
+          - PromotionSourceAccountIds
+          - EnableS3ArtifactsBucketEventBridge
+      -
+        Label:
           default: "Module Source"
         Parameters:
           - S3ModuleLocation
@@ -197,6 +203,21 @@ Parameters:
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
 
+  # ---------------------------------------------------------------------------
+  # Promotion
+
+  PromotionSourceAccountIds:
+    Type: CommaDelimitedList
+    Description: "Optional list of AWS account IDs permitted to write cross-account promotion artifacts to the account-wide artifacts bucket. When set, a bucket policy statement grants the listed accounts' *-PromoteServiceRole roles write/read access scoped to the promotions/* prefix only. Leave empty to omit the cross-account statement entirely."
+    Default: ""
+
+  EnableS3ArtifactsBucketEventBridge:
+    Type: String
+    Description: "Set to 'true' to enable EventBridge notifications on the account-wide S3 artifacts bucket. Required for promotion source event rules that trigger receiving pipelines when a promotion artifact is written. Default is 'false'."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
@@ -211,6 +232,8 @@ Conditions:
   HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
   EnableS3AccessLogBucket: !Equals [!Ref EnableS3AccessLogBucket, "true"]
   EnableLegacyCloudFrontLogs: !Equals [!Ref AllowLegacyCloudFrontLogs, "true"]
+  HasPromotionSourceAccounts: !Not [!Equals [!Join ["", !Ref PromotionSourceAccountIds], ""]]
+  EnableArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]
 
 # =============================================================================
 # RESOURCES

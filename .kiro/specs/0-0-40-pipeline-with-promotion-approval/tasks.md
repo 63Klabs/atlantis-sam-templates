@@ -78,33 +78,33 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 
 ### 0. Pre-flight verification
 
-- [ ] 0.1 Verify management-role adequacy (no changes expected)
+- [x] 0.1 Verify management-role adequacy (no changes expected)
   - Read `templates/v2/modules/management-roles/pipeline-mgmt-role.yml` and confirm it already permits creating: a CodeBuild project (`${Prefix}-*-Promote`), a worker role (`${Prefix}-Worker-*-PromoteServiceRole`) with an inline policy referencing a cross-account bucket ARN, an EventBridge rule, and the EventBridge service role.
   - Record the finding in the PR/commit description. If a gap is found, STOP and raise it before widening the role.
   - _Requirements: 16.1, 16.3_
 
-- [ ] 0.2 Verify the `Atlantis=pipeline-infrastructure` tag is queryable
+- [x] 0.2 Verify the `Atlantis=pipeline-infrastructure` tag is queryable
   - Confirm deployed pipelines carry the tag (via stack-tag propagation) and can be enumerated with `aws resourcegroupstaggingapi get-resources` / `aws codepipeline list-tags-for-resource`. Note the exact query for use in Task 7.3.
   - _Requirements: 14.5, 14.6_
 
 ### 1. Version management (first edit to each template)
 
-- [ ] 1.1 Bump `templates/v2/pipeline/template-pipeline.yml` header to `v2.0.23/<today>`
-- [ ] 1.2 Bump `templates/v2/pipeline/template-pipeline-github.yml` header to `v2.0.5/<today>`
-- [ ] 1.3 Bump `templates/v2/pipeline/template-pipeline-build-only.yml` header to `v2.0.7/<today>`
-- [ ] 1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-promoted-artifact.yml` will start at `v0.0.0`.
+- [x] 1.1 Bump `templates/v2/pipeline/template-pipeline.yml` header to `v2.0.23/<today>`
+- [x] 1.2 Bump `templates/v2/pipeline/template-pipeline-github.yml` header to `v2.0.5/<today>`
+- [x] 1.3 Bump `templates/v2/pipeline/template-pipeline-build-only.yml` header to `v2.0.7/<today>`
+- [x] 1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-promoted-artifact.yml` will start at `v0.0.0`.
   - _Requirements: 17.1, 17.2, 17.3, 17.4_
 
 ### 2. Account-wide artifacts bucket and policy
 
-- [ ] 2.1 Update `templates/v2/modules/account-wide/s3-artifacts-bucket.yml`
+- [x] 2.1 Update `templates/v2/modules/account-wide/s3-artifacts-bucket.yml`
   - Change `NoncurrentVersionExpirationInDays` in the `ExpireObjects` rule from `30` to `365`; keep `ExpirationInDays: 395` and `AbortIncompleteMultipartUpload` unchanged.
   - Add `OwnershipControls: Rules: [{ ObjectOwnership: BucketOwnerEnforced }]`.
   - Add conditional `NotificationConfiguration` = `Fn::If [EnableArtifactsBucketEventBridge, { EventBridgeConfiguration: {} }, AWS::NoValue]`.
   - Update the module contract comment (new conditions consumed).
   - _Requirements: 7.6, 8.1, 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 2.2 Update `templates/v2/modules/account-wide/s3-artifacts-bucket-policy.yml`
+- [x] 2.2 Update `templates/v2/modules/account-wide/s3-artifacts-bucket-policy.yml`
   - Append a cross-account statement `AllowCrossAccountPromotionWrite`, wrapped in `Fn::If [HasPromotionSourceAccounts, {statement}, AWS::NoValue]`:
     - `Principal.AWS: !Ref PromotionSourceAccountIds`
     - Actions `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`
@@ -113,7 +113,7 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
   - Update the module contract comment (new parameter + condition consumed).
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 2.3 Update `templates/v2/account/account-wide-infrastructure.yml` parent
+- [x] 2.3 Update `templates/v2/account/account-wide-infrastructure.yml` parent
   - Add parameters `PromotionSourceAccountIds` (`CommaDelimitedList`, default `""`) and `EnableS3ArtifactsBucketEventBridge` (`String`, `true`/`false`, default `false`), grouped under a "Promotion" metadata group.
   - Add conditions `HasPromotionSourceAccounts` and `EnableArtifactsBucketEventBridge`.
   - Confirm cfn-lint `AWS::Include` suppressions are present.
@@ -121,27 +121,27 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 
 ### 3. New pipeline modules
 
-- [ ] 3.1 Create `templates/v2/modules/pipeline/promote-service-role.yml`
+- [x] 3.1 Create `templates/v2/modules/pipeline/promote-service-role.yml`
   - `AWS::IAM::Role`, condition `IsPromoteEnabledAndNotDev`, name `${Prefix}-Worker-${ProjectId}-${StageId}-PromoteServiceRole`, trust `codebuild.amazonaws.com`, path + permissions boundary per convention.
   - Inline policy: manage its logs; read local `${S3ArtifactsBucket}` (input SourceArtifact); write/read `arn:aws:s3:::<resolved PromoteTargetBucket>/promotions/*` (`s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`).
   - Contract comment block naming required parent params/conditions.
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 15.3_
 
-- [ ] 3.2 Create `templates/v2/modules/pipeline/promote-project.yml`
+- [x] 3.2 Create `templates/v2/modules/pipeline/promote-project.yml`
   - `AWS::CodeBuild::Project`, condition `IsPromoteEnabledAndNotDev`, name `${Prefix}-${ProjectId}-${StageId}-Promote`, ServiceRole `PromoteServiceRole`, same image/compute as Build.
   - Environment variables per design §5.1 (PROMOTE_TARGET_*, resolved bucket/region/account, PROMOTION_KEY_PREFIX).
   - Inline `BuildSpec` (framework-owned): resolve SHA, zip `CODEBUILD_SRC_DIR` → `source.zip`, write `promote.json`, upload manifest first then `source.zip` last (with `--region` target). No app-repo override.
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 9.5, 9.6, 11.1, 11.2_
 
-- [ ] 3.3 Create `templates/v2/modules/pipeline/promote-log-group.yml`
+- [x] 3.3 Create `templates/v2/modules/pipeline/promote-log-group.yml`
   - `AWS::Logs::LogGroup`, condition `IsPromoteEnabledAndNotDev`, name `/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote`, retention 90 (mirror `codebuild-log-group.yml`).
   - _Requirements: 9.5_
 
-- [ ] 3.4 Create `templates/v2/modules/pipeline/promotion-source-event-service-role.yml`
+- [x] 3.4 Create `templates/v2/modules/pipeline/promotion-source-event-service-role.yml`
   - `AWS::IAM::Role`, condition `IsNotDevelopment`, name `${Prefix}-Worker-${ProjectId}-${StageId}-PromotionSourceEventServiceRole`, trust `events.amazonaws.com`, single `codepipeline:StartPipelineExecution` on the receiving pipeline ARN (mirror `source-event-service-role.yml`).
   - _Requirements: 8.3_
 
-- [ ] 3.5 Create `templates/v2/modules/pipeline/promotion-source-event-rule.yml`
+- [x] 3.5 Create `templates/v2/modules/pipeline/promotion-source-event-rule.yml`
   - `AWS::Events::Rule`, condition `IsNotDevelopment`, name `${Prefix}-${ProjectId}-${StageId}-PromotionSourceEvent`.
   - EventPattern: `aws.s3` / `Object Created`, `detail.bucket.name = [S3ArtifactsBucket]`, `detail.object.key = ["promotions/${Prefix}-${ProjectId}/${StageId}/source.zip"]`.
   - Target the receiving pipeline ARN with `PromotionSourceEventServiceRole`.
@@ -151,51 +151,51 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 
 Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipeline-github.yml`, `template-pipeline-build-only.yml`.
 
-- [ ] 4.1 Add promotion parameters + metadata group
+- [x] 4.1 Add promotion parameters + metadata group
   - Add `PromoteTargetStageId`, `PromoteApprovalRequired` (default `true`), `PromoteTargetAccountId`, `PromoteTargetRegion`, `PromoteTargetBucket` (all default `""` except approval).
   - Group under "Promotion (Send to Next Stage)" immediately after the Post Deploy group.
   - Write the `PromoteApprovalRequired` description with the explicit ungated-into-PROD warning.
   - _Requirements: 6.1, 6.3, 6.5, 10.1, 10.6_
 
-- [ ] 4.2 Add conditions
+- [x] 4.2 Add conditions
   - `IsPromoteEnabled`, `IsPromoteApprovalRequired`, `IsPromoteEnabledAndApprovalRequired`, `IsPromoteEnabledAndNotDev`, `HasPromoteTargetAccount`, `HasPromoteTargetRegion`, `HasPromoteTargetBucket`.
   - _Requirements: 3.2, 3.3, 3.4, 10.3, 10.4, 10.5_
 
-- [ ] 4.3 Include the new modules
+- [x] 4.3 Include the new modules
   - Add `PromoteServiceRole`, `PromoteProject`, `PromoteLogGroup` via `AWS::Include` (exact sibling logical IDs).
   - _Requirements: 9.1, 9.5, 15.1, 15.2_
 
-- [ ] 4.4 Add inline stages to `ProjectPipeline`
+- [x] 4.4 Add inline stages to `ProjectPipeline`
   - `ApproveToPromote` (Manual, named `ApproveToPromote`, `NotificationArn = PipelineNotificationTopic`, CustomData + ExternalEntityLink) gated on `IsPromoteEnabledAndApprovalRequired`.
   - `Promote` (CodeBuild `${Prefix}-${ProjectId}-${StageId}-Promote`, input = SourceArtifact) gated on `IsPromoteEnabled`.
   - Order: `... → [PostDeploy] → [ApproveToPromote] → [Promote]` (build-only: `Source → Build → [ApproveToPromote] → [Promote]`).
   - _Requirements: 3.1, 3.5, 3.6, 3.8, 13.1, 13.2, 13.3, 13.4_
 
-- [ ] 4.5 Verify backward compatibility
+- [x] 4.5 Verify backward compatibility
   - With all promotion params at defaults, confirm the rendered pipeline is structurally identical to pre-change (no new stages/resources created; new module resources gated off).
   - _Requirements: 3.7, NFR #1_
 
 ### 5. New receiving template
 
-- [ ] 5.1 Create `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (v0.0.0)
+- [x] 5.1 Create `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (v0.0.0)
   - Header comment block, Metadata interface, standard parameter set minus `Repository`/`RepositoryBranch`/`GitHubConnectionArn`.
   - Add `ReleaseApprovalRequired` (default `true`, with auto-release warning), `DeployStageEnabled` (default `true`), and the `PromoteTarget*`/`PromoteApprovalRequired` set for chained promotion.
   - Module Source params + cfn-lint suppressions.
   - _Requirements: 4.1, 5.1, 6.2, 6.4, 10.1, 15.5_
 
-- [ ] 5.2 Conditions + module includes
+- [x] 5.2 Conditions + module includes
   - Add `IsReleaseApprovalRequired`, `IsDeployStageEnabled`, plus the promotion conditions from 4.2.
   - Include shared modules (CodeBuild project/role/log group, CloudFormation svc role, CodeDeploy svc role, PostDeploy set, notification set) and the new promote + promotion-source-event modules.
   - _Requirements: 4.5, 5.1, 8.2, 8.3_
 
-- [ ] 5.3 Define `ProjectPipeline` stages
+- [x] 5.3 Define `ProjectPipeline` stages
   - Source (S3): `S3Bucket = S3ArtifactsBucket`, `S3ObjectKey = promotions/${Prefix}-${ProjectId}/${StageId}/source.zip`, `PollForSourceChanges: false`.
   - `[ApproveRelease]` (Manual, named `ApproveRelease`) gated on `IsReleaseApprovalRequired`, between Source and Build.
   - Build (identical to existing), `[Deploy]` gated on `IsDeployStageEnabled`, `[PostDeploy]`, `[ApproveToPromote]`, `[Promote]` (chained).
   - `ArtifactStore.Location = S3ArtifactsBucket` (same bucket as S3 source).
   - _Requirements: 4.2, 4.3, 4.4, 4.6, 4.7, 4.8, 5.2, 5.3, 5.4_
 
-- [ ] 5.4 Outputs
+- [x] 5.4 Outputs
   - Pipeline console link, pipeline name, and the watched promotion key (for operator reference); conditional promote/release outputs as useful.
   - _Requirements: 4.1_
 

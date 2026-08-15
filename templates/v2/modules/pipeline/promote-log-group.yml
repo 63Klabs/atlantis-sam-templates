@@ -1,0 +1,19 @@
+# -- Promote CodeBuild Log Group --
+# Parent template must define parameters: Prefix, ProjectId, StageId
+# Parent template must define conditions: IsPromoteEnabledAndNotDev
+#
+# Creates a CloudWatch Logs log group for the promotion CodeBuild project with a
+# 90-day retention policy. This resource is only created when
+# IsPromoteEnabledAndNotDev is true.
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::Logs::LogGroup
+Condition: IsPromoteEnabledAndNotDev
+DeletionPolicy: Delete
+UpdateReplacePolicy: Retain
+Properties:
+  LogGroupName:
+    Fn::Sub: "/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote"
+  RetentionInDays: 90
