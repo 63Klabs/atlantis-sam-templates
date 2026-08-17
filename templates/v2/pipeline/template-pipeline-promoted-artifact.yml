@@ -78,6 +78,8 @@ Metadata:
           - S3ArtifactsBucket
           - S3StaticHostBucket
           - BuildSpec
+          - Repository
+          - RepositoryBranch
       -
         Label:
           default: "Release Approval and Deploy Control"
@@ -211,6 +213,20 @@ Parameters:
     Default: "application-infrastructure/buildspec.yml"
     AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec\\.yml)$|^$"
     ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec.yml'. For example, 'buildspec.yml', 'application-infrastructure/buildspec.yml' or 's3://mybucket/buildspec.yml'. If empty, buildspec.yml at root of repo will be sought."
+
+  Repository:
+    Type: String
+    Description: "Defaults to 'PROMOTED' for this receiving (promoted-artifact) pipeline, whose real source is the promoted S3 promotion archive rather than a repository. This value is passed to the Build and PostDeploy CodeBuild projects as the REPOSITORY environment variable so application buildspecs that reference it continue to work. May optionally be overridden with the origin repository (name or owner/repository) for traceability."
+    Default: "PROMOTED"
+    AllowedPattern: "^$|^[a-zA-Z0-9][a-zA-Z0-9_\\-\\/]{0,62}[a-zA-Z0-9]$"
+    ConstraintDescription: "May be empty, or a valid repository name/identifier (alphanumeric, dashes, underscores, slashes)."
+
+  RepositoryBranch:
+    Type: String
+    Description: "Defaults to 'promoted' for this receiving (promoted-artifact) pipeline. Passed to the Build and PostDeploy CodeBuild projects as the REPOSITORY_BRANCH environment variable so application buildspecs that reference it continue to work. May optionally be overridden with the origin branch for traceability."
+    Default: "promoted"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9_\\-\\/]{0,14}[a-zA-Z0-9]$"
+    ConstraintDescription: "Must be a valid branch name."
 
   # ---------------------------------------------------------------------------
   # Release Approval and Deploy Control
