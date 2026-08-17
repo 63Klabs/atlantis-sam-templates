@@ -62,7 +62,7 @@ Throughout this procedure:
 1.2. In the **RECEIVING** account, update/redeploy `account-wide-infrastructure.yml`
    with:
    - `PromotionSourceAccountIds = 111111111111` (the SENDING account ID)
-   - `EnableS3ArtifactsBucketEventBridge = true`
+   - `EnablePromotionTrigger = true`
 
    Confirm after deploy:
    - The bucket policy on the receiving bucket contains the
@@ -278,7 +278,7 @@ Repeat Sections 2-7 within **one** account, using two stages (e.g. `test` and
 - Deploy the origin pipeline with `PromoteTargetAccountId` **empty** (and
   `PromoteTargetRegion` empty) — this is same-account/same-region promotion.
 - Skip step 1.2's cross-account bucket policy setup entirely; `PromotionSourceAccountIds`
-  can stay empty. `EnableS3ArtifactsBucketEventBridge=true` is still required.
+  can stay empty. `EnablePromotionTrigger=true` is still required.
 - Deploy the receiving pipeline (`StageId=beta`) in the same account.
 - Everything else (Sections 4-7) is identical — the sending pipeline's
   `PromoteServiceRole` writes to the same account's own artifacts bucket
@@ -315,7 +315,7 @@ After the test, remove the test-only resources so they don't linger:
    ```
    Also delete any `DeleteMarkers` the same way if present.
 
-9.3. If you changed `PromotionSourceAccountIds` / `EnableS3ArtifactsBucketEventBridge`
+9.3. If you changed `PromotionSourceAccountIds` / `EnablePromotionTrigger`
    on the receiving account's `account-wide-infrastructure.yml` solely for
    this test and don't want them left enabled, redeploy with the prior
    values (or leave enabled if you intend to use promotion going forward —
@@ -331,7 +331,7 @@ After the test, remove the test-only resources so they don't linger:
 | Symptom | Likely cause | Resolution |
 |---|---|---|
 | `Promote` CodeBuild action fails with `AccessDenied` on `PutObject` | `PromotionSourceAccountIds` on the receiving account doesn't include the sending account, or the writer role doesn't match `*-PromoteServiceRole` | Re-check §1.2; confirm the bucket policy statement and the sending role name |
-| `source.zip`/`promote.json` land in the receiving bucket, but the receiving pipeline never starts | `EnableS3ArtifactsBucketEventBridge` is `false`, or the EventBridge rule's key pattern doesn't match | Confirm §1.2 and the rule's `detail.object.key` equals `promotions/atl-promotest/beta/source.zip` exactly |
+| `source.zip`/`promote.json` land in the receiving bucket, but the receiving pipeline never starts | `EnablePromotionTrigger` is `false`, or the EventBridge rule's key pattern doesn't match | Confirm §1.2 and the rule's `detail.object.key` equals `promotions/atl-promotest/beta/source.zip` exactly |
 | Receiving pipeline starts but its `Source` action fails / pulls stale content | `S3ObjectKey` on the receiving Source action doesn't match the sender's write key (mismatched `Prefix`/`ProjectId`/`StageId`) | Confirm sender's `PromoteTargetStageId` equals receiver's `StageId`, and `Prefix`/`ProjectId` match on both sides (design §5.2) |
 | `ApproveToPromote` / `ApproveRelease` never appears | Approval parameter was left/set to `false` | Confirm `PromoteApprovalRequired`/`ReleaseApprovalRequired` are `true` on the relevant template, or use the [approval-audit CLI](../admin-ops/) to check the deployed pipeline structure |
 | Rollback write doesn't re-trigger the pipeline | You overwrote the key with identical bytes and no new version was created, or EventBridge notifications got disabled between tests | Confirm `aws s3api list-object-versions` shows a new version ID after the rollback copy; re-check EventBridge is still enabled |

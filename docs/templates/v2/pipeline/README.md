@@ -208,7 +208,7 @@ To minimize costs:
 ### Promote Stage Fails or Receiving Pipeline Doesn't Trigger (origin templates)
 - Verify `PromoteTargetStageId` equals the receiving pipeline's `StageId` exactly
 - For cross-account promotion, confirm the receiving account's `PromotionSourceAccountIds` includes the sending account
-- Confirm the receiving account-wide bucket was deployed with `EnableS3ArtifactsBucketEventBridge="true"`
+- Confirm the receiving account-wide bucket was deployed with `EnablePromotionTrigger="true"`
 - Check the Promote CodeBuild logs (`/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote`) for the exact S3 error
 
 ## Related Templates

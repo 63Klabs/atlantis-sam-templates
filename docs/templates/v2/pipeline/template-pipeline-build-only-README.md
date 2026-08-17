@@ -776,13 +776,13 @@ This promotes a validated `test`-stage build to the `beta` stage in account `222
 **Possible Causes:**
 - `PromoteTargetStageId` does not match the receiving pipeline's `StageId`
 - Cross-account promotion but the receiving account's `PromotionSourceAccountIds` does not include this account
-- The receiving account's account-wide artifacts bucket does not have EventBridge notifications enabled (`EnableS3ArtifactsBucketEventBridge`)
+- The receiving account's account-wide artifacts bucket does not have EventBridge notifications enabled (`EnablePromotionTrigger`)
 - `PromoteTargetBucket` (or the derived bucket name) does not match the actual target bucket
 
 **Solutions:**
 1. Verify `PromoteTargetStageId` equals the receiving pipeline's `StageId` exactly
 2. For cross-account promotion, confirm the target account's `account-wide-infrastructure.yml` stack includes this account in `PromotionSourceAccountIds`
-3. Confirm the target account-wide bucket was deployed with `EnableS3ArtifactsBucketEventBridge="true"`
+3. Confirm the target account-wide bucket was deployed with `EnablePromotionTrigger="true"`
 4. Check the Promote CodeBuild logs (`/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote`) for the exact S3 error
 5. If using an explicit `PromoteTargetBucket`, verify it matches the receiving account's actual bucket name
 

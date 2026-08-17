@@ -51,7 +51,7 @@ Two independent, default-on approval gates are provided:
 ### Prerequisites
 
 - The receiving account's account-wide artifacts bucket must already exist (deployed via `account-wide-infrastructure.yml`) and be versioned.
-- If receiving cross-account, the sending account's `PromoteServiceRole` must be included in the receiving bucket's `PromotionSourceAccountIds` parameter (on `account-wide-infrastructure.yml`), and `EnableS3ArtifactsBucketEventBridge` must be set to `true` on that same stack so the S3 `Object Created` event reaches this pipeline.
+- If receiving cross-account, the sending account's `PromoteServiceRole` must be included in the receiving bucket's `PromotionSourceAccountIds` parameter (on `account-wide-infrastructure.yml`), and `EnablePromotionTrigger` must be set to `true` on that same stack so the S3 `Object Created` event reaches this pipeline.
 - An origin pipeline (`template-pipeline.yml`, `template-pipeline-github.yml`, or `template-pipeline-build-only.yml`) configured with `PromoteTargetStageId` equal to this template's `StageId`, and (for cross-account/cross-region) matching `PromoteTargetAccountId`/`PromoteTargetRegion`.
 - S3 bucket for build artifacts (also used as the S3 Source location).
 - (Optional) S3 bucket for static hosting.
@@ -586,7 +586,7 @@ Type: AWS::Events::Rule
 Condition: IsNotDevelopment  
 Module: `templates/v2/modules/pipeline/promotion-source-event-rule.yml`
 
-EventBridge rule that detects the arrival of the promoted `source.zip` at `promotions/${Prefix}-${ProjectId}/${StageId}/source.zip` in the account-wide artifacts bucket and starts this pipeline. Requires EventBridge notifications enabled on the artifacts bucket (`account-wide-infrastructure.yml`, `EnableS3ArtifactsBucketEventBridge=true`).
+EventBridge rule that detects the arrival of the promoted `source.zip` at `promotions/${Prefix}-${ProjectId}/${StageId}/source.zip` in the account-wide artifacts bucket and starts this pipeline. Requires EventBridge notifications enabled on the artifacts bucket (`account-wide-infrastructure.yml`, `EnablePromotionTrigger=true`).
 
 ### CodeBuildProject
 
@@ -808,7 +808,7 @@ Parameters:
   S3ModuleLocation: "63klabs-atlas-us-east-1"
 ```
 
-Deployed in the receiving (PROD) account. The account-wide `account-wide-infrastructure.yml` stack in this account must set `PromotionSourceAccountIds` to include the sending account, and `EnableS3ArtifactsBucketEventBridge: "true"`. The sending pipeline (in a different account) sets `PromoteTargetStageId: "prod"`, `PromoteTargetAccountId: "999999999999"`.
+Deployed in the receiving (PROD) account. The account-wide `account-wide-infrastructure.yml` stack in this account must set `PromotionSourceAccountIds` to include the sending account, and `EnablePromotionTrigger: "true"`. The sending pipeline (in a different account) sets `PromoteTargetStageId: "prod"`, `PromoteTargetAccountId: "999999999999"`.
 
 ### Chained Promotion (beta -> prod)
 
@@ -851,13 +851,13 @@ Parameters:
 **Symptom:** The receiving pipeline never starts after the sending pipeline's Promote stage completes.
 
 **Possible Causes:**
-- `EnableS3ArtifactsBucketEventBridge` is `false` (or unset) on this account's `account-wide-infrastructure.yml` stack.
+- `EnablePromotionTrigger` is `false` (or unset) on this account's `account-wide-infrastructure.yml` stack.
 - The sending pipeline's `PromoteTargetStageId` does not exactly match this template's `StageId`.
 - Cross-account: `PromotionSourceAccountIds` on `account-wide-infrastructure.yml` does not include the sending account, so the write failed with `AccessDenied` before the trigger object was written.
 - `Prefix`/`ProjectId` mismatch between sending and receiving accounts.
 
 **Solutions:**
-1. Confirm `EnableS3ArtifactsBucketEventBridge: "true"` on the receiving account's `account-wide-infrastructure.yml`.
+1. Confirm `EnablePromotionTrigger: "true"` on the receiving account's `account-wide-infrastructure.yml`.
 2. Compare the `WatchedPromotionKey` output on this stack against the sending pipeline's Promote CodeBuild logs (the key it wrote to).
 3. For cross-account, verify `PromotionSourceAccountIds` includes the sending account and that the writer role matches `*-PromoteServiceRole`.
 4. Check the sending pipeline's Promote CodeBuild logs for S3 `PutObject` errors.

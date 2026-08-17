@@ -191,7 +191,7 @@ The receiving pipeline's watched key is derived from its **own** `Prefix`/`Proje
 | Parameter | Type | Default | Notes |
 |---|---|---|---|
 | `PromotionSourceAccountIds` | CommaDelimitedList | `""` | Accounts allowed to write promotions cross-account. Empty ⇒ statement omitted. |
-| `EnableS3ArtifactsBucketEventBridge` | String | `false` | `true`/`false`. Opt-in EventBridge notifications on the account-wide artifacts bucket. |
+| `EnablePromotionTrigger` | String | `false` | `true`/`false`. Opt-in EventBridge notifications on the account-wide artifacts bucket. |
 
 *(Per DD-1 = Option 3, promotions live in the account-wide artifacts bucket; there is no separate promotions bucket.)*
 
@@ -212,7 +212,7 @@ The receiving pipeline's watched key is derived from its **own** `Prefix`/`Proje
 
 **account-wide-infrastructure.yml:**
 - `HasPromotionSourceAccounts: !Not [!Equals [!Join ["", !Ref PromotionSourceAccountIds], ""]]`
-- `EnableS3ArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]`
+- `EnablePromotionTrigger: !Equals [!Ref EnablePromotionTrigger, "true"]`
 
 ---
 
@@ -417,7 +417,7 @@ Add an opt-in notification configuration:
 ```yaml
 NotificationConfiguration:
   Fn::If:
-    - EnableS3ArtifactsBucketEventBridge
+    - EnablePromotionTrigger
     - EventBridgeConfiguration:
         EventBridgeEnabled: true
     - Ref: "AWS::NoValue"
@@ -546,7 +546,7 @@ The design is expected to preserve the following invariants; the testing strateg
 | Cross-account `PutObject` denied | Promote build fails with an S3 AccessDenied error; the receiving pipeline is not triggered. Resolution: confirm `PromotionSourceAccountIds` includes the sender and the writer matches `*-PromoteServiceRole` (§6.3). |
 | Object ownership mismatch (ACLs enabled on target) | Mitigated by `BucketOwnerEnforced` on the target bucket (§7.2); fallback path adds `--acl bucket-owner-full-control` on upload (§5.1). |
 | Manifest present but `source.zip` write fails | The trigger object (`source.zip`) never appears, so the receiving pipeline does not start; the stale manifest is harmless and is overwritten on the next attempt. |
-| EventBridge not enabled on target bucket | No trigger fires. Resolution: deploy account-wide infrastructure with `EnableS3ArtifactsBucketEventBridge=true` (§7.1). |
+| EventBridge not enabled on target bucket | No trigger fires. Resolution: deploy account-wide infrastructure with `EnablePromotionTrigger=true` (§7.1). |
 | Current promotion object expires at 395 days (DD-1 limitation) | Receiving stage loses its `source.zip` pointer until the next promotion re-creates it; noncurrent versions are still retained 365 days for rollback (§7.3). |
 
 ---

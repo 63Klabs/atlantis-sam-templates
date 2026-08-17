@@ -79,7 +79,7 @@ Metadata:
           default: "Promotion"
         Parameters:
           - PromotionSourceAccountIds
-          - EnableS3ArtifactsBucketEventBridge
+          - EnablePromotionTrigger
       -
         Label:
           default: "Module Source"
@@ -211,9 +211,9 @@ Parameters:
     Description: "Optional list of AWS account IDs permitted to write cross-account promotion artifacts to the account-wide artifacts bucket. When set, a bucket policy statement grants the listed accounts' *-PromoteServiceRole roles write/read access scoped to the promotions/* prefix only. Leave empty to omit the cross-account statement entirely."
     Default: ""
 
-  EnableS3ArtifactsBucketEventBridge:
+  EnablePromotionTrigger:
     Type: String
-    Description: "Set to 'true' to enable EventBridge notifications on the account-wide S3 artifacts bucket. Required for promotion source event rules that trigger receiving pipelines when a promotion artifact is written. Default is 'false'."
+    Description: "Set to 'true' to let this account's artifacts bucket automatically trigger receiving (promotion) pipelines when a promoted artifact arrives. Enable this on the receiving account when using same-account or cross-account promotion. (Under the hood this turns on S3 EventBridge notifications on the bucket, which the promotion source event rule depends on.) Default is 'false'."
     Default: "false"
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
@@ -233,7 +233,7 @@ Conditions:
   EnableS3AccessLogBucket: !Equals [!Ref EnableS3AccessLogBucket, "true"]
   EnableLegacyCloudFrontLogs: !Equals [!Ref AllowLegacyCloudFrontLogs, "true"]
   HasPromotionSourceAccounts: !Not [!Equals [!Join ["", !Ref PromotionSourceAccountIds], ""]]
-  EnableS3ArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]
+  EnablePromotionTrigger: !Equals [!Ref EnablePromotionTrigger, "true"]
 
 # =============================================================================
 # RESOURCES

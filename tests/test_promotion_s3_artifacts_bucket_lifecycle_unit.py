@@ -81,7 +81,7 @@ class TestObjectOwnershipEnforced:
 
 class TestEventBridgeOptIn:
     """Req 8.1: EventBridge notifications are opt-in (gated behind
-    EnableS3ArtifactsBucketEventBridge), defaulting to no notification
+    EnablePromotionTrigger), defaulting to no notification
     configuration change for existing deployments."""
 
     def test_notification_configuration_gated_by_condition(self, template):
@@ -89,7 +89,7 @@ class TestEventBridgeOptIn:
         assert "!If" in notification_config or "Fn::If" in notification_config
         if_key = "!If" if "!If" in notification_config else "Fn::If"
         cond_name, enabled_value, disabled_value = notification_config[if_key]
-        assert cond_name == "EnableS3ArtifactsBucketEventBridge"
+        assert cond_name == "EnablePromotionTrigger"
         assert enabled_value == {"EventBridgeConfiguration": {"EventBridgeEnabled": True}}
 
     def test_disabled_branch_is_no_value(self, template):

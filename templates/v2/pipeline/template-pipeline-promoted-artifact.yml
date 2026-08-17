@@ -594,7 +594,7 @@ Resources:
   # EventBridge rule that detects the arrival of the promoted source.zip in the
   # account-wide artifacts bucket and starts this (receiving) pipeline. Requires
   # EventBridge notifications enabled on the artifacts bucket (account-wide
-  # infrastructure, EnableS3ArtifactsBucketEventBridge=true).
+  # infrastructure, EnablePromotionTrigger=true).
 
   PromotionSourceEvent:
     Fn::Transform:
