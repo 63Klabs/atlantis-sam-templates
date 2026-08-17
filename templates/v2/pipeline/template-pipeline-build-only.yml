@@ -409,6 +409,13 @@ Resources:
             - !Sub "arn:aws:s3:::${S3ArtifactsBucket}"
             - !Sub "arn:aws:s3:::${S3ArtifactsBucket}/*"
 
+          - Sid: ApprovalNotifications
+            Effect: Allow
+            Action:
+            - sns:Publish
+            Resource:
+            - !Ref PipelineNotificationTopic
+
   # -- CodeBuild Service Role --
 
   CodeBuildServiceRole:

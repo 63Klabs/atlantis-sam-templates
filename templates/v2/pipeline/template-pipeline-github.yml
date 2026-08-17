@@ -516,6 +516,13 @@ Resources:
             Resource:
             - !GetAtt 'CloudFormationSvcRole.Arn'
 
+          - Sid: ApprovalNotifications
+            Effect: Allow
+            Action:
+            - sns:Publish
+            Resource:
+            - !Ref PipelineNotificationTopic
+
           - Sid: CodeConnectionsAccess
             Effect: Allow
             Action:

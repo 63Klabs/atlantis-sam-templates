@@ -416,6 +416,7 @@ Service role for CodePipeline to access resources during pipeline execution.
 - **Source Phase**: Read access to CodeCommit repository
 - **Build Phase**: Full access to CodeBuild project and report groups
 - **Artifacts**: Read/write access to S3 artifacts bucket
+- **SNS**: sns:Publish to the pipeline notification topic (for manual approval action notifications)
 
 > **Note:** This role does NOT include CloudFormation permissions since this template does not have a Deploy stage.
 

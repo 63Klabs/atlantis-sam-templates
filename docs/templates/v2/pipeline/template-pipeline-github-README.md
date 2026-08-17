@@ -480,6 +480,7 @@ Service role for CodePipeline to access resources during pipeline execution.
 - **Artifacts**: Read/write access to S3 artifacts bucket
 - **IAM**: PassRole permission for CloudFormation service role
 - **CodeConnections**: UseConnection permission for GitHub connection
+- **SNS**: sns:Publish to the pipeline notification topic (for manual approval action notifications)
 
 > **Important:** This role includes permissions for both CodeConnections and the deprecated CodeStar Connections. The Pipeline Source Stage currently only works with CodeStar Connections provider, though CodeConnections is the recommended approach.
 

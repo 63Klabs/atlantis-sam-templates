@@ -534,6 +534,7 @@ Service role for CodePipeline to access resources during pipeline execution. Def
 - **DeployPhaseCloudFormation**: Full access to the application CloudFormation stack/stackset
 - **ManageArtifactsInS3**: Read/write access to `S3ArtifactsBucket` (covers both the S3 Source read and the pipeline `ArtifactStore`)
 - **PassRole**: `iam:PassRole` for `CloudFormationSvcRole`
+- **SNS**: sns:Publish to the pipeline notification topic (for manual approval action notifications)
 
 ### CodeBuildServiceRole
 

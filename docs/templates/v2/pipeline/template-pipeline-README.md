@@ -536,6 +536,7 @@ Service role for CodePipeline to access resources during pipeline execution. Thi
 - **Deploy Phase**: Full access to CloudFormation stack operations
 - **Artifacts**: Read/write access to S3 artifacts bucket
 - **IAM**: PassRole permission for CloudFormation service role
+- **SNS**: sns:Publish to the pipeline notification topic (for manual approval action notifications)
 
 ### CodeBuildServiceRole
 
