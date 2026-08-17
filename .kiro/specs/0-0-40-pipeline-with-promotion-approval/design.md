@@ -212,7 +212,7 @@ The receiving pipeline's watched key is derived from its **own** `Prefix`/`Proje
 
 **account-wide-infrastructure.yml:**
 - `HasPromotionSourceAccounts: !Not [!Equals [!Join ["", !Ref PromotionSourceAccountIds], ""]]`
-- `EnableArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]`
+- `EnableS3ArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]`
 
 ---
 
@@ -417,8 +417,9 @@ Add an opt-in notification configuration:
 ```yaml
 NotificationConfiguration:
   Fn::If:
-    - EnableArtifactsBucketEventBridge
-    - EventBridgeConfiguration: {}
+    - EnableS3ArtifactsBucketEventBridge
+    - EventBridgeConfiguration:
+        EventBridgeEnabled: true
     - Ref: "AWS::NoValue"
 ```
 Default (`false`) leaves existing deployments unchanged (Req 8.1). When enabled, the account-wide artifacts bucket emits `Object Created` events to the default event bus in the bucket's region; the receiving-region rule (§7.4) consumes them — this is what makes cross-region promotion work with no extra components (NFR #4).

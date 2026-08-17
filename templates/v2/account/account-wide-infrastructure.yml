@@ -233,7 +233,7 @@ Conditions:
   EnableS3AccessLogBucket: !Equals [!Ref EnableS3AccessLogBucket, "true"]
   EnableLegacyCloudFrontLogs: !Equals [!Ref AllowLegacyCloudFrontLogs, "true"]
   HasPromotionSourceAccounts: !Not [!Equals [!Join ["", !Ref PromotionSourceAccountIds], ""]]
-  EnableArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]
+  EnableS3ArtifactsBucketEventBridge: !Equals [!Ref EnableS3ArtifactsBucketEventBridge, "true"]
 
 # =============================================================================
 # RESOURCES

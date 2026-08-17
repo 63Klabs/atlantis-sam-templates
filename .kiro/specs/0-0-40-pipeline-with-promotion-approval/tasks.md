@@ -100,7 +100,7 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 - [x] 2.1 Update `templates/v2/modules/account-wide/s3-artifacts-bucket.yml`
   - Change `NoncurrentVersionExpirationInDays` in the `ExpireObjects` rule from `30` to `365`; keep `ExpirationInDays: 395` and `AbortIncompleteMultipartUpload` unchanged.
   - Add `OwnershipControls: Rules: [{ ObjectOwnership: BucketOwnerEnforced }]`.
-  - Add conditional `NotificationConfiguration` = `Fn::If [EnableArtifactsBucketEventBridge, { EventBridgeConfiguration: {} }, AWS::NoValue]`.
+  - Add conditional `NotificationConfiguration` = `Fn::If [EnableS3ArtifactsBucketEventBridge, { EventBridgeConfiguration: { EventBridgeEnabled: true } }, AWS::NoValue]`.
   - Update the module contract comment (new conditions consumed).
   - _Requirements: 7.6, 8.1, 12.1, 12.2, 12.3, 12.4, 12.5_
 
@@ -115,7 +115,7 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 
 - [x] 2.3 Update `templates/v2/account/account-wide-infrastructure.yml` parent
   - Add parameters `PromotionSourceAccountIds` (`CommaDelimitedList`, default `""`) and `EnableS3ArtifactsBucketEventBridge` (`String`, `true`/`false`, default `false`), grouped under a "Promotion" metadata group.
-  - Add conditions `HasPromotionSourceAccounts` and `EnableArtifactsBucketEventBridge`.
+  - Add conditions `HasPromotionSourceAccounts` and `EnableS3ArtifactsBucketEventBridge`.
   - Confirm cfn-lint `AWS::Include` suppressions are present.
   - _Requirements: 7.1, 8.1, 15.4, 15.5_
 

@@ -1,6 +1,6 @@
 # -- S3 Artifacts Bucket (Account-Wide) --
 # Parent template must define parameters: S3BucketNameOrgPrefix, S3LogBucketName
-# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket, EnableS3AccessLogBucket, EnableArtifactsBucketEventBridge
+# Parent template must define conditions: UseS3BucketNameOrgPrefix, HasLoggingBucket, EnableS3ArtifactsBucket, EnableS3AccessLogBucket, EnableS3ArtifactsBucketEventBridge
 # Parent must name the access log bucket resource 'AccessLogBucketRegional' (when EnableS3AccessLogBucket)
 #
 # Creates an account-wide S3 bucket for pipeline build artifacts.
@@ -60,6 +60,7 @@ Properties:
           - Ref: "AWS::NoValue"
   NotificationConfiguration:
     Fn::If:
-      - EnableArtifactsBucketEventBridge
-      - EventBridgeConfiguration: {}
+      - EnableS3ArtifactsBucketEventBridge
+      - EventBridgeConfiguration:
+          EventBridgeEnabled: true
       - Ref: "AWS::NoValue"
