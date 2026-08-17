@@ -422,4 +422,4 @@ Outputs:
 
   IamPoliciesConsole:
     Description: "IAM Policies in AWS Console"
-    Value: !Sub "https://console.aws.amazon.com/iam/home#/policies"
+    Value: "https://console.aws.amazon.com/iam/home#/policies"

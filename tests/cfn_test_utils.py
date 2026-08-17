@@ -485,3 +485,157 @@ def validate_regex_pattern(pattern: str, test_strings: List[str]) -> Dict[str, A
             results['non_matching_strings'].append(test_string)
     
     return results
+
+
+# =============================================================================
+# Lightweight CFN condition / intrinsic evaluators for promotion tests
+# -----------------------------------------------------------------------------
+# These helpers statically evaluate a small, known subset of CloudFormation
+# intrinsic functions (as parsed by CFNLoader, i.e. short-form tag keys like
+# '!Not', '!Equals', '!Ref', '!Condition', '!And', '!Or', as well as long-form
+# 'Fn::If'/'Ref'/'Fn::Sub' used inside AWS::Include modules) against a supplied
+# set of parameter values. They are intentionally narrow (only what these
+# templates actually use) rather than a general-purpose CFN interpreter.
+# =============================================================================
+
+
+def _tag_get(mapping, *keys):
+    """Return (key, value) for the first key present in mapping, else (None, None)."""
+    for key in keys:
+        if key in mapping:
+            return key, mapping[key]
+    return None, None
+
+
+def resolve_ref_shortform(value, params):
+    """Resolve a short-form !Ref (or Ref) node to its parameter value.
+
+    Non-Ref values are returned unchanged (e.g. literal strings used as the
+    right-hand side of !Equals).
+    """
+    if isinstance(value, dict):
+        _, name = _tag_get(value, '!Ref', 'Ref')
+        if name is not None:
+            return params.get(name, '')
+    return value
+
+
+def eval_condition(cond_def, conditions, params):
+    """Evaluate a short-form CFN Condition definition given parameter values.
+
+    Supports the subset of intrinsics used by this repository's pipeline
+    templates: !Not, !And, !Or, !Equals, !Condition, plus bare !Ref/literal
+    comparison operands.
+
+    Args:
+        cond_def: The condition's AST (as parsed by CFNLoader) OR a condition
+            name (str) to look up in `conditions`.
+        conditions: The template's full Conditions section (dict of name -> AST).
+        params: Dict of parameter name -> string value to use for !Ref lookups.
+
+    Returns:
+        bool: The evaluated truth value of the condition.
+    """
+    if isinstance(cond_def, str):
+        # Treat as a condition name reference.
+        return eval_condition(conditions[cond_def], conditions, params)
+
+    if not isinstance(cond_def, dict):
+        return bool(cond_def)
+
+    key, val = _tag_get(cond_def, '!Not', 'Fn::Not')
+    if key is not None:
+        return not eval_condition(val[0], conditions, params)
+
+    key, val = _tag_get(cond_def, '!And', 'Fn::And')
+    if key is not None:
+        return all(eval_condition(c, conditions, params) for c in val)
+
+    key, val = _tag_get(cond_def, '!Or', 'Fn::Or')
+    if key is not None:
+        return any(eval_condition(c, conditions, params) for c in val)
+
+    key, val = _tag_get(cond_def, '!Equals', 'Fn::Equals')
+    if key is not None:
+        left = resolve_ref_shortform(val[0], params)
+        right = resolve_ref_shortform(val[1], params)
+        return left == right
+
+    key, val = _tag_get(cond_def, '!Condition', 'Condition')
+    if key is not None:
+        return eval_condition(val, conditions, params)
+
+    raise ValueError(f"Unsupported condition AST: {cond_def!r}")
+
+
+def get_included_stage_names(stages, conditions, params):
+    """Given a Stages list (with possible !If-wrapped conditional stages),
+    return the ordered list of stage Names that would render given `params`.
+
+    Each entry in `stages` is either:
+      - a plain stage dict with a 'Name' key, or
+      - {'!If': [condition_name, stage_dict, <else-branch>]}
+
+    The else-branch (typically !Ref AWS::NoValue) causes the stage to be
+    omitted when the condition is false.
+    """
+    included = []
+    for entry in stages:
+        if isinstance(entry, dict):
+            key, if_args = _tag_get(entry, '!If', 'Fn::If')
+            if key is not None:
+                cond_name, true_val, _false_val = if_args
+                if eval_condition(cond_name, conditions, params):
+                    included.append(true_val.get('Name'))
+                continue
+            included.append(entry.get('Name'))
+    return included
+
+
+def resolve_longform(value, conditions_bool, refs):
+    """Resolve a long-form (AWS::Include module) intrinsic-function AST to a
+    concrete string, given precomputed condition booleans and Ref values.
+
+    Supports: Fn::If, Ref, Fn::GetAtt (returns a placeholder), and Fn::Sub
+    (both the plain-string form and the [template, {vars}] form).
+
+    Args:
+        value: The AST node to resolve.
+        conditions_bool: Dict of condition name -> bool (supplied directly by
+            the test; these modules don't define their own Conditions section).
+        refs: Dict of Ref/pseudo-parameter name -> string value.
+    """
+    if isinstance(value, dict):
+        if 'Fn::If' in value:
+            cond_name, true_val, false_val = value['Fn::If']
+            branch = true_val if conditions_bool[cond_name] else false_val
+            return resolve_longform(branch, conditions_bool, refs)
+
+        if 'Ref' in value:
+            name = value['Ref']
+            return refs.get(name, f"{{{name}}}")
+
+        if 'Fn::GetAtt' in value:
+            return "{{GetAtt:%s}}" % ".".join(value['Fn::GetAtt'])
+
+        if 'Fn::Sub' in value:
+            sub_val = value['Fn::Sub']
+            if isinstance(sub_val, str):
+                template, var_map = sub_val, {}
+            else:
+                template, var_map = sub_val[0], sub_val[1]
+
+            resolved_vars = {
+                k: resolve_longform(v, conditions_bool, refs)
+                for k, v in var_map.items()
+            }
+
+            def repl(match):
+                name = match.group(1)
+                if name in resolved_vars:
+                    return str(resolved_vars[name])
+                return str(refs.get(name, f"{{{name}}}"))
+
+            return re.sub(r"\$\{([^}]+)\}", repl, template)
+
+    return value

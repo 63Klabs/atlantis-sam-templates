@@ -14,6 +14,29 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.40 - unreleased
+
+### Added
+- **Cross-Account Promotion Pipeline** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added a new S3-triggered receiving pipeline template and supporting modules for cross-account (or same-account) artifact promotion, with an optional manual approval gate
+  - Pipeline: template-pipeline-promoted-artifact.yml v0.0.0 - New receiving pipeline: Source (S3) -> [ApproveRelease] -> Build -> [Deploy] -> [PostDeploy] -> [ApproveToPromote] -> [Promote]
+  - Modules: promote-service-role.yml - IAM role for the Promote CodeBuild project, scoped to read the local artifacts bucket and read/write the target promotion bucket's promotions/* prefix
+  - Modules: promote-project.yml - CodeBuild project that packages and uploads the promoted source artifact and manifest to the target account/bucket
+  - Modules: promote-log-group.yml - CloudWatch log group for the Promote CodeBuild project
+  - Modules: promotion-source-event-rule.yml - EventBridge rule that starts the receiving pipeline when a promotion artifact is written to S3
+  - Modules: promotion-source-event-service-role.yml - IAM role allowing EventBridge to start the receiving pipeline
+- **Approval-Audit CLI** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added docs/admin-ops/approval-audit-cli.md documenting CLI one-liners to enumerate deployed pipelines missing the ApproveToPromote or ApproveRelease manual approval gates
+- **Promotion Integration Test Procedure** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added docs/maintainer/promotion-integration-test.md documenting a manual two-account (and same-account) end-to-end promotion validation procedure
+
+### Changed
+- **Promotion (Send to Next Stage) Capability** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added optional, additive, default-off Promote/ApproveToPromote stages and a new "Promotion (Send to Next Stage)" parameter group to the origin pipeline templates; existing deployments render identically until promotion is explicitly enabled
+  - Pipeline: template-pipeline.yml v2.0.23 - Added optional Promote/ApproveToPromote stages and Promotion (Send to Next Stage) parameter group
+  - Pipeline: template-pipeline-github.yml v2.0.5 - Added optional Promote/ApproveToPromote stages and Promotion (Send to Next Stage) parameter group
+  - Pipeline: template-pipeline-build-only.yml v2.0.7 - Added optional Promote/ApproveToPromote stages and Promotion (Send to Next Stage) parameter group
+- **Account: account-wide-infrastructure.yml (v0.0.0, development mode)** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added PromotionSourceAccountIds and EnableS3ArtifactsBucketEventBridge parameters, consumed by the s3-artifacts-bucket-policy.yml module (optional cross-account promotions/* write statement) and the s3-artifacts-bucket.yml module (optional EventBridge notifications, BucketOwnerEnforced ownership, and NoncurrentVersionExpirationInDays raised from 30 to 365)
+  - Modules: s3-artifacts-bucket.yml - Additive changes: BucketOwnerEnforced ownership controls, conditional EventBridge notifications, NoncurrentVersionExpirationInDays raised from 30 to 365
+  - Modules: s3-artifacts-bucket-policy.yml - Additive change: optional cross-account write statement scoped to promotions/* for configured PromotionSourceAccountIds
+- **Documentation: Pipeline Template READMEs** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Updated template-pipeline-README.md, template-pipeline-github-README.md, and template-pipeline-build-only-README.md, and the pipeline category README, to document the new promotion parameters, stages, and resources; added template-pipeline-promoted-artifact-README.md
+
 ## v0.0.39 (2026-08-11)
 
 ### Added

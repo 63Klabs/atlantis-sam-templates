@@ -167,3 +167,36 @@ This is a **pure additive allow-scope entry**: it grants the pipeline role permi
 ### Conclusion
 
 **Backward compatible: YES.** All three origin templates are additive and default-off. With promotion parameters at defaults, `IsPromoteEnabled`, `IsPromoteEnabledAndApprovalRequired`, and `IsPromoteEnabledAndNotDev` are all false; the promote modules are not created, and both new stages resolve to `AWS::NoValue`. The only unconditional addition (the `-Promote` ARN in the pipeline service role's `BuildPhase`) is an inert extra allow-scope entry with no behavioral impact when the Promote stage is absent. Existing deployments render identically after this change. cfn-lint validates all three templates clean.
+
+---
+
+## Task 7.3 — Approval-audit CLI documented in `docs/admin-ops/`
+
+**Date:** 2026-08-16
+**Type:** Documentation
+**Requirements:** 14.1, 14.2, 14.3, 14.4, 14.5
+**Status:** Complete.
+
+### What was done
+
+- No existing file for this content was found in `docs/admin-ops/` (only `README.md` and `account-management.md` existed). Created `docs/admin-ops/approval-audit-cli.md` and linked it from `docs/admin-ops/README.md`.
+- Used the exact `resourcegroupstaggingapi get-resources` query recorded in Task 0.2's findings above as the enumeration mechanism (Req 14.6), scoped to `Atlantis=pipeline-infrastructure` (Req 14.5).
+- Wrote three copy-paste one-liners chaining tag enumeration → `aws codepipeline get-pipeline` → `jq` structure inspection (Req 14.3):
+  1. Has a `Promote` stage but no `ApproveToPromote` action (Req 14.2.1).
+  2. Has an S3-provider `Source` action but no `ApproveRelease` action (Req 14.2.2).
+  3. Union of the above (Req 14.2.3).
+- Each command only flags pipelines that actually contain the relevant stage/action type, so non-participating pipelines are never flagged (Req 14.4) — verified against sample data including a plain pipeline with no promotion at all.
+- Included the risk/gap note from Task 0.2 (external deploy tooling owns the tag; case-sensitivity) directly in the new doc so operators see the caveat where they'll use the commands.
+
+### Verification performed (no live AWS credentials available)
+
+- Installed `jq` locally and validated filter syntax against hand-built sample JSON shaped to match the real `aws codepipeline get-pipeline` response envelope (`{"pipeline": {"name", "stages": [{"name", "actions": [{"name", "actionTypeId": {"category","owner","provider","version"}}]}]}, "metadata": {...}}`), confirmed via the `codepipeline` botocore service model (`PipelineDeclaration` / `StageDeclaration` / `ActionDeclaration` / `ActionTypeId` shapes).
+- Test fixtures: a plain origin pipeline (Promote, no ApproveToPromote), a fully-gated origin pipeline (Promote + ApproveToPromote), a non-promoting pipeline (no Promote stage), a receiving pipeline (S3 source, no ApproveRelease), and a fully-gated receiving pipeline (S3 source + ApproveRelease).
+- Ran all three jq filters directly against the fixtures: command 1 matched only the ungated origin pipeline; command 2 matched only the ungated receiving pipeline; command 3 matched the union of both. The non-promoting and fully-gated pipelines were correctly excluded from all three.
+- Additionally dry-ran the full bash one-liners (tag enumeration → per-pipeline `get-pipeline` → `jq`) end-to-end using a local shell stand-in for the `aws` CLI that returned the same fixtures, confirming the `awk -F: '{print $NF}'` ARN-to-name extraction and the `tr '\t' '\n'` splitting of the tagging API's `--output text` result work as intended.
+- Cleaned up all temporary fixture files after verification.
+
+### Files changed
+
+- `docs/admin-ops/approval-audit-cli.md` (new)
+- `docs/admin-ops/README.md` (added link)

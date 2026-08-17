@@ -9,15 +9,16 @@ Pipeline templates provide continuous integration and continuous deployment (CI/
 ## Available Templates
 
 ### [template-pipeline.yml](template-pipeline-README.md)
-**Version:** v2.0.17 | **Last Updated:** 2025-12-16
+**Version:** v2.0.23 | **Last Updated:** 2026-08-15
 
-Full-featured CI/CD pipeline for AWS SAM deployments using AWS CodeCommit as the source repository. Includes Source, Build, Deploy, and optional PostDeploy stages.
+Full-featured CI/CD pipeline for AWS SAM deployments using AWS CodeCommit as the source repository. Includes Source, Build, Deploy, optional PostDeploy, and optional promotion (Approve-to-Promote + Promote) stages.
 
 **Key Features:**
 - CodeCommit repository integration with branch-specific triggers
 - CodeBuild for building and packaging SAM applications
 - CloudFormation deployment with changeset execution
 - Optional PostDeploy stage for integration tests and configuration export
+- Optional, default-off promotion to a downstream stage (same or cross account/region)
 - Pipeline notifications via SNS and EventBridge
 - Comprehensive IAM roles with least-privilege permissions
 
@@ -25,16 +26,18 @@ Full-featured CI/CD pipeline for AWS SAM deployments using AWS CodeCommit as the
 - Full serverless application deployments (Lambda, API Gateway, DynamoDB, etc.)
 - Applications requiring post-deployment validation or testing
 - Projects using AWS CodeCommit for source control
+- Multi-stage promotion pipelines (e.g. test → beta → prod)
 
 ### [template-pipeline-github.yml](template-pipeline-github-README.md)
-**Version:** v2.0.1 | **Last Updated:** 2025-05-16
+**Version:** v2.0.5 | **Last Updated:** 2026-08-15
 
-CI/CD pipeline for AWS SAM deployments using GitHub as the source repository via AWS CodeConnections.
+CI/CD pipeline for AWS SAM deployments using GitHub as the source repository via AWS CodeConnections. Includes optional promotion (Approve-to-Promote + Promote) stages.
 
 **Key Features:**
 - GitHub repository integration via CodeConnections
 - CodeBuild for building and packaging SAM applications
 - CloudFormation deployment with changeset execution
+- Optional, default-off promotion to a downstream stage (same or cross account/region)
 - Pipeline notifications via SNS and EventBridge
 - Comprehensive IAM roles with least-privilege permissions
 
@@ -42,16 +45,18 @@ CI/CD pipeline for AWS SAM deployments using GitHub as the source repository via
 - Serverless applications hosted on GitHub
 - Teams using GitHub for source control and collaboration
 - Projects requiring GitHub Actions integration
+- Multi-stage promotion pipelines (e.g. test → beta → prod)
 
 ### [template-pipeline-build-only.yml](template-pipeline-build-only-README.md)
-**Version:** v2.0.3 | **Last Updated:** 2025-05-12
+**Version:** v2.0.7 | **Last Updated:** 2026-08-15
 
-Simplified pipeline with only Source and Build stages (no CloudFormation deployment). Ideal for build-and-copy workflows.
+Simplified pipeline with only Source and Build stages (no CloudFormation deployment). Ideal for build-and-copy workflows. Includes optional promotion (Approve-to-Promote + Promote) stages.
 
 **Key Features:**
 - CodeCommit repository integration
 - CodeBuild for building and copying artifacts
 - No CloudFormation deployment stage
+- Optional, default-off promotion to a downstream stage (same or cross account/region)
 - Pipeline notifications via SNS and EventBridge
 - Simplified IAM roles focused on build operations
 
@@ -59,6 +64,23 @@ Simplified pipeline with only Source and Build stages (no CloudFormation deploym
 - Static website builds that copy to S3
 - Build processes that don't require CloudFormation deployment
 - Custom deployment workflows handled outside the pipeline
+
+### [template-pipeline-promoted-artifact.yml](template-pipeline-promoted-artifact-README.md)
+**Version:** v0.0.0 | **Last Updated:** 2026-08-15
+
+S3-triggered "receiving" pipeline for cross-account (or same-account) promotion. Triggered by an EventBridge rule when an origin pipeline's Promote stage writes a promoted source archive (`source.zip`) into the account-wide artifacts bucket under `promotions/*`. Rebuilds and deploys from that archive with the same Build behavior as the origin pipelines, and can itself chain promotion onward (e.g. `beta` → `prod`).
+
+**Key Features:**
+- S3 Source action watching a stable, per-target trigger key (no polling)
+- Optional `ApproveRelease` manual approval gate before Build (default-on)
+- Deploy stage optional/skippable (`DeployStageEnabled`) for build-only-style receiving workloads
+- Supports its own optional PostDeploy and promotion (Approve-to-Promote + Promote) stages for chained promotion
+- Pipeline notifications via SNS and EventBridge
+
+**Use Cases:**
+- Receiving side of cross-account promotion (DEV/TEST/PROD account topology)
+- Same-account multi-stage promotion (e.g. test → beta → prod within one account)
+- Auditable, approval-gated release into beta/prod environments
 
 ## Common Features
 
@@ -82,6 +104,8 @@ All pipeline templates include:
 | Build-only workflow (no CloudFormation) | template-pipeline-build-only.yml |
 | Post-deployment testing/validation | template-pipeline.yml (with PostDeploy enabled) |
 | Static website deployment | template-pipeline-build-only.yml |
+| Receiving side of a promoted (cross-account/stage) deployment | template-pipeline-promoted-artifact.yml |
+| Sending side of a promotion (test → beta, beta → prod, etc.) | Any origin template above, with the Promotion parameter group configured |
 
 ## Prerequisites
 
@@ -181,12 +205,19 @@ To minimize costs:
 - Ensure PostDeployServiceRole has necessary permissions
 - Confirm deployed resources are accessible
 
+### Promote Stage Fails or Receiving Pipeline Doesn't Trigger (origin templates)
+- Verify `PromoteTargetStageId` equals the receiving pipeline's `StageId` exactly
+- For cross-account promotion, confirm the receiving account's `PromotionSourceAccountIds` includes the sending account
+- Confirm the receiving account-wide bucket was deployed with `EnableS3ArtifactsBucketEventBridge="true"`
+- Check the Promote CodeBuild logs (`/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote`) for the exact S3 error
+
 ## Related Templates
 
 Pipeline templates are typically used with:
 
 - **Service Role Templates**: Pre-created service roles for CloudFormation
 - **Storage Templates**: S3 buckets for artifacts and static hosting
+- **Account Templates**: [account-wide-infrastructure.yml](../account/account-wide-infrastructure-README.md) provides the account-wide artifacts bucket, cross-account promotion bucket policy, and EventBridge opt-in used by promotion
 - **Application Templates**: The SAM templates being deployed by the pipeline
 
 ## Additional Resources

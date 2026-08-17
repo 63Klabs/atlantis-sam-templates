@@ -201,11 +201,11 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
 
 ### 6. Testing
 
-- [ ] 6.1 cfn-lint all changed/added templates
+- [x] 6.1 cfn-lint all changed/added templates
   - `template-pipeline.yml`, `-github.yml`, `-build-only.yml`, `template-pipeline-promoted-artifact.yml`, `account-wide-infrastructure.yml`.
   - _Requirements: 19.1_
 
-- [ ] 6.2 Unit-style render/structure tests
+- [x] 6.2 Unit-style render/structure tests
   - Origin: defaults ⇒ no `Promote`/`ApproveToPromote`; `PromoteTargetStageId` set + approval `true` ⇒ both present in order; approval `false` ⇒ `Promote` only.
   - Receiving: `ReleaseApprovalRequired=false` ⇒ no `ApproveRelease`; `DeployStageEnabled=false` ⇒ no Deploy stage.
   - Bucket policy: empty `PromotionSourceAccountIds` ⇒ no cross-account statement; non-empty ⇒ statement present, `promotions/*` only, `*-PromoteServiceRole` condition.
@@ -213,32 +213,34 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
   - Lifecycle: `NoncurrentVersionExpirationInDays == 365`, `ExpirationInDays == 395`.
   - _Requirements: 3.7, 5.2, 5.3, 7.2, 7.3, 7.4, 10.5, 12.1, 19.2, 19.3_
 
-- [ ] 6.3 (optional) Minimal property-based checks only where they add value beyond 6.2
+- [x] 6.3 (optional) Minimal property-based checks only where they add value beyond 6.2
+  - Skipped: the target-bucket derivation matrix (org-prefix × same/cross account/region, the input space this would otherwise cover) is already exercised exhaustively by concrete unit-test scenarios in 6.2 (`test_promotion_target_bucket_derivation_unit.py`). No other core validation invariant in this feature has an input space large enough to justify a property test, so per the testing-guidelines steering (prioritize fast unit tests; only add PBTs where they provide unique value) this task is skipped rather than adding tests for their own sake.
   - _Requirements: 19.2_
 
-- [ ] 6.4 Clean up any temporary render files produced by tests
+- [x] 6.4 Clean up any temporary render files produced by tests
+  - No temporary/scratch render files were created during testing (tests statically parse/evaluate template YAML in-memory; no rendered YAML/JSON dumps or temp directories were written). Nothing to clean up.
   - _Requirements: 19.5_
 
 ### 7. Documentation (final; only for modified/added templates)
 
-- [ ] 7.1 Create `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md`
+- [x] 7.1 Create `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md`
   - Full end-user structure: Overview, Parameters by group, Resources, Outputs, plus Examples/Troubleshooting/Related as relevant.
   - _Requirements: 18.1_
 
-- [ ] 7.2 Update existing pipeline READMEs + category README
+- [x] 7.2 Update existing pipeline READMEs + category README
   - Document new promotion parameters, stages (`ApproveToPromote`/`Promote`), and resources in the three origin template READMEs (preserve blockquotes/custom content); add the new template to the pipeline category README.
   - _Requirements: 18.2, 18.3_
 
-- [ ] 7.3 Approval-audit CLI in `docs/admin-ops/`
+- [x] 7.3 Approval-audit CLI in `docs/admin-ops/`
   - Three copy-paste one-liners (enumerate by tag `Atlantis=pipeline-infrastructure`, then inspect `get-pipeline`): (1) has `Promote` stage but no `ApproveToPromote`; (2) has S3 source but no `ApproveRelease`; (3) either. Include the consequence context.
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-- [ ] 7.4 Manual two-account integration test in `docs/maintainer/`
+- [x] 7.4 Manual two-account integration test in `docs/maintainer/`
   - Step-by-step procedure to validate cross-account promotion end-to-end (and a same-account variant).
   - _Requirements: 18.5, 19.4_
 
 ### 8. Changelog
 
-- [ ] 8.1 Add `## v0.0.40 - unreleased` to `CHANGELOG.md` (append only; do not modify existing text)
+- [x] 8.1 Add `## v0.0.40 - unreleased` to `CHANGELOG.md` (append only; do not modify existing text)
   - Entries per modified/added template with versions, referencing this spec: pipeline v2.0.23 / github v2.0.5 / build-only v2.0.7 (Added: promotion send stages), new `template-pipeline-promoted-artifact.yml` v0.0.0 (Added), `account-wide-infrastructure.yml` (Changed: cross-account promotion policy, EventBridge opt-in, noncurrent retention 30→365).
   - _Requirements: 17.5_
