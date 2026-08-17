@@ -81,6 +81,8 @@ Parameters for deployment environment configuration.
 - [S3ArtifactsBucket](#s3artifactsbucket)
 - [S3StaticHostBucket](#s3statichostbucket)
 - [BuildSpec](#buildspec)
+- [Repository](#repository)
+- [RepositoryBranch](#repositorybranch)
 
 ### Release Approval and Deploy Control
 
@@ -239,7 +241,7 @@ Existing S3 bucket name used for both the S3 Source (promoted artifact) location
 | Allowed Pattern | `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` |
 | Constraint Description | May only contain alphanumeric characters, dashes, and must begin and end with a letter or number. |
 
-This is the account-wide artifacts bucket for this account/region; the pipeline reads `promotions/<Prefix>-<ProjectId>/<StageId>/source.zip` from it and stores pipeline artifacts in it. Must be in the same AWS account and region as the stack. Unlike the origin templates, this template does not have separate `Repository`/`RepositoryBranch`/`GitHubConnectionArn` parameters - the S3 bucket is the sole source.
+This is the account-wide artifacts bucket for this account/region; the pipeline reads `promotions/<Prefix>-<ProjectId>/<StageId>/source.zip` from it and stores pipeline artifacts in it. Must be in the same AWS account and region as the stack. Unlike the origin templates, this template has no `GitHubConnectionArn` and does not use a repository as its source - the S3 bucket is the sole source. (`Repository` and `RepositoryBranch` still exist as informational, default-valued parameters - defaulting to `PROMOTED`/`promoted` - that only populate CodeBuild environment variables; see [Repository](#repository) and [RepositoryBranch](#repositorybranch).)
 
 #### S3StaticHostBucket
 
@@ -266,6 +268,32 @@ Path to the Build stage's CodeBuild buildspec file (local or S3).
 | Constraint Description | Must be a valid S3 URI or a local path ending with 'buildspec.yml'. For example, 'buildspec.yml', 'application-infrastructure/buildspec.yml' or 's3://mybucket/buildspec.yml'. If empty, buildspec.yml at root of repo will be sought. |
 
 Best practice is to have a single buildspec file for all instances of an application, matching the buildspec used by the origin pipeline for this project (the promoted archive contains the same repository tree).
+
+#### Repository
+
+Informational repository identifier passed to the Build and PostDeploy CodeBuild projects as the `REPOSITORY` environment variable.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | PROMOTED |
+| Allowed Pattern | `^$\|^[a-zA-Z0-9][a-zA-Z0-9_\-\/]{0,62}[a-zA-Z0-9]$` |
+| Constraint Description | May be empty, or a valid repository name/identifier (alphanumeric, dashes, underscores, slashes). |
+
+This receiving pipeline's real source is the promoted S3 archive, not a repository, so this value defaults to `PROMOTED`. The parameter exists so the shared Build/PostDeploy CodeBuild modules (which set the `REPOSITORY` environment variable via `Ref: Repository`) resolve without requiring you to supply anything. You may optionally override it with the origin repository (name or `owner/repository`) for traceability in build logs and application buildspecs.
+
+#### RepositoryBranch
+
+Informational branch identifier passed to the Build and PostDeploy CodeBuild projects as the `REPOSITORY_BRANCH` environment variable.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | promoted |
+| Allowed Pattern | `^[a-zA-Z0-9][a-zA-Z0-9_\-\/]{0,14}[a-zA-Z0-9]$` |
+| Constraint Description | Must be a valid branch name. |
+
+Defaults to `promoted` for this receiving pipeline. Like `Repository`, it exists so the shared Build/PostDeploy CodeBuild modules resolve without requiring input, and it may optionally be overridden with the origin branch for traceability.
 
 #### ReleaseApprovalRequired
 
