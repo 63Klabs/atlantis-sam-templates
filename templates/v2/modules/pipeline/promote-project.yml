@@ -37,7 +37,7 @@ Properties:
   Name:
     Fn::Sub: '${Prefix}-${ProjectId}-${StageId}-Promote'
   Description:
-    Fn::Sub: "Promote CodeBuild Project for ${Prefix}-${ProjectId}-${StageId}. Re-uploads the pipeline SourceArtifact as source.zip plus an audit manifest into the promotions area of the target stage's account/region, triggering the receiving pipeline. Framework-owned inline buildspec; no app-repo override."
+    Fn::Sub: "Promotes ${Prefix}-${ProjectId}-${StageId}: re-uploads the pipeline SourceArtifact as source.zip plus a promote.json manifest to the target stage's promotions area, triggering the receiving pipeline."
   ServiceRole:
     Fn::GetAtt:
       - PromoteServiceRole
