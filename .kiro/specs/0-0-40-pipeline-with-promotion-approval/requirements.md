@@ -35,7 +35,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 - `templates/v2/account/account-wide-infrastructure.yml` (stays v0.0.0, development mode)
 
 **New template:**
-- `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (v0.0.0)
+- `templates/v2/pipeline/template-pipeline-s3-source.yml` (v0.0.0)
 
 **New modules (`templates/v2/modules/pipeline/`):**
 - `promote-project.yml`, `promote-service-role.yml`, `promote-log-group.yml`, `promotion-source-event-rule.yml`, `promotion-source-event-service-role.yml`
@@ -53,7 +53,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 | Term | Meaning |
 |---|---|
 | **Origin/sending pipeline** | A pipeline built from an existing template (`template-pipeline.yml`, `-github.yml`, `-build-only.yml`) that adds an Approve-to-Promote + Promote stage. |
-| **Receiving/promoted-artifact pipeline** | A pipeline built from the new `template-pipeline-promoted-artifact.yml`, triggered by an S3 promotion archive. |
+| **Receiving/promoted-artifact pipeline** | A pipeline built from the new `template-pipeline-s3-source.yml`, triggered by an S3 promotion archive. |
 | **Promotion bucket** | The **receiving** account's account-wide artifacts bucket (`[org-]cf-artifacts-<acct>-<region>-an`), which holds inbound promotions under `promotions/*`. |
 | **Stable trigger key** | `promotions/<prefix>-<projectId>/<stageId>/source.zip` — the object the receiving pipeline watches. |
 | **Manifest** | `promotions/<prefix>-<projectId>/<stageId>/promote.json` — audit record written alongside the archive. |
@@ -109,7 +109,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 
 #### Acceptance Criteria
 
-1. The system SHALL provide a new template `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` at version v0.0.0.
+1. The system SHALL provide a new template `templates/v2/pipeline/template-pipeline-s3-source.yml` at version v0.0.0.
 2. The template SHALL define a Source stage whose provider is S3, reading `promotions/<Prefix>-<ProjectId>/<StageId>/source.zip` from `S3ArtifactsBucket` and emitting it as the SourceArtifact.
 3. The template SHALL define a Build stage whose behavior is identical to the existing pipeline Build stage (same CodeBuild environment variables, buildspec resolution, and image), differing only in that the source is the S3 archive.
 4. The template SHALL include a Deploy stage by default, and SHALL make the Deploy stage optional/skippable via a parameter (default: included) to support build-only-style workloads.
@@ -275,7 +275,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 #### Acceptance Criteria
 
 1. The system SHALL increment `template-pipeline.yml` to v2.0.23, `template-pipeline-github.yml` to v2.0.5, and `template-pipeline-build-only.yml` to v2.0.7, each with the current date, as the first change to each template.
-2. The system SHALL create `template-pipeline-promoted-artifact.yml` at v0.0.0 (development mode).
+2. The system SHALL create `template-pipeline-s3-source.yml` at v0.0.0 (development mode).
 3. The system SHALL keep `account-wide-infrastructure.yml` at v0.0.0 (development mode; PATCH=0, no auto-increment).
 4. All changes SHALL be additive and default-off; the system SHALL NOT introduce breaking changes and SHALL NOT create new versioned template files (`-v2-1.yml`, etc.).
 5. The system SHALL add a `## v0.0.40 - unreleased` section to `CHANGELOG.md` with entries per modified/added template, referencing this spec, without modifying existing changelog text.
@@ -286,7 +286,7 @@ The design is additive and backward compatible: all new behavior is disabled by 
 
 #### Acceptance Criteria
 
-1. The system SHALL create `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md` following the end-user documentation structure (Overview, Parameters by group, Resources, Outputs, and relevant optional sections).
+1. The system SHALL create `docs/templates/v2/pipeline/template-pipeline-s3-source-README.md` following the end-user documentation structure (Overview, Parameters by group, Resources, Outputs, and relevant optional sections).
 2. The system SHALL update the affected existing pipeline template READMEs to document the new promotion parameters, stages, and resources, preserving existing blockquotes and custom content.
 3. The system SHALL update the pipeline category README to include the new template.
 4. The system SHALL document the approval-audit CLI in `docs/admin-ops/`.

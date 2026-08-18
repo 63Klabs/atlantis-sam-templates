@@ -11,7 +11,7 @@ The change set spans five areas:
 - **Account-wide artifacts** — bucket lifecycle, ownership, EventBridge opt-in, and a cross-account write policy scoped to `promotions/*`.
 - **New pipeline modules** — promote service role, promote CodeBuild project, promote log group, and the promotion-source EventBridge rule + service role.
 - **Origin templates** — additive, default-off promotion (send) capability across `template-pipeline.yml`, `template-pipeline-github.yml`, and `template-pipeline-build-only.yml`.
-- **Receiving template** — a new `template-pipeline-promoted-artifact.yml` triggered by an S3 promotion artifact.
+- **Receiving template** — a new `template-pipeline-s3-source.yml` triggered by an S3 promotion artifact.
 - **Verification & docs** — cfn-lint, fast render/structure tests, end-user docs, an approval-audit CLI, and a manual two-account integration procedure.
 
 All new pipeline parameters are additive and default-off, so existing deployments render identically until promotion is explicitly enabled.
@@ -92,7 +92,7 @@ Wave definitions (tasks in the same wave have no dependencies on each other and 
 - [x] 1.1 Bump `templates/v2/pipeline/template-pipeline.yml` header to `v2.0.23/<today>`
 - [x] 1.2 Bump `templates/v2/pipeline/template-pipeline-github.yml` header to `v2.0.5/<today>`
 - [x] 1.3 Bump `templates/v2/pipeline/template-pipeline-build-only.yml` header to `v2.0.7/<today>`
-- [x] 1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-promoted-artifact.yml` will start at `v0.0.0`.
+- [x] 1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-s3-source.yml` will start at `v0.0.0`.
   - _Requirements: 17.1, 17.2, 17.3, 17.4_
 
 ### 2. Account-wide artifacts bucket and policy
@@ -177,7 +177,7 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
 
 ### 5. New receiving template
 
-- [x] 5.1 Create `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (v0.0.0)
+- [x] 5.1 Create `templates/v2/pipeline/template-pipeline-s3-source.yml` (v0.0.0)
   - Header comment block, Metadata interface, standard parameter set minus `Repository`/`RepositoryBranch`/`GitHubConnectionArn`.
   - Add `ReleaseApprovalRequired` (default `true`, with auto-release warning), `DeployStageEnabled` (default `true`), and the `PromoteTarget*`/`PromoteApprovalRequired` set for chained promotion.
   - Module Source params + cfn-lint suppressions.
@@ -202,7 +202,7 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
 ### 6. Testing
 
 - [x] 6.1 cfn-lint all changed/added templates
-  - `template-pipeline.yml`, `-github.yml`, `-build-only.yml`, `template-pipeline-promoted-artifact.yml`, `account-wide-infrastructure.yml`.
+  - `template-pipeline.yml`, `-github.yml`, `-build-only.yml`, `template-pipeline-s3-source.yml`, `account-wide-infrastructure.yml`.
   - _Requirements: 19.1_
 
 - [x] 6.2 Unit-style render/structure tests
@@ -223,7 +223,7 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
 
 ### 7. Documentation (final; only for modified/added templates)
 
-- [x] 7.1 Create `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md`
+- [x] 7.1 Create `docs/templates/v2/pipeline/template-pipeline-s3-source-README.md`
   - Full end-user structure: Overview, Parameters by group, Resources, Outputs, plus Examples/Troubleshooting/Related as relevant.
   - _Requirements: 18.1_
 
@@ -242,5 +242,5 @@ Apply 4.x to all three origin templates: `template-pipeline.yml`, `template-pipe
 ### 8. Changelog
 
 - [x] 8.1 Add `## v0.0.40 - unreleased` to `CHANGELOG.md` (append only; do not modify existing text)
-  - Entries per modified/added template with versions, referencing this spec: pipeline v2.0.23 / github v2.0.5 / build-only v2.0.7 (Added: promotion send stages), new `template-pipeline-promoted-artifact.yml` v0.0.0 (Added), `account-wide-infrastructure.yml` (Changed: cross-account promotion policy, EventBridge opt-in, noncurrent retention 30→365).
+  - Entries per modified/added template with versions, referencing this spec: pipeline v2.0.23 / github v2.0.5 / build-only v2.0.7 (Added: promotion send stages), new `template-pipeline-s3-source.yml` v0.0.0 (Added), `account-wide-infrastructure.yml` (Changed: cross-account promotion policy, EventBridge opt-in, noncurrent retention 30→365).
   - _Requirements: 17.5_

@@ -7,7 +7,7 @@ triggering EventBridge, and starting a pipeline in that second account)
 cannot be exercised in CI. Run this procedure whenever you touch the
 promotion send/receive path (`template-pipeline.yml`,
 `template-pipeline-github.yml`, `template-pipeline-build-only.yml`,
-`template-pipeline-promoted-artifact.yml`, `account-wide-infrastructure.yml`,
+`template-pipeline-s3-source.yml`, `account-wide-infrastructure.yml`,
 or any of the `modules/pipeline/promote-*` / `promotion-source-event-*`
 modules).
 
@@ -111,7 +111,7 @@ Confirm after deploy:
 ## 3. Deploy the receiving pipeline
 
 In the **RECEIVING** account, deploy
-`templates/v2/pipeline/template-pipeline-promoted-artifact.yml` with:
+`templates/v2/pipeline/template-pipeline-s3-source.yml` with:
 
 | Parameter | Value |
 |---|---|
@@ -343,7 +343,7 @@ After the test, remove the test-only resources so they don't linger:
 - [Approval-audit CLI](../admin-ops/) — copy-paste commands to check
   `ApproveToPromote`/`ApproveRelease` gate state across deployed pipelines
   before and after this test.
-- [`template-pipeline-promoted-artifact-README.md`](../templates/v2/pipeline/template-pipeline-promoted-artifact-README.md) —
+- [`template-pipeline-s3-source-README.md`](../templates/v2/pipeline/template-pipeline-s3-source-README.md) —
   end-user parameter/resource/output reference for the receiving template.
 - [design.md](../../.kiro/specs/0-0-40-pipeline-with-promotion-approval/design.md) —
   full architecture, IAM, and data model reference for this feature.

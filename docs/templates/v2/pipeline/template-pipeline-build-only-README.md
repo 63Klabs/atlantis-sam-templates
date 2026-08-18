@@ -722,7 +722,7 @@ Parameters:
   PromoteTargetBucket: ""
 ```
 
-This promotes a validated `test`-stage build to the `beta` stage in account `222233334444` (same region), pausing for manual `ApproveToPromote` approval before the Promote stage writes the archive. Deploy [template-pipeline-promoted-artifact.yml](template-pipeline-promoted-artifact-README.md) as the `beta` pipeline in the target account to receive it.
+This promotes a validated `test`-stage build to the `beta` stage in account `222233334444` (same region), pausing for manual `ApproveToPromote` approval before the Promote stage writes the archive. Deploy [template-pipeline-s3-source.yml](template-pipeline-s3-source-README.md) as the `beta` pipeline in the target account to receive it.
 
 ## Troubleshooting
 
@@ -806,7 +806,7 @@ This template is commonly used with:
   - [template-network-route53-cloudfront-s3-apigw.yml](../network/template-network-route53-cloudfront-s3-apigw-README.md) - CloudFront distribution for S3 static hosting
 
 - **Promotion**:
-  - [template-pipeline-promoted-artifact.yml](template-pipeline-promoted-artifact-README.md) - Receiving pipeline for the Promote stage's output; deploy this in the target account/stage when using the Promotion parameter group
+  - [template-pipeline-s3-source.yml](template-pipeline-s3-source-README.md) - Receiving pipeline for the Promote stage's output; deploy this in the target account/stage when using the Promotion parameter group
   - [account-wide-infrastructure.yml](../account/account-wide-infrastructure-README.md) - Provides the account-wide artifacts bucket, cross-account promotion bucket policy, and EventBridge opt-in that the receiving pipeline depends on
 
 ## Security Considerations

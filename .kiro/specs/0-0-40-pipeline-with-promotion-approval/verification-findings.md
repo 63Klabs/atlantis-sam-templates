@@ -83,14 +83,14 @@ Notes for Task 7.3:
 
    This is a `PATCH=0` version, which is **development mode**. Per the version-control rule, no auto-increment applies to a development-mode (`v0.0.0`) template — subsequent changes stay at `v0.0.0` until the maintainer promotes it to a released version. The version was **not** changed by this task. This satisfies Requirement 17.3 (keep `account-wide-infrastructure.yml` at `v0.0.0`, development mode, PATCH=0, no auto-increment).
 
-2. **New receiving template will start at `v0.0.0`.** The new `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (created later in Task 5.1) will start at `v0.0.0` (development mode), per Requirement 17.2. This is consistent with Task 5.1's stated `(v0.0.0)` and Requirement 3.1 (template provided at v0.0.0). The file does not exist yet; confirmation recorded here for when it is authored.
+2. **New receiving template will start at `v0.0.0`.** The new `templates/v2/pipeline/template-pipeline-s3-source.yml` (created later in Task 5.1) will start at `v0.0.0` (development mode), per Requirement 17.2. This is consistent with Task 5.1's stated `(v0.0.0)` and Requirement 3.1 (template provided at v0.0.0). The file does not exist yet; confirmation recorded here for when it is authored.
 
 3. **Additive / default-off (17.4).** All spec changes are additive and default-off; no breaking changes and no new versioned template files (e.g., `-v2-1.yml`). Keeping the account-wide template at `v0.0.0` is consistent with the additive lifecycle change noted in Requirement 12.5.
 
 ### Confirmed version
 
 - `templates/v2/account/account-wide-infrastructure.yml`: **`v0.0.0/2026-04-28`** — unchanged (development mode).
-- `templates/v2/pipeline/template-pipeline-promoted-artifact.yml`: will start at **`v0.0.0`** (to be created in Task 5.1).
+- `templates/v2/pipeline/template-pipeline-s3-source.yml`: will start at **`v0.0.0`** (to be created in Task 5.1).
 ---
 
 ## Task 4.5 — Backward compatibility of the three origin templates

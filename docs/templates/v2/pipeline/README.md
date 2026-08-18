@@ -65,7 +65,7 @@ Simplified pipeline with only Source and Build stages (no CloudFormation deploym
 - Build processes that don't require CloudFormation deployment
 - Custom deployment workflows handled outside the pipeline
 
-### [template-pipeline-promoted-artifact.yml](template-pipeline-promoted-artifact-README.md)
+### [template-pipeline-s3-source.yml](template-pipeline-s3-source-README.md)
 **Version:** v0.0.0 | **Last Updated:** 2026-08-15
 
 S3-triggered "receiving" pipeline for cross-account (or same-account) promotion. Triggered by an EventBridge rule when an origin pipeline's Promote stage writes a promoted source archive (`source.zip`) into the account-wide artifacts bucket under `promotions/*`. Rebuilds and deploys from that archive with the same Build behavior as the origin pipelines, and can itself chain promotion onward (e.g. `beta` → `prod`).
@@ -104,7 +104,7 @@ All pipeline templates include:
 | Build-only workflow (no CloudFormation) | template-pipeline-build-only.yml |
 | Post-deployment testing/validation | template-pipeline.yml (with PostDeploy enabled) |
 | Static website deployment | template-pipeline-build-only.yml |
-| Receiving side of a promoted (cross-account/stage) deployment | template-pipeline-promoted-artifact.yml |
+| Receiving side of a promoted (cross-account/stage) deployment | template-pipeline-s3-source.yml |
 | Sending side of a promotion (test → beta, beta → prod, etc.) | Any origin template above, with the Promotion parameter group configured |
 
 ## Prerequisites

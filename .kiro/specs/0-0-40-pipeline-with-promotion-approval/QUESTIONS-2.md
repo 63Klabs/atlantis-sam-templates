@@ -125,7 +125,7 @@ Build-only has only `Source → Build` (no Deploy/PostDeploy; you noted post-dep
 
 - **R7a:** Confirm that ordering for `template-pipeline-build-only.yml`.
   **Answer:** Confirmed
-- **R7b:** The **receiving** side of a build-only promotion would use the **new `template-pipeline-promoted-artifact.yml`** too, but that template always contains Build → Deploy. For a build-only-style workload (no deploy), would you (i) still use the promoted-artifact template with Deploy present-but-empty/skippable, or (ii) expect a build-only *flavor* of the receiving template? *(My lean: keep one receiving template with an optional/skippable Deploy so we don't fork it; but I want your call since it affects the new template's stage conditionals.)*
+- **R7b:** The **receiving** side of a build-only promotion would use the **new `template-pipeline-s3-source.yml`** too, but that template always contains Build → Deploy. For a build-only-style workload (no deploy), would you (i) still use the promoted-artifact template with Deploy present-but-empty/skippable, or (ii) expect a build-only *flavor* of the receiving template? *(My lean: keep one receiving template with an optional/skippable Deploy so we don't fork it; but I want your call since it affects the new template's stage conditionals.)*
   **Answer:** Good catch. We'll keep one receiving template with an optional deploy (default is include it).
 
 ---

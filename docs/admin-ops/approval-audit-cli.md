@@ -33,7 +33,7 @@ aws resourcegroupstaggingapi get-resources --resource-type-filters codepipeline 
 
 ## Command 2 — S3-sourced (promoted-artifact) pipeline with no `ApproveRelease` gate
 
-Flags receiving pipelines (built from `template-pipeline-promoted-artifact.yml`, identifiable by an S3-provider `Source` action) where `ReleaseApprovalRequired=false` is in effect (no `ApproveRelease` action between Source and Build). **Consequence:** every incoming promotion archive is built and deployed into this stage automatically, with no review of what arrived before it goes live.
+Flags receiving pipelines (built from `template-pipeline-s3-source.yml`, identifiable by an S3-provider `Source` action) where `ReleaseApprovalRequired=false` is in effect (no `ApproveRelease` action between Source and Build). **Consequence:** every incoming promotion archive is built and deployed into this stage automatically, with no review of what arrived before it goes live.
 
 ```bash
 aws resourcegroupstaggingapi get-resources --resource-type-filters codepipeline --tag-filters Key=Atlantis,Values=pipeline-infrastructure --query 'ResourceTagMappingList[].ResourceARN' --output text | tr '\t' '\n' | awk -F: '{print $NF}' | while read -r p; do aws codepipeline get-pipeline --name "$p" | jq -r 'select([.pipeline.stages[].actions[]?.actionTypeId.provider] | index("S3")) | select([.pipeline.stages[].actions[]?.name] | index("ApproveRelease") | not) | .pipeline.name'; done
@@ -54,5 +54,5 @@ aws resourcegroupstaggingapi get-resources --resource-type-filters codepipeline 
 - **Read-only:** these commands only call `resourcegroupstaggingapi get-resources` and `codepipeline get-pipeline`. Neither mutates any resource, so they are safe to run against production accounts at any time.
 - **No output = no findings.** An empty result from any command means no Atlantis-tagged pipeline in the current account/region matched that condition (subject to the tagging caveat above).
 - **`awk -F: '{print $NF}'`** extracts the pipeline name from the full ARN returned by the tagging API (`arn:aws:codepipeline:<region>:<account-id>:<pipeline-name>`), since `get-pipeline` takes a bare name, not an ARN.
-- **Chained promotion:** a single stage can be both a receiving pipeline (for the stage before it) and a sending pipeline (for the stage after it) — for example a `beta` stage built from `template-pipeline-promoted-artifact.yml`. Such a pipeline can appear in the results of command 1 (if its own `Promote` gate is off), command 2 (if its own `ApproveRelease` gate is off), or both.
+- **Chained promotion:** a single stage can be both a receiving pipeline (for the stage before it) and a sending pipeline (for the stage after it) — for example a `beta` stage built from `template-pipeline-s3-source.yml`. Such a pipeline can appear in the results of command 1 (if its own `Promote` gate is off), command 2 (if its own `ApproveRelease` gate is off), or both.
 - **jq required.** These one-liners depend on `jq` being installed on the machine running them (`apt install jq`, `brew install jq`, etc.).

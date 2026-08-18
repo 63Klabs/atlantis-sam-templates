@@ -1,6 +1,6 @@
 """
-Unit tests for the receiving (promoted-artifact) pipeline template's stage
-composition: template-pipeline-promoted-artifact.yml.
+Unit tests for the receiving (S3 source) pipeline template's stage
+composition: template-pipeline-s3-source.yml.
 
 Fast, concrete unit tests covering the ApproveRelease and Deploy stage gates
 (ReleaseApprovalRequired, DeployStageEnabled) plus the chained
@@ -25,7 +25,7 @@ TEMPLATE_PATH = (
     / "templates"
     / "v2"
     / "pipeline"
-    / "template-pipeline-promoted-artifact.yml"
+    / "template-pipeline-s3-source.yml"
 )
 
 BASE_PARAMS = {
@@ -50,7 +50,7 @@ BASE_PARAMS = {
 
 @pytest.fixture
 def template():
-    """Load the receiving (promoted-artifact) pipeline template."""
+    """Load the receiving (S3 source) pipeline template."""
     return load_template(TEMPLATE_PATH)
 
 

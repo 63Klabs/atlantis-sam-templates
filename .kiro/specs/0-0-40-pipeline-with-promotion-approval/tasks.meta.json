@@ -86,7 +86,7 @@
         "timestamp": 1786813886661
       }
     ],
-    "1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-promoted-artifact.yml` will start at `v0.0.0`.": [
+    "1.4 Confirm `templates/v2/account/account-wide-infrastructure.yml` stays `v0.0.0` (development mode; no auto-increment). New `template-pipeline-s3-source.yml` will start at `v0.0.0`.": [
       {
         "executionId": "73d1d924-67e3-4c4b-b270-1e8fb93459a1",
         "chatSessionId": "sess_6d40ee06-0e57-4be5-83d1-6a6a19efa7b8",
@@ -329,7 +329,7 @@
         "timestamp": 1786816316540
       }
     ],
-    "5.1 Create `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (v0.0.0)": [
+    "5.1 Create `templates/v2/pipeline/template-pipeline-s3-source.yml` (v0.0.0)": [
       {
         "executionId": "73d1d924-67e3-4c4b-b270-1e8fb93459a1",
         "chatSessionId": "sess_6d40ee06-0e57-4be5-83d1-6a6a19efa7b8",
@@ -470,7 +470,7 @@
         "timestamp": 1786904991435
       }
     ],
-    "7.1 Create `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md`": [
+    "7.1 Create `docs/templates/v2/pipeline/template-pipeline-s3-source-README.md`": [
       {
         "executionId": "73d1d924-67e3-4c4b-b270-1e8fb93459a1",
         "chatSessionId": "sess_6d40ee06-0e57-4be5-83d1-6a6a19efa7b8",

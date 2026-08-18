@@ -6,7 +6,7 @@
 # CodePipeline execution. This role is used by the PromotionSourceEvent rule to
 # start the receiving pipeline when a promotion artifact (source.zip) arrives in
 # the account-wide artifacts bucket. Used by the receiving template
-# (template-pipeline-promoted-artifact.yml) only.
+# (template-pipeline-s3-source.yml) only.
 # This resource is only created when IsNotDevelopment is true (TEST and PROD).
 #
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)

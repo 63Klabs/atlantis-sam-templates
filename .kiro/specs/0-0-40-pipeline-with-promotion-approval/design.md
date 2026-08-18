@@ -63,7 +63,7 @@ The design follows the repository's established patterns:
                                                                            ▼           │
                                               StartPipelineExecution (SourceEvent role)│
                                                                            │           │
-                                   Receiving pipeline (template-pipeline-promoted-artifact.yml)
+                                   Receiving pipeline (template-pipeline-s3-source.yml)
                                      Source(S3) → [ApproveRelease] → Build → [Deploy] → [PostDeploy]
                                                                               │
                                                                     [ApproveToPromote] → [Promote] ──▶ prod
@@ -80,7 +80,7 @@ Within a single account holding DEV/TEST/PROD, the flow is identical except `Pro
 - `account/account-wide-infrastructure.yml` (stays v0.0.0) — bucket, bucket policy, EventBridge
 
 **New template:**
-- `template-pipeline-promoted-artifact.yml` (v0.0.0) — S3-triggered receiving pipeline
+- `template-pipeline-s3-source.yml` (v0.0.0) — S3-triggered receiving pipeline
 
 **New modules (`modules/pipeline/`):**
 - `promote-project.yml`, `promote-service-role.yml`, `promote-log-group.yml`
@@ -103,7 +103,7 @@ This section indexes the components introduced or modified by this design and th
 | Component | Kind | Change | Detailed section |
 |---|---|---|---|
 | `template-pipeline*.yml` origin pipelines | Modified templates | additive Promote stage + parameters | §3.1, §4.1 |
-| `template-pipeline-promoted-artifact.yml` | New receiving template | S3-triggered pipeline | §3.2, §4.2 |
+| `template-pipeline-s3-source.yml` | New receiving template | S3-triggered pipeline | §3.2, §4.2 |
 | `promote-project.yml` | New module (CodeBuild) | archive + manifest writer | §5.1, §8 |
 | `promote-service-role.yml` | New module (IAM Role) | sole cross-account writer | §6.1, §8 |
 | `promote-log-group.yml` | New module (Log Group) | Promote build logs | §8 |
@@ -174,7 +174,7 @@ Grouped under a new metadata group **"Promotion (Send to Next Stage)"**, placed 
 
 > The origin templates already define `Prefix`, `ProjectId`, `StageId`, `S3BucketNameOrgPrefix`, `S3ArtifactsBucket`, `RolePath`, `PermissionsBoundaryArn`, `AlarmNotificationEmail`, `DeployEnvironment`, and the notification topic — all reused by the Promote stage/role.
 
-### 3.2 New parameters — receiving template (`template-pipeline-promoted-artifact.yml`)
+### 3.2 New parameters — receiving template (`template-pipeline-s3-source.yml`)
 
 Includes the full standard parameter set (naming, `DeployEnvironment`, `S3ArtifactsBucket`, `BuildSpec`, PostDeploy group, module source, managed-policy lists, `AlarmNotificationEmail`) **minus** `Repository`/`RepositoryBranch`/`GitHubConnectionArn` (source is S3), **plus:**
 
@@ -516,10 +516,10 @@ Approach (documented, not a committed script):
 
 ## 11. Versioning, changelog, documentation (Reqs 17, 18)
 
-- **First edit to each template** bumps the header version + date: `template-pipeline.yml` → v2.0.23, `-github.yml` → v2.0.5, `-build-only.yml` → v2.0.7. New `template-pipeline-promoted-artifact.yml` starts at v0.0.0. `account-wide-infrastructure.yml` stays v0.0.0 (dev mode).
+- **First edit to each template** bumps the header version + date: `template-pipeline.yml` → v2.0.23, `-github.yml` → v2.0.5, `-build-only.yml` → v2.0.7. New `template-pipeline-s3-source.yml` starts at v0.0.0. `account-wide-infrastructure.yml` stays v0.0.0 (dev mode).
 - No breaking changes; no new versioned `-v2-1.yml` files.
 - Add `## v0.0.40 - unreleased` to `CHANGELOG.md` (append only), with per-template entries referencing this spec.
-- Docs: new `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md`; update the three existing pipeline READMEs (preserve blockquotes/custom content) and the pipeline category README; approval-audit CLI in `docs/admin-ops/`; manual two-account integration test in `docs/maintainer/`.
+- Docs: new `docs/templates/v2/pipeline/template-pipeline-s3-source-README.md`; update the three existing pipeline READMEs (preserve blockquotes/custom content) and the pipeline category README; approval-audit CLI in `docs/admin-ops/`; manual two-account integration test in `docs/maintainer/`.
 
 ---
 

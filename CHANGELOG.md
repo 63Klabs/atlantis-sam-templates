@@ -18,7 +18,7 @@ The Atlantis Templates Repository is free and open source. Templates and build/d
 
 ### Added
 - **Cross-Account Promotion Pipeline** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added a new S3-triggered receiving pipeline template and supporting modules for cross-account (or same-account) artifact promotion, with an optional manual approval gate
-  - Pipeline: template-pipeline-promoted-artifact.yml v0.0.0 - New receiving pipeline: Source (S3) -> [ApproveRelease] -> Build -> [Deploy] -> [PostDeploy] -> [ApproveToPromote] -> [Promote]
+  - Pipeline: template-pipeline-s3-source.yml v0.0.0 - New receiving pipeline: Source (S3) -> [ApproveRelease] -> Build -> [Deploy] -> [PostDeploy] -> [ApproveToPromote] -> [Promote]
   - Modules: promote-service-role.yml - IAM role for the Promote CodeBuild project, scoped to read the local artifacts bucket and read/write the target promotion bucket's promotions/* prefix
   - Modules: promote-project.yml - CodeBuild project that packages and uploads the promoted source artifact and manifest to the target account/bucket
   - Modules: promote-log-group.yml - CloudWatch log group for the Promote CodeBuild project
@@ -35,7 +35,7 @@ The Atlantis Templates Repository is free and open source. Templates and build/d
 - **Account: account-wide-infrastructure.yml (v0.0.0, development mode)** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added PromotionSourceAccountIds and EnablePromotionTrigger parameters, consumed by the s3-artifacts-bucket-policy.yml module (optional cross-account promotions/* write statement) and the s3-artifacts-bucket.yml module (optional EventBridge notifications, BucketOwnerEnforced ownership, and NoncurrentVersionExpirationInDays raised from 30 to 365)
   - Modules: s3-artifacts-bucket.yml - Additive changes: BucketOwnerEnforced ownership controls, conditional EventBridge notifications, NoncurrentVersionExpirationInDays raised from 30 to 365
   - Modules: s3-artifacts-bucket-policy.yml - Additive change: optional cross-account write statement scoped to promotions/* for configured PromotionSourceAccountIds
-- **Documentation: Pipeline Template READMEs** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Updated template-pipeline-README.md, template-pipeline-github-README.md, and template-pipeline-build-only-README.md, and the pipeline category README, to document the new promotion parameters, stages, and resources; added template-pipeline-promoted-artifact-README.md
+- **Documentation: Pipeline Template READMEs** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Updated template-pipeline-README.md, template-pipeline-github-README.md, and template-pipeline-build-only-README.md, and the pipeline category README, to document the new promotion parameters, stages, and resources; added template-pipeline-s3-source-README.md
 
 ## v0.0.39 (2026-08-11)
 

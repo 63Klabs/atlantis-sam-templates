@@ -34,7 +34,7 @@ TEMPLATE_FILES = [
     "template-pipeline.yml",
     "template-pipeline-github.yml",
     "template-pipeline-build-only.yml",
-    "template-pipeline-promoted-artifact.yml",
+    "template-pipeline-s3-source.yml",
 ]
 
 TOPIC_LOGICAL_ID = "PipelineNotificationTopic"

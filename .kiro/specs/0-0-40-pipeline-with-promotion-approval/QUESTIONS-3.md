@@ -97,7 +97,7 @@ For the record, these are settled from Rounds 1–2 and will flow straight into 
 - Same Prefix/ProjectId across accounts; sender's `PromoteTargetStageId` == receiver's `StageId`.
 - Reuse the pipeline SourceArtifact as `source.zip`; framework-owned **inline** promote buildspec (no app-repo override).
 - Dedicated `…-PromoteServiceRole` is the **sole** cross-account writer; bucket policy trusts `*-PromoteServiceRole` via Principal-account-list + single `StringLike` condition; `PromotionSourceAccountIds` (`CommaDelimitedList`, empty ⇒ statement omitted); write **and scoped read**; `promotions/*` prefix only; Bucket-Owner-Enforced ownership to be verified in design.
-- One receiving template (`template-pipeline-promoted-artifact.yml`, v0.0.0) with an **optional Deploy** (default included); covers cross-account **and** same-account by parameters (empty `PromoteTargetAccountId` ⇒ same account).
+- One receiving template (`template-pipeline-s3-source.yml`, v0.0.0) with an **optional Deploy** (default included); covers cross-account **and** same-account by parameters (empty `PromoteTargetAccountId` ⇒ same account).
 - `PromoteTargetBucket` empty ⇒ derive `<S3BucketNameOrgPrefix->cf-artifacts-<TargetAccountId>-<TargetRegion>-an` using the current template's `S3BucketNameOrgPrefix`; `PromoteTargetRegion` empty ⇒ current region.
 - Promote/Approve added to all three existing templates (`template-pipeline.yml`, `-github.yml`, `-build-only.yml`); ordering `… → PostDeploy → Approve-to-Promote → Promote` (build-only: `Source → Build → Approve-to-Promote → Promote`).
 - **Drop** `PromoteTargetDeployEnvironment` (receiver's own stack is authoritative; omit `target_deploy_env` from the manifest).
@@ -106,7 +106,7 @@ For the record, these are settled from Rounds 1–2 and will flow straight into 
 - Manifest is **write-only audit**; one rolling `promote.json` (history via versioning).
 - Admin-owned bucket changes (`account-wide-infrastructure.yml` / `s3-artifacts-bucket-policy.yml` + EventBridge on the bucket); **no** `pipeline-mgmt-role` changes.
 - New modules: `promote-project.yml`, `promote-service-role.yml`, `promote-log-group.yml`, `promotion-source-event-rule.yml`, `promotion-source-event-service-role.yml`; modify `s3-artifacts-bucket-policy.yml` (+ `s3-artifacts-bucket.yml` for EventBridge) in place (unversioned modules).
-- Versioning: `template-pipeline.yml` v2.0.22→v2.0.23, `-github.yml` v2.0.4→v2.0.5, `-build-only.yml` v2.0.6→v2.0.7; new `template-pipeline-promoted-artifact.yml` @ v0.0.0; `account-wide-infrastructure.yml` stays v0.0.0 (dev). No breaking changes. New `## v0.0.40 - unreleased` CHANGELOG section.
+- Versioning: `template-pipeline.yml` v2.0.22→v2.0.23, `-github.yml` v2.0.4→v2.0.5, `-build-only.yml` v2.0.6→v2.0.7; new `template-pipeline-s3-source.yml` @ v0.0.0; `account-wide-infrastructure.yml` stays v0.0.0 (dev). No breaking changes. New `## v0.0.40 - unreleased` CHANGELOG section.
 - Tests: cfn-lint for all changed/added templates, unit-style over property-based. Manual two-account integration test documented under `docs/maintainer`. End-user docs for the new template + category README as the final task.
 
 ---

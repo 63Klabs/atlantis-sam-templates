@@ -1,10 +1,10 @@
-# template-pipeline-promoted-artifact.yml
+# template-pipeline-s3-source.yml
 
 AWS CodePipeline triggered by a promoted source artifact arriving in S3 - the "receiving" side of cross-account (or same-account) stage-to-stage promotion.
 
 **Version:** v0.0.0  
 **Last Updated:** 2026-08-15  
-**Template:** [templates/v2/pipeline/template-pipeline-promoted-artifact.yml](../../../../templates/v2/pipeline/template-pipeline-promoted-artifact.yml)
+**Template:** [templates/v2/pipeline/template-pipeline-s3-source.yml](../../../../templates/v2/pipeline/template-pipeline-s3-source.yml)
 
 > **Development mode:** This template is at v0.0.0 (PATCH = 0), meaning it has not yet been deployed to any environment. Breaking changes may occur without a new versioned file until it reaches v0.0.1.
 

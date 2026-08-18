@@ -214,7 +214,7 @@ And a modification to `templates/v2/modules/account-wide/s3-artifacts-bucket-pol
 
 New parent template (name TBD — see Q17): composed the same way as the existing pipelines.
 
-- **Q17 — New template filename.** The preliminary uses `pipeline-promoted-artifact` (§6.2) while the spec is `pipeline-with-promotion-approval`. I recommend the file `templates/v2/pipeline/template-pipeline-promoted-artifact.yml` (starting at **v0.0.0**, development mode). Confirm the filename. **Answer:** template-pipeline-promoted-artifact.yml
+- **Q17 — New template filename.** The preliminary uses `pipeline-promoted-artifact` (§6.2) while the spec is `pipeline-with-promotion-approval`. I recommend the file `templates/v2/pipeline/template-pipeline-s3-source.yml` (starting at **v0.0.0**, development mode). Confirm the filename. **Answer:** template-pipeline-s3-source.yml
 - **Q18 — Modules are unversioned today; the changed `s3-artifacts-bucket-policy.yml` is consumed by `account-wide-infrastructure.yml` (v0.0.0, dev mode).** Adding an optional statement there is non-breaking. Confirm you're fine modifying that module in place (no module versioning exists yet). **Answer:** Yes, modify in place
 
 ---
@@ -251,10 +251,10 @@ Under Option A nothing reads it at runtime. Confirming it is **write-only audit*
 
 Per the repo steering, I expect the following in `requirements.md`/`tasks.md`. Flagging now so there are no surprises:
 
-- **Version increments (non-breaking, additive):** `template-pipeline.yml` v2.0.22 → v2.0.23; `template-pipeline-github.yml` v2.0.4 → v2.0.5. New `template-pipeline-promoted-artifact.yml` starts at v0.0.0. `account-wide-infrastructure.yml` stays in dev mode (v0.0.0). All new params default off ⇒ **no breaking changes anticipated.**
+- **Version increments (non-breaking, additive):** `template-pipeline.yml` v2.0.22 → v2.0.23; `template-pipeline-github.yml` v2.0.4 → v2.0.5. New `template-pipeline-s3-source.yml` starts at v0.0.0. `account-wide-infrastructure.yml` stays in dev mode (v0.0.0). All new params default off ⇒ **no breaking changes anticipated.**
 - **CHANGELOG:** add a new `## v0.0.40 - unreleased` header with entries per template.
 - **Tests:** `cfn-lint` validation for all changed/added templates; unit-style checks favored over property-based per testing guidelines. Cross-account behavior itself can't be unit-tested in CI — I'll propose a documented manual integration test (two accounts) as a separate, non-CI task.
-- **Docs:** per the documentation steering, add `docs/templates/v2/pipeline/template-pipeline-promoted-artifact-README.md` and update the pipeline category README + the modified templates' docs as the final task.
+- **Docs:** per the documentation steering, add `docs/templates/v2/pipeline/template-pipeline-s3-source-README.md` and update the pipeline category README + the modified templates' docs as the final task.
 
 - **Q23:** Do you agree there are **no breaking changes** (everything additive/default-off), so we stay on PATCH increments + one new v0.0.0 file — i.e. **no** new `-v2-1.yml` files needed? If you foresee a breaking change I've missed, flag it now. **Answer:** I agree there are no breaking changes
 - **Q24:** Should the two-account manual integration test be part of this spec's tasks (documented procedure only), or tracked separately? **Answer:** manual integration test should be documented under docs/maintainer
@@ -285,7 +285,7 @@ If you'd rather not answer every question individually, I will proceed under the
 2. EventBridge notifications **opt-in** on the account-wide artifacts bucket.
 3. **Two independent, default-off** approval gates (sending "Approve-to-Promote", receiving "Approve-Release") + default-off Promote stage.
 4. Promote/Approve added to `template-pipeline.yml` and `-github.yml` only (**not** build-only).
-5. New template `template-pipeline-promoted-artifact.yml` @ v0.0.0, composed from new modules.
+5. New template `template-pipeline-s3-source.yml` @ v0.0.0, composed from new modules.
 6. Reuse the existing SourceArtifact as `source.zip`; framework-owned **inline** promote buildspec.
 7. Cross-account bucket policy: optional `PromotionSourceAccountId`, scoped to the sender's `*-CodeBuildServiceRole` and the `promotions/*` prefix; empty by default.
 8. Reuse existing `PipelineNotificationTopic` for approval emails.
