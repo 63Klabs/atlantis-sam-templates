@@ -375,6 +375,42 @@ Parameters:
     MaxLength: 128
     ConstraintDescription: "Must be 1 to 128 characters containing only lowercase alphanumeric characters, hyphens, and forward slashes. Must not start or end with a slash. Each segment between slashes must start with a lowercase alphanumeric character."
 
+
+# =============================================================================
+# MAPPINGS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+#
+
+Mappings:
+  LambdaInsightsAccountId:
+    us-east-1:
+      AccountId: "580247275435"
+    us-east-2:
+      AccountId: "580247275435"
+    us-west-1:
+      AccountId: "580247275435"
+    us-west-2:
+      AccountId: "580247275435"
+    af-south-1:
+      AccountId: "012438385374"
+    # Add more regions as needed
+    # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versions.html
+
+  LambdaParamSecretsAccountId:
+    us-east-1:
+      AccountId: "177933569100"
+    us-east-2:
+      AccountId: "590474943231"
+    us-west-1:
+      AccountId: "997803712105"
+    us-west-2:
+      AccountId: "345057560386"
+    af-south-1:
+      AccountId: "317013901791"
+    # Add more regions as needed
+    # https://docs.aws.amazon.com/systems-manager/latest/userguide/ps-integration-lambda-extensions.html#ps-integration-lambda-extensions-add
+
 # =============================================================================
 # CONDITIONS
 # -----------------------------------------------------------------------------
