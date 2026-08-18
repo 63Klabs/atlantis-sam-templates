@@ -1,0 +1,173 @@
+# -- Promote CodeBuild Project Module --
+# Framework-owned CodeBuild project that promotes a validated commit to the next
+# stage by re-uploading the pipeline SourceArtifact as source.zip plus an audit
+# manifest (promote.json) into the receiving account's S3 promotions area.
+# See design.md sections 5.1 (env vars), 5.2 (key convention), 5.3 (bucket
+# resolution), and 5.4 (manifest schema).
+#
+# Parent template must define parameters:
+#   - Prefix
+#   - ProjectId
+#   - StageId
+#   - PromoteTargetStageId
+#   - PromoteTargetAccountId
+#   - PromoteTargetRegion
+#   - PromoteTargetBucket
+#   - S3BucketNameOrgPrefix
+#
+# Parent template must define conditions:
+#   - IsPromoteEnabledAndNotDev      (gates this resource)
+#   - UseS3BucketNameOrgPrefix       (target bucket derivation)
+#   - HasPromoteTargetAccount        (target account resolution)
+#   - HasPromoteTargetRegion         (target region resolution)
+#   - HasPromoteTargetBucket         (explicit target bucket override)
+#
+# Parent must name the promote service role resource 'PromoteServiceRole'
+#   (referenced here via Fn::GetAtt).
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, !If, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, Fn::GetAtt, Fn::If).
+#
+# Uses the same image/compute as the Build project (codebuild-project.yml):
+#   aws/codebuild/amazonlinux-x86_64-standard:5.0, BUILD_GENERAL1_SMALL.
+
+Type: AWS::CodeBuild::Project
+Condition: IsPromoteEnabledAndNotDev
+Properties:
+  Name:
+    Fn::Sub: '${Prefix}-${ProjectId}-${StageId}-Promote'
+  Description:
+    Fn::Sub: "Promotes ${Prefix}-${ProjectId}-${StageId}: re-uploads the pipeline SourceArtifact as source.zip plus a promote.json manifest to the target stage's promotions area, triggering the receiving pipeline."
+  ServiceRole:
+    Fn::GetAtt:
+      - PromoteServiceRole
+      - Arn
+  Artifacts:
+    Packaging: ZIP
+    Type: CODEPIPELINE
+  Cache:
+    Type: LOCAL
+    Modes:
+      - LOCAL_CUSTOM_CACHE
+  Environment:
+    ComputeType: BUILD_GENERAL1_SMALL
+    Type: LINUX_CONTAINER
+    Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+    EnvironmentVariables:
+      - Name: PREFIX
+        Value:
+          Ref: Prefix
+      - Name: PROJECT_ID
+        Value:
+          Ref: ProjectId
+      - Name: STAGE_ID
+        Value:
+          Ref: StageId
+      - Name: PROMOTE_TARGET_STAGE_ID
+        Value:
+          Ref: PromoteTargetStageId
+      - Name: PROMOTE_TARGET_BUCKET
+        Value:
+          Fn::If:
+            - HasPromoteTargetBucket
+            - Ref: PromoteTargetBucket
+            - Fn::If:
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub:
+                    - "${S3BucketNameOrgPrefix}-cf-artifacts-${TargetAccount}-${TargetRegion}-an"
+                    - TargetAccount:
+                        Fn::If:
+                          - HasPromoteTargetAccount
+                          - Ref: PromoteTargetAccountId
+                          - Ref: AWS::AccountId
+                      TargetRegion:
+                        Fn::If:
+                          - HasPromoteTargetRegion
+                          - Ref: PromoteTargetRegion
+                          - Ref: AWS::Region
+                - Fn::Sub:
+                    - "cf-artifacts-${TargetAccount}-${TargetRegion}-an"
+                    - TargetAccount:
+                        Fn::If:
+                          - HasPromoteTargetAccount
+                          - Ref: PromoteTargetAccountId
+                          - Ref: AWS::AccountId
+                      TargetRegion:
+                        Fn::If:
+                          - HasPromoteTargetRegion
+                          - Ref: PromoteTargetRegion
+                          - Ref: AWS::Region
+      - Name: PROMOTE_TARGET_REGION
+        Value:
+          Fn::If:
+            - HasPromoteTargetRegion
+            - Ref: PromoteTargetRegion
+            - Ref: AWS::Region
+      - Name: PROMOTE_TARGET_ACCOUNT_ID
+        Value:
+          Fn::If:
+            - HasPromoteTargetAccount
+            - Ref: PromoteTargetAccountId
+            - Ref: AWS::AccountId
+      - Name: SOURCE_ACCOUNT_ID
+        Value:
+          Ref: AWS::AccountId
+      - Name: AWS_REGION
+        Value:
+          Ref: AWS::Region
+      - Name: PROMOTION_KEY_PREFIX
+        Value:
+          Fn::Sub: 'promotions/${Prefix}-${ProjectId}/${PromoteTargetStageId}'
+  Source:
+    Type: CODEPIPELINE
+    # Framework-owned inline buildspec (no app-repo override). Plain literal string:
+    # all ${...} references are SHELL variables (CodeBuild env vars set above), NOT
+    # CloudFormation intrinsics, so no Fn::Sub is used here.
+    BuildSpec: |
+      version: 0.2
+      phases:
+        build:
+          commands:
+            - set -euo pipefail
+            # 1. Resolve the commit SHA (full 40-char) and derive the 7-char short SHA.
+            - GIT_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+            - GIT_SHA_SHORT="$(printf '%s' "$GIT_SHA" | cut -c1-7)"
+            - echo "Promoting ${PREFIX}-${PROJECT_ID}-${STAGE_ID} -> stage '${PROMOTE_TARGET_STAGE_ID}' (sha ${GIT_SHA_SHORT})"
+            - SOURCE_ARCHIVE_KEY="${PROMOTION_KEY_PREFIX}/source.zip"
+            - MANIFEST_KEY="${PROMOTION_KEY_PREFIX}/promote.json"
+            # 2. Create source.zip from the CONTENTS of CODEBUILD_SRC_DIR (repo tree),
+            #    so the receiving S3 Source unpacks an identical working tree.
+            - echo "Creating source.zip from CODEBUILD_SRC_DIR contents..."
+            - ( cd "$CODEBUILD_SRC_DIR" && zip -r -q -X /tmp/source.zip . -x '.git/*' )
+            # 3. Build the write-only audit manifest (promote.json), design 5.4.
+            - echo "Writing promote.json manifest..."
+            - |
+              cat > /tmp/promote.json <<MANIFEST_EOF
+              {
+                "project": "${PROJECT_ID}",
+                "prefix": "${PREFIX}",
+                "git_sha": "${GIT_SHA}",
+                "git_sha_short": "${GIT_SHA_SHORT}",
+                "source_archive_key": "${SOURCE_ARCHIVE_KEY}",
+                "promoted_from_stage": "${STAGE_ID}",
+                "target_stage": "${PROMOTE_TARGET_STAGE_ID}",
+                "promoted_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "source_account_id": "${SOURCE_ACCOUNT_ID}",
+                "target_account_id": "${PROMOTE_TARGET_ACCOUNT_ID}",
+                "target_region": "${PROMOTE_TARGET_REGION}",
+                "target_bucket": "${PROMOTE_TARGET_BUCKET}",
+                "source_pipeline_execution_id": "${CODEBUILD_INITIATOR}",
+                "post_deploy_passed": true
+              }
+              MANIFEST_EOF
+            # 4. Upload the manifest FIRST so the audit record is present before the trigger.
+            #    Target bucket is BucketOwnerEnforced (task 2.1), so no ACL is required.
+            #    If a target bucket were NOT BucketOwnerEnforced, append
+            #    '--acl bucket-owner-full-control' to both uploads for cross-account ownership.
+            - echo "Uploading manifest (first) to s3://${PROMOTE_TARGET_BUCKET}/${MANIFEST_KEY}"
+            - aws s3 cp /tmp/promote.json "s3://${PROMOTE_TARGET_BUCKET}/${MANIFEST_KEY}" --region "${PROMOTE_TARGET_REGION}"
+            # 5. Upload source.zip LAST. This is the trigger object for the receiving
+            #    pipeline, so it must be written only after the manifest exists.
+            - echo "Uploading source.zip (last) to s3://${PROMOTE_TARGET_BUCKET}/${SOURCE_ARCHIVE_KEY}"
+            - aws s3 cp /tmp/source.zip "s3://${PROMOTE_TARGET_BUCKET}/${SOURCE_ARCHIVE_KEY}" --region "${PROMOTE_TARGET_REGION}"
+            - echo "Promotion upload complete."

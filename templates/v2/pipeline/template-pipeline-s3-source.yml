@@ -1,0 +1,995 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CodePipeline triggered by a promoted source artifact in S3 - Deployed using SAM"
+
+# Atlantis for AWS SAM Deployments
+# Pipeline Infrastructure Template
+# Author: Chad Kluck - 63klabs.net
+# Version: v0.0.0/2026-08-15
+
+# Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
+# https://github.com/63Klabs/atlantis-sam-templates/
+
+# Creates an AWS CodePipeline that is triggered when a promoted source archive
+# (source.zip) arrives in the account-wide S3 artifacts bucket under the
+# promotions/ prefix. An EventBridge rule watching the stable trigger key starts
+# the pipeline, whose S3 Source action emits the archive as its SourceArtifact.
+# The pipeline then rebuilds and deploys from source in the target account
+# context, behaving identically to a normal build once past the Source stage.
+#
+# This is the "receiving" side of cross-account (and same-account) promotion:
+# an origin pipeline (template-pipeline.yml / -github.yml / -build-only.yml)
+# writes the archive here via its Promote stage. This template can also chain
+# promotion onward (e.g. beta -> prod) via its own optional Promote stage.
+#
+# Two independent, default-on approval gates are provided:
+#   - ReleaseApprovalRequired (ApproveRelease) gates incoming builds/deploys.
+#   - PromoteApprovalRequired (ApproveToPromote) gates outbound chained promotion.
+
+# USE WITH:
+# - Origin Pipelines (write the promoted artifact):
+#   - templates/v2/pipeline/template-pipeline.yml
+#   - templates/v2/pipeline/template-pipeline-github.yml
+#   - templates/v2/pipeline/template-pipeline-build-only.yml
+# - Account-Wide Infrastructure (artifacts bucket, EventBridge, cross-account policy):
+#   - templates/v2/account/account-wide-infrastructure.yml
+# - Application Infrastructure (API Gateway, Event Bridge, Lambda, Step Functions, S3, DynamoDB, etc)
+# - OPTIONAL: Route53 and CloudFront for custom domains
+
+# TUTORIALS:
+# - Atlantis Tutorials: https://github.com/63Klabs/atlantis-sam-templates/
+
+# =============================================================================
+# META DATA
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudformation-interface.html
+#
+
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - E1010 # GetAtt references to resources defined in AWS::Include modules
+        - E1019 # Ref/GetAtt references to resources defined in AWS::Include modules
+        - E1020 # Ref to a resource (e.g. PipelineNotificationTopic) defined in an AWS::Include module
+        - E3001 # Resource Type property is defined inside AWS::Include modules
+        - E3005 # Resource names resolved at deploy time via AWS::Include transforms
+        - E3703 # Resources referenced in Outputs are defined in AWS::Include modules
+        - E6101 # Resources from AWS::Include modules are not visible to cfn-lint
+        - W2001 # Parameters consumed by AWS::Include modules appear unused
+        - W7001 # Mappings consumed by AWS::Include modules appear unused
+        - W8001 # Conditions consumed by AWS::Include modules appear unused
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Application Resource Naming"
+        Parameters:
+          - Prefix
+          - ProjectId
+          - StageId
+          - S3BucketNameOrgPrefix
+          - RolePath
+          - PermissionsBoundaryArn
+      -
+        Label:
+          default: "Deployment Environment Information"
+        Parameters:
+          - DeployEnvironment
+          - S3ArtifactsBucket
+          - S3StaticHostBucket
+          - BuildSpec
+          - Repository
+          - RepositoryBranch
+      -
+        Label:
+          default: "Release Approval and Deploy Control"
+        Parameters:
+          - ReleaseApprovalRequired
+          - DeployStageEnabled
+      -
+        Label:
+          default: "Post Deploy Environment Information"
+        Parameters:
+          - PostDeployStageEnabled
+          - PostDeployS3StaticHostBucket
+          - PostDeployBuildSpec
+      -
+        Label:
+          default: "Promotion (Send to Next Stage)"
+        Parameters:
+          - PromoteTargetStageId
+          - PromoteApprovalRequired
+          - PromoteTargetAccountId
+          - PromoteTargetRegion
+          - PromoteTargetBucket
+      -
+        Label:
+          default: "External Resources"
+        Parameters:
+          - ParameterStoreHierarchy
+          - AlarmNotificationEmail
+          - CloudFormationSvcRoleIncludeManagedPolicyArns
+          - CodeBuildSvcRoleIncludeManagedPolicyArns
+          - PostDeploySvcRoleIncludeManagedPolicyArns
+      -
+        Label:
+          default: "Module Source"
+        Parameters:
+          - S3ModuleLocation
+          - S3ModuleNamespace
+
+# =============================================================================
+# PARAMETERS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+#
+
+Parameters:
+
+  # ---------------------------------------------------------------------------
+  # Application Resource Naming
+  #
+  # General Practice:
+  # - Prefix max 8 characters
+  # - ProjectId max 20 characters
+  # - StageId max 8 characters
+  # - Hyphen between Prefix, ProjectId, StageId, ResourceId is 3 characters
+  # This adds up to 39 characters leaving 24 characters for the resource identifier (Used at end of resource name such as *-SalesData or *-CfnSvcRole).
+  # For buckets without S3 Org Prefixes, the length of the bucket resource identifier is limited to 2 (Region + Acct takes up ~22 on their own).
+  # Try to keep the length of the S3 bucket prefix and resource identifier to a minimum for bucket names.
+
+  Prefix:
+    Type: String
+    Description: "Prefix pre-pended to all resources. This can be thought of as a Name Space used to identify ownership/access for teams, departments, etc. For example, resources named ws-* could belong to the web service team and could have IAM permissions to allow access to other ws-* resources. The Prefix must have a corresponding CloudFormation Service Role. Short, descriptive 2-6 character values work best. Due to resource naming length restrictions, length of Prefix + Project ID should not exceed 28 characters. Resources are named <Prefix>-<ProjectId>-<StageId>-<ResourceId>"
+    Default: "acme"
+    AllowedPattern: "^[a-z][a-z0-9-]{0,6}[a-z0-9]$"
+    MinLength: 2
+    MaxLength: 8
+    ConstraintDescription: "2 to 8 characters. Lower case alphanumeric and dashes. Must start with a letter and end with a letter or number. Length of Prefix + Project ID should not exceed 28 characters."
+
+  ProjectId:
+    Type: String
+    Description: "This is the Project or Application Identifier. If you receive 'S3 bucket name too long' errors during stack creation, then you must shorten the Project ID or use an S3 Org Prefix. Due to resource naming length restrictions, length of Prefix + Project ID should not exceed 28 characters. Resources are named <Prefix>-<ProjectId>-<StageId>-<ResourceId>"
+    AllowedPattern: "^[a-z][a-z0-9-]{0,24}[a-z0-9]$"
+    MinLength: 2
+    MaxLength: 26
+    ConstraintDescription: "Minimum of 2 characters (suggested maximum of 20). Lower case alphanumeric and dashes. Must start with a letter and end with a letter or number. Length of Prefix + Project ID should not exceed 28 characters."
+
+  StageId:
+    Type: String
+    Description: "This is an alias for the branch. It does not need to match RepositoryBranch or DeployEnvironment. Due to resource naming restrictions you can use this to provide shorter names without special characters that are allowed in branch names. For example if you have a 'test/feature-98' branch, you could use 'tf98' as the StageId. For a promoted-artifact (receiving) pipeline, this StageId is the promotion target; the pipeline watches promotions/<Prefix>-<ProjectId>/<StageId>/source.zip. Resources are named <Prefix>-<ProjectId>-<StageId>-<ResourceId>"
+    AllowedPattern: "^[a-z][a-z0-9-]{0,6}[a-z0-9]$"
+    MinLength: 2
+    MaxLength: 8
+    ConstraintDescription: "2 to 8 characters. Lower case alphanumeric and dashes. Must start with a letter and end with a letter or number."
+
+  S3BucketNameOrgPrefix:
+    Type: String
+    Description: "By default, to enforce uniqueness, buckets include account and region in the bucket name. However, due to character limits, you can specify your own S3 prefix (like an org code). This will be used in addition to the Prefix entered above. Note that this length is shared with the recommended length of 20 characters for Resource Identifiers. So if you have a 10 character S3BucketNameOrgPrefix, you are limited to 10 characters for your bucket name identifier in your templates. Buckets are named <Prefix>-<Region>-<AccountId>-<ProjectId>-<StageId>-<ResourceId> or <S3OrgPrefix>-<Prefix>-<ProjectId>-<StageId>-<ResourceId>"
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters (8 or less recommended). Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
+  RolePath:
+    Type: String
+    Description: "Path to use for IAM Roles and Policies. You may wish to separate out your applications from users, or create seperate paths per prefix or application. Specific paths may required by permission boundaries. Ex: /ws-hello-world-test/ or /app_role/"
+    Default: "/"
+    AllowedPattern: "^\\/([a-zA-Z0-9-_]+[\\/])+$|^\\/$"
+    ConstraintDescription: "May only contain alphanumeric characters, forward slashes, underscores, and dashes. Must begin and end with a slash."
+
+  PermissionsBoundaryArn:
+    Type: String
+    Description: "Permissions Boundary is a policy attached to a role to further restrict the permissions of the role. Your organization may or may not require boundaries. If left empty, no permissions boundary will be used."
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[\\w+=,.@\\-\\/]*[\\w+=,.@\\-]+$"
+    ConstraintDescription: "Must be empty or a valid IAM Policy ARN in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+
+  # ---------------------------------------------------------------------------
+  # Deployment Environment Identification
+
+  DeployEnvironment:
+    Type: String
+    Description: "What deploy/testing environment will this run under? An environment can contain multiple stages (for example 'test' and 't98' would be in 'TEST' environment, and 'beta' and 'prod' stages would deploy to 'PROD'). Utilize this environment variable to determine your tests, app logging levels, and conditionals in the template. For example, PROD will use gradual deployment while DEV and TEST is AllAtOnce. Other resources, such as dashboards and alarms  (which cost money) could be created in PROD and not DEV or TEST. Suggested use: DEV for local SAM deployment, TEST for test/QA deployments, PROD for stage, beta, and main/prod deployments."
+    Default: "PROD"
+    AllowedValues: ["DEV", "TEST", "PROD"]
+    ConstraintDescription: "Must specify DEV, TEST, or PROD."
+
+  S3ArtifactsBucket:
+    Type: String
+    Description: "An already existing S3 bucket name used for both the S3 Source (promoted artifact) location and the CodePipeline ArtifactStore. This is the account-wide artifacts bucket for this account/region; the pipeline reads promotions/<Prefix>-<ProjectId>/<StageId>/source.zip from it and stores pipeline artifacts in it. Must be in the same AWS account and region as the stack."
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$"
+    ConstraintDescription: "May only contain alphanumeric characters, dashes, and must begin and end with a letter or number."
+
+  S3StaticHostBucket:
+    Type: String
+    Description: "An already existing S3 bucket name the build stage will copy files to. Passed as S3_STATIC_HOST_BUCKET to CodeBuild. Can be left blank if CodeBuild will programmatically construct the bucket name, or doesn't need a S3_STATIC_HOST_BUCKET value. Used primarily for hosting static content (JS, CSS, HTML, React, etc) from S3."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^$"
+    ConstraintDescription: "May only contain alphanumeric characters, dashes, and must begin and end with a letter or number."
+
+  BuildSpec:
+    Type: String
+    Description: "The local or S3 URI of the CodeBuild buildspec.yml file. For example, 'buildspec.yml', 'application-infrastructure/buildspec.yml' or 's3://mybucket/path/buildspec.yml'. Best practice is to have a single buildspec file for all instances of an application. This option exists if you cannot store your buildspec file with your source code OR wish to use a central buildspec for a group of deployments. This is not for managing multiple buildspecs on a single repo. Default is application-infrastructure/buildspec.yml, and blank will use the SAM default buildspec.yml in the root of the repository. If using S3: Though Source.BuildSpec uses an ARN for S3 locations, an S3 url is requested to make it easier to parse for permissions and other uses."
+    Default: "application-infrastructure/buildspec.yml"
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec\\.yml)$|^$"
+    ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec.yml'. For example, 'buildspec.yml', 'application-infrastructure/buildspec.yml' or 's3://mybucket/buildspec.yml'. If empty, buildspec.yml at root of repo will be sought."
+
+  Repository:
+    Type: String
+    Description: "Defaults to 'PROMOTED' for this receiving (promoted-artifact) pipeline, whose real source is the promoted S3 promotion archive rather than a repository. This value is passed to the Build and PostDeploy CodeBuild projects as the REPOSITORY environment variable so application buildspecs that reference it continue to work. May optionally be overridden with the origin repository (name or owner/repository) for traceability."
+    Default: "PROMOTED"
+    AllowedPattern: "^$|^[a-zA-Z0-9][a-zA-Z0-9_\\-\\/]{0,62}[a-zA-Z0-9]$"
+    ConstraintDescription: "May be empty, or a valid repository name/identifier (alphanumeric, dashes, underscores, slashes)."
+
+  RepositoryBranch:
+    Type: String
+    Description: "Defaults to 'promoted' for this receiving (promoted-artifact) pipeline. Passed to the Build and PostDeploy CodeBuild projects as the REPOSITORY_BRANCH environment variable so application buildspecs that reference it continue to work. May optionally be overridden with the origin branch for traceability."
+    Default: "promoted"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9_\\-\\/]{0,14}[a-zA-Z0-9]$"
+    ConstraintDescription: "Must be a valid branch name."
+
+  # ---------------------------------------------------------------------------
+  # Release Approval and Deploy Control
+  #
+  # These parameters control the receiving pipeline's own behavior: whether an
+  # incoming promoted artifact must be approved before it is built/deployed, and
+  # whether the Deploy stage is included at all (build-only-style receiving
+  # workloads).
+
+  ReleaseApprovalRequired:
+    Type: String
+    Description: "Controls the ApproveRelease manual approval gate for this receiving pipeline. When 'true' (default), an incoming promoted artifact pauses after the Source stage and before Build until a human approves it, giving the stage owner control over what is released into this environment. WARNING: Setting this to 'false' auto-releases EVERY incoming promotion - the artifact will build and deploy in this environment with no human review at this stage. If the upstream (sending) pipeline also has PromoteApprovalRequired=false, this yields a FULLY UNGATED path into this environment with no human review at any point, including into PROD stages. The ApproveRelease action name is fixed so this gate is auditable."
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  DeployStageEnabled:
+    Type: String
+    Description: "Controls whether the Deploy (CloudFormation) stage is included in the pipeline. When 'true' (default), the pipeline deploys the built application infrastructure via CloudFormation. Set to 'false' for build-only-style receiving workloads where the promoted artifact is built (and optionally copied to S3 in the Build stage) but not deployed via CloudFormation."
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  # ---------------------------------------------------------------------------
+  # Post Deployment Environment
+  #
+
+  PostDeployStageEnabled:
+    Type: String
+    Description: "Controls whether the PostDeploy stage is created and included in the pipeline. When enabled, creates a final stage to run integration tests, configuration checks, or export configurations (such as export OpenAPI specifications from API Gateway to an external bucket for static documentation generation). This should only be used for tasks that require a deployment first. Pre-deploy tasks should be done in the Build stage. Setting to 'true' creates PostDeployServiceRole, PostDeployProject, PostDeployLogGroup, and adds the PostDeploy stage to the pipeline."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  PostDeployS3StaticHostBucket:
+    Type: String
+    Description: "An already existing S3 bucket name the PostDeploy stage will copy files to. Passed as POST_DEPLOY_S3_STATIC_HOST_BUCKET environment variable to the PostDeploy CodeBuild project. Can be left blank if CodeBuild will programmatically construct the bucket name, or doesn't need this environment variable. Used primarily to store artifacts that will be picked up by another process such as static API specification documentation or exported configuration files."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^$"
+    ConstraintDescription: "May only contain alphanumeric characters, dashes, and must begin and end with a letter or number."
+
+  PostDeployBuildSpec:
+    Type: String
+    Description: "The local or S3 URI of the buildspec file for the PostDeploy stage. For example, 'application-infrastructure/buildspec-postdeploy.yml', 'buildspec-postdeploy.yml' or 's3://mybucket/buildspec-postdeploy.yml'. Best practice is to have a single file for all instances of an application. This option exists if you cannot store your buildspec-postdeploy file with your source code OR wish to use a central buildspec-postdeploy for a group of deployments. Default is 'application-infrastructure/buildspec-postdeploy.yml', and leaving blank will use the SAM default buildspec-postdeploy.yml in the root of the repository. For S3 use an S3 URL (S3://) rather than an ARN."
+    Default: "application-infrastructure/buildspec-postdeploy.yml"
+    AllowedPattern: "^s3:\\/\\/[a-zA-Z0-9][a-zA-Z0-9\\-]{1,61}[a-zA-Z0-9]\\/.*$|^([a-zA-Z0-9][a-zA-Z0-9_\\-\\/]*)?(buildspec-postdeploy\\.yml)$|^$"
+    ConstraintDescription: "Must be a valid S3 URI or a local path ending with 'buildspec-postdeploy.yml'. For example, 'buildspec-postdeploy.yml', 'application-infrastructure/buildspec-postdeploy.yml' or 's3://mybucket/buildspec-postdeploy.yml'. May not be empty."
+
+  # ---------------------------------------------------------------------------
+  # Promotion (Send to Next Stage)
+  #
+  # Optional, default-off (except approval which defaults on) parameters that
+  # enable this pipeline to CHAIN promotion onward to a further downstream stage
+  # (e.g. beta -> prod). Leaving PromoteTargetStageId empty disables the Promote
+  # stage entirely. See §3.1/§3.2 of the design document.
+
+  PromoteTargetStageId:
+    Type: String
+    Description: "The receiving StageId to promote (chain) to next. Non-empty ENABLES the Promote stage (and the ApproveToPromote gate unless disabled below). Leave empty to disable chained promotion. Must equal the downstream (receiving) pipeline's StageId. Same pattern as StageId but may be empty."
+    Default: ""
+    AllowedPattern: "^$|^[a-z][a-z0-9-]{0,6}[a-z0-9]$"
+    ConstraintDescription: "May be empty, or 2 to 8 characters: lower case alphanumeric and dashes, starting with a letter and ending with a letter or number."
+
+  PromoteApprovalRequired:
+    Type: String
+    Description: "Controls the ApproveToPromote manual approval gate before the outbound Promote stage. When 'true' (default), a human must approve before this pipeline promotes the build to the next stage. WARNING: Setting this to 'false' removes the human gate and promotes AUTOMATICALLY. If the receiving (downstream) pipeline also has ReleaseApprovalRequired=false, the artifact will build and deploy in the target environment with NO human review at any point, INCLUDING INTO PROD STAGES. The ApproveToPromote action name is fixed so this gate is auditable."
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must specify true or false."
+
+  PromoteTargetAccountId:
+    Type: String
+    Description: "The AWS account ID of the promotion target. Leave empty for same-account promotion (target account = current account). When set, the Promote stage writes the source archive cross-account into the target account's artifacts bucket."
+    Default: ""
+    AllowedPattern: "^$|^\\d{12}$"
+    ConstraintDescription: "Must be empty or a 12-digit AWS account ID."
+
+  PromoteTargetRegion:
+    Type: String
+    Description: "The AWS region of the promotion target. Leave empty to use the current region. When set, the Promote stage writes the source archive into the target region's artifacts bucket (cross-region promotion)."
+    Default: ""
+    AllowedPattern: "^$|^[a-z]{2}-[a-z]+-\\d$"
+    ConstraintDescription: "Must be empty or a valid AWS region (e.g. us-east-1)."
+
+  PromoteTargetBucket:
+    Type: String
+    Description: "The target artifacts bucket name to write promotions into. Leave empty to derive the name automatically as <S3BucketNameOrgPrefix->cf-artifacts-<TargetAccountId>-<TargetRegion>-an using the resolved target account/region. Set explicitly only when the target bucket name does not follow the standard account-wide artifacts bucket convention."
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+    ConstraintDescription: "May be empty or a valid S3 bucket name between 3 and 63 characters: lower case alphanumeric and dashes, starting and ending with a letter or number."
+
+  # ---------------------------------------------------------------------------
+  # External Resources and Alarm Notifications
+
+  ParameterStoreHierarchy:
+    Type: String
+    Description: "Parameters specific to the application may be organized within a hierarchy based on your organizational or operations structure. For example, /Finance/ops/ for this value would then generate /Finance/ops/<DeployEnvironment>/<Prefix>-<ProjectId>-<StageId>/<parameterName>. Must either be a single '/' or begin and end with a '/'."
+    Default: "/"
+    AllowedPattern: "^\\/([a-zA-Z0-9_.\\-]*[\\/])*$|^$"
+    ConstraintDescription: "Must only contain alpha-numeric, dashes, underscores, or slashes. Must be a single slash or begin and end with a slash. (/Finance/, /Finance/ops/, or /)"
+
+  AlarmNotificationEmail:
+    Type: String
+    Description: "Email address to send notifications to when alarms are triggered. Be sure to check the inbox as you will need to confirm the subscription."
+    AllowedPattern: "^[\\w\\-\\.]+@([\\w\\-]+\\.)+[\\w\\-]{2,4}$"
+    ConstraintDescription: "A valid email address"
+
+  CloudFormationSvcRoleIncludeManagedPolicyArns:
+    Type: CommaDelimitedList
+    Description: "List of IAM Managed Policy ARNs to add to the CloudFormation Service Role. Use when external resources provide policies to interact with them."
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[a-zA-Z0-9_\\-]+(?:\\/[a-zA-Z0-9_\\-]+)*$"
+    ConstraintDescription: "Must be an empty string or comma delimited valid IAM Policy ARNs in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+
+  CodeBuildSvcRoleIncludeManagedPolicyArns:
+    Type: CommaDelimitedList
+    Description: "List of IAM Managed Policy ARNs to add to the CodeBuild Service Role. Use when external resources provide policies to interact with them."
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[a-zA-Z0-9_\\-]+(?:\\/[a-zA-Z0-9_\\-]+)*$"
+    ConstraintDescription: "Must be an empty string or comma delimited valid IAM Policy ARNs in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+
+  PostDeploySvcRoleIncludeManagedPolicyArns:
+    Type: CommaDelimitedList
+    Description: "List of IAM Managed Policy ARNs to add to the Post Deploy Stage Service Role. Use when external resources provide policies to interact with them."
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:iam::\\d{12}:policy\\/[a-zA-Z0-9_\\-]+(?:\\/[a-zA-Z0-9_\\-]+)*$"
+    ConstraintDescription: "Must be an empty string or comma delimited valid IAM Policy ARNs in the format: arn:aws:iam::{account_id}:policy/{policy_name}"
+
+  # ---------------------------------------------------------------------------
+  # Module Source
+
+  S3ModuleLocation:
+    Type: String
+    Description: "S3 bucket name containing module snippets. Modules are loaded from s3://<S3ModuleLocation>/<S3ModuleNamespace>/templates/v2/modules/*. Regional buckets provided by 63klabs: 63klabs-atlas-us-east-1, 63klabs-zenith-us-east-2, 63klabs-fabric-us-west-1, 63klabs-orbit-us-west-2. Admins must supply their own bucket if deploying outside us-*"
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
+    MinLength: 3
+    MaxLength: 63
+    ConstraintDescription: "Must be a valid S3 bucket name between 3 and 63 characters containing only lowercase letters, numbers, and hyphens."
+
+  S3ModuleNamespace:
+    Type: String
+    Description: "Namespace prefix within the S3 module bucket. This is the path prefix where modules are stored. Modules are loaded from s3://<BucketName>/<S3ModuleNamespace>/templates/v2/modules/*"
+    Default: "atlantis"
+    AllowedPattern: "^[a-z0-9][a-z0-9\\-]*(\\/[a-z0-9][a-z0-9\\-]*)*$"
+    MinLength: 1
+    MaxLength: 128
+    ConstraintDescription: "Must be 1 to 128 characters containing only lowercase alphanumeric characters, hyphens, and forward slashes. Must not start or end with a slash. Each segment between slashes must start with a lowercase alphanumeric character."
+
+
+# =============================================================================
+# MAPPINGS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html
+#
+
+Mappings:
+  LambdaInsightsAccountId:
+    us-east-1:
+      AccountId: "580247275435"
+    us-east-2:
+      AccountId: "580247275435"
+    us-west-1:
+      AccountId: "580247275435"
+    us-west-2:
+      AccountId: "580247275435"
+    af-south-1:
+      AccountId: "012438385374"
+    # Add more regions as needed
+    # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versions.html
+
+  LambdaParamSecretsAccountId:
+    us-east-1:
+      AccountId: "177933569100"
+    us-east-2:
+      AccountId: "590474943231"
+    us-west-1:
+      AccountId: "997803712105"
+    us-west-2:
+      AccountId: "345057560386"
+    af-south-1:
+      AccountId: "317013901791"
+    # Add more regions as needed
+    # https://docs.aws.amazon.com/systems-manager/latest/userguide/ps-integration-lambda-extensions.html#ps-integration-lambda-extensions-add
+
+# =============================================================================
+# CONDITIONS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-conditions.html
+#
+
+Conditions:
+  # -- Core naming / environment conditions (shared with the origin templates) --
+  IsNotDevelopment: !Not [!Equals [!Ref DeployEnvironment, "DEV"]]
+  # IsDevelopment: !Equals [!Ref DeployEnvironment, "DEV"] # currently unused - uncomment if you have a use for it
+  UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
+  HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
+
+  # -- Build / artifacts conditions --
+  HasS3StaticHostBucket: !Not [!Equals [!Ref S3StaticHostBucket, ""]]
+  HasS3BuildSpecLocation: !And 
+    - !Not [!Equals [!Ref BuildSpec, ""]]
+    - !Equals [!Select [0, !Split [":", !Ref BuildSpec]], "s3"]
+  UseDefaultBuildSpecLocation: !Equals [!Ref BuildSpec, ""]
+  HasManagedPoliciesForCodeBuildSvcRole: !Not [!Equals [!Join [",", !Ref CodeBuildSvcRoleIncludeManagedPolicyArns], ""]]
+
+  HasManagedPoliciesForCloudFormationSvcRole: !Not [!Equals [!Join [",", !Ref CloudFormationSvcRoleIncludeManagedPolicyArns], ""]]
+
+  # -- PostDeploy Conditional Logic --
+  # These conditions control when PostDeploy resources are created and the stage is included in the pipeline
+  IsPostDeployEnabled: !Equals [!Ref PostDeployStageEnabled, "true"]
+  HasPostDeployS3StaticHostBucket: !Not [!Equals [!Ref PostDeployS3StaticHostBucket, ""]]
+  HasPostDeployBuildSpecS3Location: !And 
+    - !Condition IsPostDeployEnabled
+    - !Not [!Equals [!Ref PostDeployBuildSpec, ""]]
+    - !Equals [!Select [0, !Split [":", !Ref PostDeployBuildSpec]], "s3"]
+  UseDefaultPostDeployBuildSpecLocation: !Equals [!Ref PostDeployBuildSpec, ""]
+  HasManagedPoliciesForPostDeploySvcRole: !Not [!Equals [!Join [",", !Ref PostDeploySvcRoleIncludeManagedPolicyArns], ""]]
+
+  # Combined condition for PostDeploy resource creation
+  IsPostDeployEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPostDeployEnabled]
+
+  # -- Receiving-side gates (this template) --
+  # ReleaseApprovalRequired gates incoming builds/deploys; DeployStageEnabled
+  # controls whether the Deploy (CloudFormation) stage is included.
+  IsReleaseApprovalRequired: !Equals [!Ref ReleaseApprovalRequired, "true"]
+  IsDeployStageEnabled: !Equals [!Ref DeployStageEnabled, "true"]
+
+  # -- Promotion (Send to Next Stage) conditions (chained promotion) --
+  # Mirror the origin templates (design §3.4). A non-empty PromoteTargetStageId
+  # enables the outbound Promote stage (and the ApproveToPromote gate unless
+  # PromoteApprovalRequired is false).
+  IsPromoteEnabled: !Not [!Equals [!Ref PromoteTargetStageId, ""]]
+  IsPromoteApprovalRequired: !Equals [!Ref PromoteApprovalRequired, "true"]
+  IsPromoteEnabledAndApprovalRequired: !And [!Condition IsPromoteEnabled, !Condition IsPromoteApprovalRequired]
+  IsPromoteEnabledAndNotDev: !And [!Condition IsNotDevelopment, !Condition IsPromoteEnabled]
+  HasPromoteTargetAccount: !Not [!Equals [!Ref PromoteTargetAccountId, ""]]
+  HasPromoteTargetRegion: !Not [!Equals [!Ref PromoteTargetRegion, ""]]
+  HasPromoteTargetBucket: !Not [!Equals [!Ref PromoteTargetBucket, ""]]
+
+
+# =============================================================================
+# RESOURCES
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+#
+# NOTE: The inline ProjectPipeline (Source(S3) -> [ApproveRelease] -> Build ->
+#       [Deploy] -> [PostDeploy] -> [ApproveToPromote] -> [Promote]) and the
+#       Outputs section are populated by tasks 5.3 and 5.4 respectively.
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # -- IAM Service Roles and Policies --
+  # --
+  # AWS CodePipeline and its resources require permissions to perform operations.
+  # --
+  # Practice The Principle of Least Privilege
+  # IAM policies should be scoped down to give only necessary actions on
+  # resources specific to this deployment.
+  # --
+  #
+  # NOTE: Unlike the origin (repository-triggered) pipeline templates, this
+  # receiving template has NO SourceEventServiceRole. The pipeline source is an
+  # S3 object (the promoted source.zip), so there is no CodeCommit/GitHub source
+  # event to grant. The receiving pipeline is started by EventBridge via the
+  # PromotionSourceEventServiceRole / PromotionSourceEvent modules below.
+
+  # -- CodePipeline Service Role --
+  # --
+  # Inline (not a module) because its policy differs from the origin templates:
+  # there are NO source-provider permissions (no CodeCommit, no CodeConnections).
+  # The S3 Source action reads promotions/<Prefix>-<ProjectId>/<StageId>/source.zip
+  # from S3ArtifactsBucket, which is already covered by the ManageArtifactsInS3
+  # statement (s3:Get*/s3:List*). The remaining statements mirror the origin:
+  # BuildPhase (Build/PostDeploy/Promote CodeBuild projects), CodeBuildReportGroup,
+  # DeployPhaseCloudFormation, ManageArtifactsInS3, and PassRole.
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Condition: IsNotDevelopment
+    Properties:
+      Path: !Ref RolePath
+      RoleName: !Sub "${Prefix}-Worker-${ProjectId}-${StageId}-CodePipelineServiceRole"
+      Description: "Service Role to access resources during execution of AWS CodePipeline to build and deploy a promoted source artifact. No source-provider permissions are granted; the pipeline source is an S3 object read via the artifacts-bucket permissions."
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue' ]
+      AssumeRolePolicyDocument:
+        Statement:
+        - Sid: "CodePipelineTrustPolicy"
+          Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service:
+            - codepipeline.amazonaws.com
+      Policies:
+      - PolicyName: !Sub "${Prefix}-Worker-${ProjectId}-${StageId}-CodePipelineServicePolicy"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+
+          - Sid: BuildPhase
+            Action:
+            - codebuild:*
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-Build"
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-PostDeploy"
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-${ProjectId}-${StageId}-Promote"
+
+          - Sid: CodeBuildReportGroup
+            Action:
+            - codebuild:*
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId": !Sub "${Prefix}-${ProjectId}-${StageId}"
+
+          - Sid: DeployPhaseCloudFormation
+            Action:
+            - cloudformation:*
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-${ProjectId}-${StageId}-application/*"
+            - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stackset/${Prefix}-${ProjectId}-${StageId}-application:*"
+
+          - Sid: ManageArtifactsInS3
+            Action:
+            - s3:Get*
+            - s3:List*
+            - s3:PutObject
+            Effect: Allow
+            Resource:
+            - !Sub "arn:aws:s3:::${S3ArtifactsBucket}"
+            - !Sub "arn:aws:s3:::${S3ArtifactsBucket}/*"
+
+          - Sid: PassRole
+            Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource:
+            - !GetAtt 'CloudFormationSvcRole.Arn'
+
+          - Sid: ApprovalNotifications
+            Effect: Allow
+            Action:
+            - sns:Publish
+            Resource:
+            - !Ref PipelineNotificationTopic
+
+  # -- CodeBuild Service Role --
+
+  CodeBuildServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/codebuild-service-role.yml"
+
+  # -- PostDeploy Service Role --
+  #
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true"
+  # (via the module's IsPostDeployEnabledAndNotDev condition). Mirrors the
+  # CodeBuildServiceRole permissions so Build and PostDeploy stages have
+  # consistent capabilities.
+
+  PostDeployServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/postdeploy-service-role.yml"
+
+  # -- CodeDeploy Service Role --
+
+  CodeDeployServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/codedeploy-service-role.yml"
+
+  # -- CloudFormation Application Infrastructure Stack Service Role --
+  # --
+  # These permissions dictate resources AWS CloudFormation can create and manage in your application's infrastructure stack.
+  # As you add functionality and resource types (such as DynamoDb, Event Bridge, Step Functions, etc) you will need to add additional permissions.
+  # --
+
+  CloudFormationSvcRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/cloudformation-svc-role.yml"
+
+  # -- Promote Service Role --
+  # --
+  # CONDITIONAL RESOURCE: Only created when promotion is enabled
+  # (PromoteTargetStageId non-empty) and the environment is not DEV
+  # (IsPromoteEnabledAndNotDev). Sole cross-account writer of promotion archives.
+
+  PromoteServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-service-role.yml"
+
+  # -- Promotion Source Event Service Role --
+  # --
+  # CONDITIONAL RESOURCE: Only created when IsNotDevelopment. IAM role assumed by
+  # EventBridge to call codepipeline:StartPipelineExecution on this pipeline when
+  # a promoted source.zip arrives in the artifacts bucket.
+
+  PromotionSourceEventServiceRole:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promotion-source-event-service-role.yml"
+
+  # ---------------------------------------------------------------------------
+  # -- AWS CodePipeline Supporting Resources --
+  # --
+  # CodeBuild projects, log groups, the promotion trigger, and pipeline
+  # notifications. The inline ProjectPipeline (task 5.3) ties them together.
+
+  # -- Promotion Source Event --
+  # --
+  # EventBridge rule that detects the arrival of the promoted source.zip in the
+  # account-wide artifacts bucket and starts this (receiving) pipeline. Requires
+  # EventBridge notifications enabled on the artifacts bucket (account-wide
+  # infrastructure, EnablePromotionTrigger=true).
+
+  PromotionSourceEvent:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promotion-source-event-rule.yml"
+
+  # -- CodeBuild Project --
+
+  CodeBuildProject:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/codebuild-project.yml"
+
+  # ---------------------------------------------------------------------------
+  # -- Log Group for CodeBuild Project --
+  # -- (Just so we can add a retention policy)
+
+  CodeBuildLogGroup:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/codebuild-log-group.yml"
+
+  # -- PostDeploy CodeBuild Project --
+  #
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true".
+  # Uses the same compute environment, container image, and core environment
+  # variables as the Build stage for consistency.
+
+  PostDeployProject:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/postdeploy-project.yml"
+
+  # ---------------------------------------------------------------------------
+  # -- PostDeploy Log Group --
+  #
+  # CONDITIONAL RESOURCE: Only created when PostDeployStageEnabled="true".
+  # Dedicated CloudWatch log group for PostDeploy CodeBuild logs with retention.
+
+  PostDeployLogGroup:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/postdeploy-log-group.yml"
+
+  # -- Promote CodeBuild Project --
+  #
+  # CONDITIONAL RESOURCE: Only created when IsPromoteEnabledAndNotDev. Framework-
+  # owned inline buildspec that re-uploads the SourceArtifact as source.zip plus
+  # an audit manifest into the next stage's promotions area (chained promotion).
+
+  PromoteProject:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-project.yml"
+
+  # ---------------------------------------------------------------------------
+  # -- Promote Log Group --
+  #
+  # CONDITIONAL RESOURCE: Only created when IsPromoteEnabledAndNotDev.
+  # Dedicated CloudWatch log group for the Promote CodeBuild project.
+
+  PromoteLogGroup:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/promote-log-group.yml"
+
+  # ---------------------------------------------------------------------------
+  # -- AWS CodePipeline (Receiving / Promoted-Artifact Pipeline) --
+  # --
+  # Inline AWS::CodePipeline::Pipeline that rebuilds and deploys a promoted
+  # source archive (source.zip) that arrived in the account-wide S3 artifacts
+  # bucket under promotions/<Prefix>-<ProjectId>/<StageId>/. The pipeline is
+  # started by the PromotionSourceEvent (EventBridge) rule.
+  #
+  # STAGE ORDER (optional stages in [brackets] are conditionally included):
+  #   Source(S3) -> [ApproveRelease] -> Build -> [Deploy] -> [PostDeploy]
+  #                 -> [ApproveToPromote] -> [Promote]
+  #
+  # - Source (S3): reads promotions/<Prefix>-<ProjectId>/<StageId>/source.zip
+  #   from S3ArtifactsBucket (same bucket used for the ArtifactStore) and emits
+  #   it as the SourceArtifact. PollForSourceChanges is false; the pipeline is
+  #   triggered by EventBridge, not S3 polling.
+  # - [ApproveRelease]: manual gate (IsReleaseApprovalRequired) between Source
+  #   and Build so the stage owner controls what is released here.
+  # - Build: identical to the origin templates' Build stage.
+  # - [Deploy]: CloudFormation GenerateChangeSet + ExecuteChangeSet
+  #   (IsDeployStageEnabled); omitted for build-only-style receiving workloads.
+  # - [PostDeploy]: optional post-deploy CodeBuild stage (IsPostDeployEnabled).
+  # - [ApproveToPromote] / [Promote]: optional chained promotion onward
+  #   (beta -> prod), mirroring the origin templates.
+
+  ProjectPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    DependsOn:
+      - CodeBuildProject
+    Condition: IsNotDevelopment
+    Properties:
+      Name: !Sub '${Prefix}-${ProjectId}-${StageId}-Pipeline'
+      ArtifactStore:
+        Location: !Ref S3ArtifactsBucket
+        Type: S3
+      RoleArn: !GetAtt 'CodePipelineServiceRole.Arn'
+      Stages:
+        - Name: Source
+          Actions:
+          - Name: PromotedArtifact
+            ActionTypeId:
+              Category: Source
+              Owner: AWS
+              Provider: S3
+              Version: 1
+            Configuration:
+              S3Bucket: !Ref S3ArtifactsBucket
+              S3ObjectKey: !Sub "promotions/${Prefix}-${ProjectId}/${StageId}/source.zip"
+              PollForSourceChanges: "false"
+            InputArtifacts: []
+            OutputArtifacts:
+            - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+            RunOrder: 1
+        - !If
+          - IsReleaseApprovalRequired
+          - Name: ApproveRelease
+            Actions:
+            - Name: ApproveRelease
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                NotificationArn: !Ref PipelineNotificationTopic
+                CustomData: !Sub "Approve release of the promoted artifact into '${Prefix}-${ProjectId}-${StageId}'. Review the incoming promotion (promotions/${Prefix}-${ProjectId}/${StageId}/source.zip) before approving."
+                ExternalEntityLink: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+        - Name: Build
+          Actions:
+          - Name: PackageExport
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: 1
+            Configuration:
+              ProjectName: !Sub '${Prefix}-${ProjectId}-${StageId}-Build'
+            InputArtifacts:
+            - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+            OutputArtifacts:
+            - Name: !Sub "${ProjectId}-${StageId}-BuildArtifact"
+            RunOrder: 1
+        - !If
+          - IsDeployStageEnabled
+          - Name: Deploy
+            Actions:
+            - Name: GenerateChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                StackName: !Sub "${Prefix}-${ProjectId}-${StageId}-application"
+                ActionMode: CHANGE_SET_REPLACE
+                Capabilities: CAPABILITY_NAMED_IAM
+                ChangeSetName: pipeline-changeset
+                RoleArn: !GetAtt 'CloudFormationSvcRole.Arn'
+                # These are the parameters that will be set in your AWS CloudFormation stack.
+                ParameterOverrides: !Sub '{
+                  "Prefix": "${Prefix}",
+                  "ProjectId": "${ProjectId}",
+                  "StageId": "${StageId}",
+                  "S3BucketNameOrgPrefix": "${S3BucketNameOrgPrefix}",
+                  "RolePath": "${RolePath}",
+                  "DeployEnvironment": "${DeployEnvironment}",
+                  "ParameterStoreHierarchy": "${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/",
+                  "DeployRole": "${CodeDeployServiceRole.Arn}",
+                  "AlarmNotificationEmail": "${AlarmNotificationEmail}",
+                  "PermissionsBoundaryArn": "${PermissionsBoundaryArn}"
+                }'
+                TemplateConfiguration: !Sub '${ProjectId}-${StageId}-BuildArtifact::application-infrastructure/template-configuration.json'
+                TemplatePath: !Sub "${ProjectId}-${StageId}-BuildArtifact::application-infrastructure/template-export.yml"
+              InputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-BuildArtifact"
+              OutputArtifacts: []
+              RunOrder: 1
+            - Name: ExecuteChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: pipeline-changeset
+                StackName: !Sub "${Prefix}-${ProjectId}-${StageId}-application"
+              InputArtifacts: []
+              OutputArtifacts: []
+              RunOrder: 2
+          - !Ref 'AWS::NoValue'
+        - !If
+          - IsPostDeployEnabled
+          - Name: PostDeploy
+            Actions:
+            - Name: PackageExport
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Sub '${Prefix}-${ProjectId}-${StageId}-PostDeploy'
+              InputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+              OutputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-PostDeployArtifact"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+        - !If
+          - IsPromoteEnabledAndApprovalRequired
+          - Name: ApproveToPromote
+            Actions:
+            - Name: ApproveToPromote
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                NotificationArn: !Ref PipelineNotificationTopic
+                CustomData: !Sub "Approve promotion of ${Prefix}-${ProjectId}-${StageId} to stage '${PromoteTargetStageId}'. Review the execution before approving."
+                ExternalEntityLink: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+        - !If
+          - IsPromoteEnabled
+          - Name: Promote
+            Actions:
+            - Name: Promote
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Sub "${Prefix}-${ProjectId}-${StageId}-Promote"
+              InputArtifacts:
+              - Name: !Sub "${ProjectId}-${StageId}-SourceArtifact"
+              RunOrder: 1
+          - !Ref 'AWS::NoValue'
+
+  # ---------------------------------------------------------------------------
+  # -- Pipeline Notifications --
+  # Using the AlarmNotificationEmail parameter, send pipeline execution updates.
+  # The approval actions (ApproveRelease / ApproveToPromote) also publish to this
+  # PipelineNotificationTopic.
+
+  # Create SNS Topic for Pipeline notifications
+  PipelineNotificationTopic:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/pipeline-notification-topic.yml"
+
+  # EventBridge Rule for Pipeline Started events
+  PipelineStartedRule:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/pipeline-notification-started-rule.yml"
+
+  # EventBridge Rule for Pipeline Succeeded events
+  PipelineSucceededRule:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/pipeline-notification-succeeded-rule.yml"
+
+  # EventBridge Rule for Pipeline Failed events
+  PipelineFailedRule:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/pipeline-notification-failed-rule.yml"
+
+  # Add required SNS topic policy to allow EventBridge to publish
+  PipelineNotificationTopicPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline/pipeline-notification-topic-policy.yml"
+
+
+# =============================================================================
+# OUTPUTS
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+#
+# Place anything interesting that you would like to quickly refer to in
+# your cloudformation OUTPUT section. Test URLs, direct links to resources, etc
+#
+Outputs:
+
+  # -- Pipeline quick-reference --
+
+  ProjectPipeline:
+    Description: "CodePipeline console link for the receiving (promoted-artifact) pipeline"
+    Condition: IsNotDevelopment
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${Prefix}-${ProjectId}-${StageId}-Pipeline/view?region=${AWS::Region}"
+
+  PipelineName:
+    Description: "Name of the receiving CodePipeline (empty/unused in DEV where the pipeline is not created)"
+    Value: !Sub "${Prefix}-${ProjectId}-${StageId}-Pipeline"
+
+  WatchedPromotionKey:
+    Description: "The S3 object key (in S3ArtifactsBucket) that triggers this pipeline. An origin pipeline's Promote stage writes the promoted source.zip here, which the PromotionSourceEvent rule watches to start this pipeline."
+    Value: !Sub "promotions/${Prefix}-${ProjectId}/${StageId}/source.zip"
+
+  # -- Release / promotion gate status (informational) --
+
+  ReleaseApprovalGate:
+    Description: "Whether the incoming ApproveRelease manual gate is active. 'Enabled' means an incoming promoted artifact pauses after Source until a human approves; 'Disabled' means every incoming promotion auto-releases (builds/deploys) with no human review at this stage."
+    Value: !If [IsReleaseApprovalRequired, "Enabled (ApproveRelease)", "Disabled (auto-release)"]
+
+  PromotionTarget:
+    Description: "The downstream StageId this pipeline chains promotion to (the Promote stage target). Only present when chained promotion is enabled (PromoteTargetStageId non-empty)."
+    Condition: IsPromoteEnabled
+    Value: !Ref PromoteTargetStageId
+
+  PromoteApprovalGate:
+    Description: "Whether the outbound ApproveToPromote manual gate is active for chained promotion. 'Enabled' means a human must approve before promoting to the target stage; 'Disabled' means promotion happens automatically. Only present when chained promotion is enabled."
+    Condition: IsPromoteEnabled
+    Value: !If [IsPromoteApprovalRequired, "Enabled (ApproveToPromote)", "Disabled (auto-promote)"]

@@ -1,0 +1,106 @@
+# -- Promote Service Role Module --
+#
+# IAM role for the CodeBuild Promote stage. This is the SOLE cross-account
+# writer: it reads the pipeline SourceArtifact from the local artifacts bucket,
+# then writes the promoted source archive + audit manifest into the receiving
+# account's account-wide artifacts bucket under the "promotions/*" prefix only.
+# Build and PostDeploy roles are intentionally NOT granted cross-account write.
+#
+# Parent template must define parameters:
+#   - Prefix: Team/org namespace identifier
+#   - ProjectId: Project identifier
+#   - StageId: Stage identifier
+#   - RolePath: IAM role path
+#   - PermissionsBoundaryArn: Optional permissions boundary ARN
+#   - S3ArtifactsBucket: Local S3 artifacts bucket (holds the input SourceArtifact)
+#   - S3BucketNameOrgPrefix: Optional org prefix for S3 bucket names
+#   - PromoteTargetBucket: Optional explicit target bucket (empty => derive)
+#   - PromoteTargetAccountId: Optional target account (empty => current account)
+#   - PromoteTargetRegion: Optional target region (empty => current region)
+#
+# Parent template must define conditions:
+#   - IsPromoteEnabledAndNotDev: Promotion enabled and not DEV environment
+#   - HasPermissionsBoundaryArn: PermissionsBoundaryArn is not empty
+#   - UseS3BucketNameOrgPrefix: S3BucketNameOrgPrefix is not empty
+#   - HasPromoteTargetBucket: PromoteTargetBucket is not empty
+#   - HasPromoteTargetAccount: PromoteTargetAccountId is not empty
+#   - HasPromoteTargetRegion: PromoteTargetRegion is not empty
+#
+# The resolved target bucket ARN mirrors the account-wide bucket naming in
+# s3-artifacts-bucket.yml (design §5.3):
+#   <S3BucketNameOrgPrefix->cf-artifacts-<TargetAccount>-<TargetRegion>-an
+# and the cross-account write is confined to the promotions/* prefix.
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+
+Type: AWS::IAM::Role
+Condition: IsPromoteEnabledAndNotDev
+Properties:
+  Path:
+    Ref: RolePath
+  RoleName:
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromoteServiceRole"
+  Description: "Service Role for the CodeBuild Promote stage of AWS CodePipeline. Sole cross-account writer of promotion archives. Only created when promotion is enabled (PromoteTargetStageId non-empty) and the environment is not DEV."
+  PermissionsBoundary:
+    Fn::If:
+      - HasPermissionsBoundaryArn
+      - Ref: PermissionsBoundaryArn
+      - Ref: "AWS::NoValue"
+  AssumeRolePolicyDocument:
+    Statement:
+      - Sid: "PromoteTrustPolicy"
+        Effect: Allow
+        Action: sts:AssumeRole
+        Principal:
+          Service: codebuild.amazonaws.com
+  Policies:
+    - PolicyName:
+        Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromoteServicePolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowPromoteToManageItsLogs"
+            Effect: Allow
+            Action:
+              - logs:*
+            Resource:
+              Fn::Sub: "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-Promote:*"
+
+          - Sid: "ReadSourceArtifact"
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListBucket
+            Resource:
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}"
+              - Fn::Sub: "arn:aws:s3:::${S3ArtifactsBucket}/*"
+
+          - Sid: "WritePromotionToTarget"
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+            Resource:
+              Fn::If:
+                - HasPromoteTargetBucket
+                - Fn::Sub: "arn:aws:s3:::${PromoteTargetBucket}/promotions/*"
+                - Fn::Sub:
+                    - "arn:aws:s3:::${OrgPrefix}cf-artifacts-${TargetAccount}-${TargetRegion}-an/promotions/*"
+                    - OrgPrefix:
+                        Fn::If:
+                          - UseS3BucketNameOrgPrefix
+                          - Fn::Sub: "${S3BucketNameOrgPrefix}-"
+                          - ""
+                      TargetAccount:
+                        Fn::If:
+                          - HasPromoteTargetAccount
+                          - Ref: PromoteTargetAccountId
+                          - Ref: "AWS::AccountId"
+                      TargetRegion:
+                        Fn::If:
+                          - HasPromoteTargetRegion
+                          - Ref: PromoteTargetRegion
+                          - Ref: "AWS::Region"

@@ -1,0 +1,53 @@
+# -- EventBridge Rule for S3 Promotion Artifact --
+# This module defines an EventBridge rule that detects the arrival of a promoted
+# source artifact in the account-wide artifacts bucket and triggers the receiving
+# pipeline execution. Only created when DeployEnvironment is not DEV.
+#
+# The rule watches the exact promotion source key so it fires only on a completed
+# promotion write (the audit manifest is written earlier). Re-writing a prior
+# archive (rollback) creates a new version of the same key, producing a new
+# "Object Created" event that re-triggers the pipeline.
+#
+# PARENT PREREQUISITES:
+# The parent template must define the following parameters:
+#   - Prefix: Team/org namespace identifier
+#   - ProjectId: Project/application identifier
+#   - StageId: Deployment stage/branch alias
+#   - S3ArtifactsBucket: Account-wide artifacts bucket name (source of promotion objects)
+#
+# The parent template must define the following conditions:
+#   - IsNotDevelopment: Condition to create resource only when not in DEV
+#
+# The parent template must name the promotion source event service role resource:
+#   - PromotionSourceEventServiceRole: IAM role for EventBridge to invoke CodePipeline
+#
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, !GetAtt, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, Fn::GetAtt, etc.)
+
+Type: AWS::Events::Rule
+Condition: IsNotDevelopment
+Properties:
+  Name:
+    Fn::Sub: "${Prefix}-${ProjectId}-${StageId}-PromotionSourceEvent"
+  Description: Rule for Amazon EventBridge to detect a promoted source artifact in the account-wide artifacts bucket and trigger the receiving pipeline execution
+  EventPattern:
+    source:
+    - aws.s3
+    detail-type:
+    - Object Created
+    detail:
+      bucket:
+        name:
+        - Ref: S3ArtifactsBucket
+      object:
+        key:
+        - Fn::Sub: "promotions/${Prefix}-${ProjectId}/${StageId}/source.zip"
+  State: ENABLED
+  Targets:
+  - Arn:
+      Fn::Sub: 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Prefix}-${ProjectId}-${StageId}-Pipeline'
+    Id: PromotedArtifactPipelineTarget
+    RoleArn:
+      Fn::GetAtt:
+      - PromotionSourceEventServiceRole
+      - Arn
