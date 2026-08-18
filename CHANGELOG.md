@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.40 - unreleased
+## v0.0.40 (2026-08-19)
 
 ### Added
 - **Cross-Account Promotion Pipeline** [Spec: 0-0-40-pipeline-with-promotion-approval](.kiro/specs/0-0-40-pipeline-with-promotion-approval/) - Added a new S3-triggered receiving pipeline template and supporting modules for cross-account (or same-account) artifact promotion, with an optional manual approval gate
