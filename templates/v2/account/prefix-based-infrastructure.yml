@@ -4,7 +4,7 @@ Description: "Combined prefix-based IAM Service Roles and Managed Policies for P
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Prefix-Based Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.2/2026-08-10
+# Version: v2.0.1/2026-08-20
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/

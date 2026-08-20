@@ -4,7 +4,7 @@ Description: "Account-wide resources: ABAC-scoped managed policies and shared co
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Account-Wide Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.0/2026-04-28
+# Version: v2.0.1/2026-08-20
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/
