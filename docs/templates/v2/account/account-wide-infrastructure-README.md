@@ -131,7 +131,7 @@ Set to 'true' to create the account-level IAM role and API Gateway Account confi
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | false |
+| Default | true |
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 
@@ -142,7 +142,7 @@ Set to 'true' to create a shared, account-wide S3 artifacts bucket for pipeline 
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | false |
+| Default | true |
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 
@@ -183,7 +183,7 @@ Set to 'true' to create a shared, account-wide S3 bucket for storing S3 server a
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | false |
+| Default | true |
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 
@@ -227,12 +227,12 @@ Optional list of AWS account IDs permitted to write cross-account promotion arti
 
 #### EnablePromotionTrigger
 
-Set to 'true' to let this account's artifacts bucket automatically trigger receiving (promotion) pipelines when a promoted artifact arrives. Enable this on the receiving account when using same-account or cross-account promotion. Under the hood this turns on S3 EventBridge notifications on the bucket, which the promotion source event rule depends on.
+Set to 'true' to let this account's artifacts bucket automatically trigger receiving (promotion) pipelines when a promoted artifact arrives. Enable this on the receiving account when using same-account or cross-account promotion. Under the hood this turns on S3 EventBridge notifications on the bucket, which the promotion source event rule depends on. This does not automatically approve incoming artifacts to run the pipeline.
 
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | false |
+| Default | true |
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 
