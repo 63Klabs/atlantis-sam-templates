@@ -73,6 +73,13 @@ Optional shared S3 access log bucket for storing S3 server access logs (and opti
 - [LogExpirationInDays](#logexpirationindays)
 - [AllowLegacyCloudFrontLogs](#allowlegacycloudfrontlogs)
 
+### Promotion
+
+Optional, additive, default-off parameters that grant cross-account write access to the artifacts bucket's `promotions/*` prefix and enable EventBridge notifications so this account can act as a promotion receiver.
+
+- [PromotionSourceAccountIds](#promotionsourceaccountids)
+- [EnablePromotionTrigger](#enablepromotiontrigger)
+
 ### Module Source
 
 Configuration for where module snippets are loaded from.
@@ -189,7 +196,7 @@ The number of days to keep logs in the access log bucket. Default is 90 days, ma
 | Attribute | Setting |
 |-----------|---------|
 | Type | Number |
-| Default | 90 |
+| Default | 180 |
 | Min Value | 1 |
 | Max Value | 365 |
 | Constraint Description | Must be between 1 and 365 days. |
@@ -206,6 +213,30 @@ Set to 'true' to enable legacy CloudFront standard logging support on the access
 | Constraint Description | Must be 'true' or 'false'. |
 
 > **Security Note:** Enabling legacy CloudFront logging relaxes the bucket's ACL and ownership controls (`BlockPublicAcls: false`, `ObjectOwnership: BucketOwnerPreferred`) to satisfy the legacy CloudFront log delivery mechanism. Leave this `false` unless you specifically need legacy CloudFront standard logging into this bucket.
+
+#### PromotionSourceAccountIds
+
+Optional list of AWS account IDs permitted to write cross-account promotion artifacts to the account-wide artifacts bucket. When set, a bucket policy statement grants the listed accounts' `*-PromoteServiceRole` roles write/read access scoped to the `promotions/*` prefix only. Leave empty to omit the cross-account statement entirely.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | CommaDelimitedList |
+| Default | "" (empty) |
+
+> **Note:** This parameter has no effect unless `EnableS3ArtifactsBucket` is `'true'`. It only widens the `S3ArtifactBucketPolicy` to allow the listed accounts' `*-PromoteServiceRole` roles to `s3:PutObject`, `s3:GetObject`, and `s3:GetObjectVersion` under `promotions/*` in this account's artifacts bucket — no other prefix or principal is affected.
+
+#### EnablePromotionTrigger
+
+Set to 'true' to let this account's artifacts bucket automatically trigger receiving (promotion) pipelines when a promoted artifact arrives. Enable this on the receiving account when using same-account or cross-account promotion. Under the hood this turns on S3 EventBridge notifications on the bucket, which the promotion source event rule depends on.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | false |
+| Allowed Values | true, false |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Note:** This parameter has no effect unless `EnableS3ArtifactsBucket` is `'true'`. Set this to `'true'` on the account that hosts `template-pipeline-s3-source.yml` receiving pipelines so their `PromotionSourceEvent` EventBridge rules can react to new promotion artifacts.
 
 #### S3ModuleLocation
 
@@ -348,8 +379,10 @@ Creates a shared S3 artifacts bucket for pipeline build artifacts. The bucket is
 - **Versioning:** Enabled
 - **Encryption:** AES256 server-side encryption
 - **Public Access:** Fully blocked (all four public access blocks enabled)
-- **Lifecycle:** Objects expire after 395 days, noncurrent versions after 30 days, incomplete multipart uploads abort after 1 day
+- **Ownership Controls:** `BucketOwnerEnforced` (ACLs disabled; bucket owner owns all objects, including those written by other accounts during promotion)
+- **Lifecycle:** Objects expire after 395 days, noncurrent versions after 365 days, incomplete multipart uploads abort after 1 day
 - **Logging:** Server access logging destination follows this precedence — (1) an explicit `S3LogBucketName` wins; (2) otherwise the account-wide access log bucket (`AccessLogBucketRegional`) when `EnableS3AccessLogBucket=true`; (3) otherwise no logging. Logs are written under the `cf-artifacts/` prefix.
+- **Notifications (Conditional: EnablePromotionTrigger):** When `EnablePromotionTrigger='true'`, EventBridge notifications are enabled on the bucket (`EventBridgeEnabled: true`) so a receiving pipeline's `PromotionSourceEvent` rule can react to newly written promotion artifacts. When `'false'`, no `NotificationConfiguration` is set.
 
 **Module Source:** `templates/v2/modules/account-wide/s3-artifacts-bucket.yml`
 
@@ -368,6 +401,7 @@ Bucket policy for the shared S3 artifacts bucket. Enforces HTTPS-only access and
 | DenyNonSecureTransportAccess | Deny | * | SecureTransport=false | s3:* |
 | WhitelistedGet | Allow | * | ArnLike on aws:PrincipalArn (CodePipeline/CodeBuild/CloudFormation roles) | s3:GetObject, s3:GetObjectVersion, s3:GetBucketVersioning |
 | WhitelistedPut | Allow | * | ArnLike on aws:PrincipalArn (CodePipeline/CodeBuild roles) | s3:PutObject |
+| AllowCrossAccountPromotionWrite (Conditional: HasPromotionSourceAccounts) | Allow | AWS: `PromotionSourceAccountIds` | StringLike on aws:PrincipalArn (`arn:aws:iam::*:role/*-PromoteServiceRole`) | s3:PutObject, s3:GetObject, s3:GetObjectVersion (scoped to `promotions/*`) |
 
 **Access Control Mechanism:**
 
@@ -381,6 +415,8 @@ The WhitelistedGet and WhitelistedPut statements use `Principal: "*"` with `aws:
 **Module Source:** `templates/v2/modules/account-wide/s3-artifacts-bucket-policy.yml`
 
 > **Note:** Unlike the per-project `template-storage-s3-artifacts.yml`, this bucket policy uses suffix wildcard patterns (`*-RoleType`), granting access to ALL pipeline roles in the account regardless of their Prefix. This is intentional for account-wide shared usage. The condition-based approach (`Principal: "*"` with `ArnLike`) avoids "Invalid principal in policy" errors that occur when named principals don't yet exist.
+
+> **Cross-account promotion:** The `AllowCrossAccountPromotionWrite` statement is additive and only appears when `PromotionSourceAccountIds` is non-empty (condition `HasPromotionSourceAccounts`). It is the receiving-account counterpart to the `PromoteServiceRole` created by `template-pipeline-s3-source.yml` and the origin pipeline templates (`template-pipeline.yml`, `template-pipeline-github.yml`, `template-pipeline-build-only.yml`) — write access is confined to the `promotions/*` prefix, and only for principals matching `*-PromoteServiceRole`.
 
 ## Outputs
 
@@ -534,6 +570,8 @@ IAM Policies console link for quick access to view created policies.
 | HasLoggingBucket | S3LogBucketName ≠ "" | Determines if an explicit external log bucket overrides the shared access log bucket |
 | EnableS3AccessLogBucket | EnableS3AccessLogBucket = "true" | Controls access log bucket and policy creation |
 | EnableLegacyCloudFrontLogs | AllowLegacyCloudFrontLogs = "true" | Enables legacy CloudFront logging support on the access log bucket |
+| HasPromotionSourceAccounts | PromotionSourceAccountIds ≠ "" | Controls creation of the `AllowCrossAccountPromotionWrite` bucket policy statement |
+| EnablePromotionTrigger | EnablePromotionTrigger = "true" | Enables EventBridge notifications on the artifacts bucket for promotion receivers |
 
 ## Examples
 
@@ -598,12 +636,31 @@ S3ModuleNamespace: atlantis
 
 This creates: `acme-cf-artifacts-123456789012-us-east-1-an`
 
+### Artifacts Bucket as a Cross-Account Promotion Receiver
+
+Enable the artifacts bucket, allow a source account to write promoted artifacts into `promotions/*`, and turn on the EventBridge trigger so a `template-pipeline-s3-source.yml` receiving pipeline in this account starts automatically:
+
+```
+OrgPrefix: ACME
+RolePath: /
+EnableS3ArtifactsBucket: true
+S3BucketNameOrgPrefix: acme
+PromotionSourceAccountIds: 111122223333
+EnablePromotionTrigger: true
+S3ModuleLocation: 63klabs-atlas-us-east-1
+S3ModuleNamespace: atlantis
+```
+
+This grants the `111122223333` account's `*-PromoteServiceRole` roles write/read access scoped to `promotions/*` in `acme-cf-artifacts-123456789012-us-east-1-an`, and enables S3 EventBridge notifications so a receiving pipeline's `PromotionSourceEvent` rule can start on arrival. `PromotionSourceAccountIds` accepts a comma-delimited list, so multiple sending accounts can be listed at once.
+
 ## Related Templates
 
 - **[template-storage-s3-artifacts](../storage/template-storage-s3-artifacts-README.md)**: Per-project, prefix-scoped S3 artifacts bucket (alternative to the account-wide bucket)
 - **[template-storage-s3-access-logs](../storage/template-storage-s3-access-logs-README.md)**: The standalone, prefix + project scoped S3 access-logs template. It is the canonical reference for the access-log resource definitions and remains unchanged; the modules consumed here are its account-wide, condition-aware counterparts
 - **[template-service-role-pipeline](../service-role/template-service-role-pipeline-README.md)**: Per-project service roles that use the managed policies exported by this template
 - **[template-pipeline-github](../pipeline/template-pipeline-github-README.md)**: CI/CD pipeline that references the GitHub connection and managed policy exports
+- **[template-pipeline](../pipeline/template-pipeline-README.md)** / **[template-pipeline-build-only](../pipeline/template-pipeline-build-only-README.md)**: Origin pipelines whose optional Promote stage writes to this template's artifacts bucket when `PromotionSourceAccountIds`/`EnablePromotionTrigger` are configured
+- **[template-pipeline-s3-source](../pipeline/template-pipeline-s3-source-README.md)**: Receiving pipeline triggered by the `EnablePromotionTrigger` EventBridge notification on the artifacts bucket
 
 ## Troubleshooting
 

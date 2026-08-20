@@ -14,6 +14,11 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.41 - unreleased
+
+### Changed
+- **Documentation: account-wide-infrastructure-README.md** - Documented the `PromotionSourceAccountIds` and `EnablePromotionTrigger` parameters, the `AllowCrossAccountPromotionWrite` bucket policy statement, and the `BucketOwnerEnforced`/lifecycle/EventBridge notification changes to `S3ArtifactsBucketRegional` that shipped in v0.0.40 but were missing from the README; corrected the documented `LogExpirationInDays` default (180, not 90) to match the template
+
 ## v0.0.40 (2026-08-19)
 
 ### Added
