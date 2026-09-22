@@ -1,0 +1,40 @@
+# -- Bedrock Model Invocation Log Group (Account-Wide) --
+# Parent template must define parameters:
+#   OrgPrefix, BedrockInvocationLogExpirationInDays, BedrockInvocationLogKmsKeyArn
+# Parent template must define conditions:
+#   EnableBedrockInvocationLogs, HasBedrockInvocationLogKmsKey
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# CloudWatch Logs destination for Amazon Bedrock model invocation logs. Amazon
+# Bedrock writes to the log stream 'aws/bedrock/modelinvocations' within this
+# log group once model invocation logging is activated.
+#
+# IMPORTANT: Creating this log group does NOT enable model invocation logging.
+# Activation is a manual post-deployment step; see the parent template header
+# and docs/admin-ops/bedrock-model-invocation-logging.md
+#
+# KEEP IN SYNC: the log group name below must match the log-group segment of the
+# policy Resource ARN in bedrock-cloudwatch-role.yml
+#
+# DeletionPolicy/UpdateReplacePolicy are Retain (deliberate): invocation logs are
+# audit records containing prompt and response content and must survive stack
+# deletion, feature disablement, and log group replacement. This intentionally
+# differs from the pipeline log group modules, which use Delete.
+#
+# See https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html
+
+Type: AWS::Logs::LogGroup
+Condition: EnableBedrockInvocationLogs
+DeletionPolicy: Retain
+UpdateReplacePolicy: Retain
+Properties:
+  LogGroupName:
+    Fn::Sub: "/aws/bedrock/${OrgPrefix}-ModelInvocations"
+  RetentionInDays:
+    Ref: BedrockInvocationLogExpirationInDays
+  KmsKeyId:
+    Fn::If:
+      - HasBedrockInvocationLogKmsKey
+      - Ref: BedrockInvocationLogKmsKeyArn
+      - Ref: "AWS::NoValue"

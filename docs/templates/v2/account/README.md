@@ -81,6 +81,8 @@ account-wide-infrastructure.yml
 │   ├── codeconnections-github.yml (Conditional: HasGitHubOrg)
 │   ├── apigw-cloudwatch-role.yml (Conditional: EnableApiGatewayLogging)
 │   ├── apigw-cloudwatch-account.yml (Conditional: EnableApiGatewayLogging)
+│   ├── bedrock-cloudwatch-log-group.yml (Conditional: EnableBedrockInvocationLogs)
+│   ├── bedrock-cloudwatch-role.yml (Conditional: EnableBedrockInvocationLogs)
 │   ├── s3-artifacts-bucket.yml (Conditional: EnableS3ArtifactsBucket)
 │   └── s3-artifacts-bucket-policy.yml (Conditional: EnableS3ArtifactsBucket)
 ├── modules/s3-access-logs/
@@ -119,6 +121,7 @@ Deploy this template once per AWS account per region. It creates account-level r
 
 All optional resources are disabled by default. Enable them by setting the corresponding parameter to "true":
 - `EnableApiGwCloudWatchLogs` → API Gateway CloudWatch role and account configuration
+- `EnableBedrockInvocationLogs` → Bedrock model invocation log group and CloudWatch role (activation is a separate manual CLI step)
 - `EnableS3ArtifactsBucket` → Shared S3 artifacts bucket and bucket policy
 - `EnableS3AccessLogBucket` → Shared S3 access log bucket and bucket policy (used as the artifacts bucket's log destination)
 

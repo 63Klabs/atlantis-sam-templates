@@ -7,6 +7,8 @@ Store nested stacks for use in your templates.
 Located in `templates/v2/modules/account-wide/`:
 
 - **s3-artifacts-bucket.yml** - S3 bucket for build artifacts with lifecycle policies. Server access logging destination follows this precedence: an explicitly supplied `S3LogBucketName` wins; otherwise the account-wide access log bucket is used (when `EnableS3AccessLogBucket=true`); if neither is set, logging is not configured. Logs are written under the `cf-artifacts/` prefix.
+- **bedrock-cloudwatch-log-group.yml** - CloudWatch Logs log group for Amazon Bedrock model invocation logs (`/aws/bedrock/${OrgPrefix}-ModelInvocations`). Uses `DeletionPolicy: Retain` and `UpdateReplacePolicy: Retain` because invocation logs are audit records. Gated by `EnableBedrockInvocationLogs` condition. Supports optional KMS encryption via `HasBedrockInvocationLogKmsKey`. **KEEP IN SYNC** with `bedrock-cloudwatch-role.yml` — both encode the log group path.
+- **bedrock-cloudwatch-role.yml** - IAM role (`${OrgPrefix}-Bedrock-CloudWatch-Role`) that Amazon Bedrock assumes to publish model invocation logs. Trust policy includes `aws:SourceAccount` and `aws:SourceArn` confused-deputy guards. Inline policy grants exactly `logs:CreateLogStream` and `logs:PutLogEvents` scoped to the log group and `aws/bedrock/modelinvocations` stream. **KEEP IN SYNC** with `bedrock-cloudwatch-log-group.yml` — both encode the log group path.
 
 ## S3 Access-Logs Modules
 

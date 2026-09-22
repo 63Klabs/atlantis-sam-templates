@@ -2,18 +2,19 @@
 
 Account-wide resources: ABAC-scoped managed policies, shared connections, optional S3 artifacts bucket, and optional shared S3 access log bucket — Assembled from reusable modules.
 
-**Version:** v0.0.0/2026-04-28  
+**Version:** v2.0.2/2026-09-22  
 **Template:** [templates/v2/account/account-wide-infrastructure.yml](../../../../templates/v2/account/account-wide-infrastructure.yml)
 
 ## Overview
 
-This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, shared GitHub connections, optional API Gateway CloudWatch logging, an optional shared S3 artifacts bucket, and an optional shared S3 access log bucket.
+This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, shared GitHub connections, optional API Gateway CloudWatch logging, optional Bedrock model invocation logging, an optional shared S3 artifacts bucket, and an optional shared S3 access log bucket.
 
 ### Use Cases
 
 - Deploy ABAC-scoped managed policies (CodeBuild CRUD, Cognito CRUD) for CloudFormation service roles
 - Create a shared GitHub connection for all pipeline templates in the account
 - Enable account-level API Gateway CloudWatch logging (one-time per-region setup)
+- Enable Bedrock model invocation logging prerequisites (one-time per-region setup)
 - Provision a shared S3 artifacts bucket accessible by all pipeline roles
 - Provision a shared S3 access log bucket that receives server access logs (and optionally legacy CloudFront standard logs) — used automatically as the artifacts bucket's log destination
 
@@ -72,6 +73,16 @@ Optional shared S3 access log bucket for storing S3 server access logs (and opti
 - [EnableS3AccessLogBucket](#enables3accesslogbucket)
 - [LogExpirationInDays](#logexpirationindays)
 - [AllowLegacyCloudFrontLogs](#allowlegacycloudfrontlogs)
+
+### Bedrock Model Invocation Logs
+
+Optional CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. **Deploying this stack does not activate logging** — a post-deployment CLI step is required.
+
+- [EnableBedrockInvocationLogs](#enablebedrockinvocationlogs)
+- [BedrockInvocationLogExpirationInDays](#bedrockinvocationlogexpirationindays)
+- [BedrockInvocationLogKmsKeyArn](#bedrockinvocationlogkmskeyarn)
+
+> **Important:** Creating these resources does NOT enable Bedrock model invocation logging. After deployment you must run the activation command in the `BedrockModelInvocationLoggingEnableCommand` stack output. See [docs/admin-ops/bedrock-model-invocation-logging.md](../../../../docs/admin-ops/bedrock-model-invocation-logging.md) for full instructions.
 
 ### Promotion
 
@@ -214,6 +225,46 @@ Set to 'true' to enable legacy CloudFront standard logging support on the access
 
 > **Security Note:** Enabling legacy CloudFront logging relaxes the bucket's ACL and ownership controls (`BlockPublicAcls: false`, `ObjectOwnership: BucketOwnerPreferred`) to satisfy the legacy CloudFront log delivery mechanism. Leave this `false` unless you specifically need legacy CloudFront standard logging into this bucket.
 
+#### EnableBedrockInvocationLogs
+
+Set to 'true' to create the CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. Creating these resources does NOT enable logging — a post-deployment CLI step is required.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | true |
+| Allowed Values | true, false |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Important:** Deploying with `EnableBedrockInvocationLogs="true"` creates the infrastructure prerequisites but does **not** activate logging. After deployment run: `aws bedrock put-model-invocation-logging-configuration --region <REGION> --logging-config '<BedrockModelInvocationLoggingEnableCommand output>'`. See [docs/admin-ops/bedrock-model-invocation-logging.md](../../../../docs/admin-ops/bedrock-model-invocation-logging.md) for full instructions.
+
+#### BedrockInvocationLogExpirationInDays
+
+The number of days to retain Bedrock model invocation logs in CloudWatch Logs. Invocation logs contain full prompt and response content — consider your data retention policy. Longer retention increases CloudWatch Logs storage cost. Only applies when `EnableBedrockInvocationLogs` is `'true'`. Must be one of the retention periods supported by CloudWatch Logs.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | Number |
+| Default | 180 |
+| Allowed Values | 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653 |
+| Constraint Description | Must be one of the CloudWatch Logs retention values listed above. |
+
+> **Note:** Unlike `LogExpirationInDays` (which uses `MinValue`/`MaxValue`), this parameter uses `AllowedValues` because CloudWatch Logs only accepts an enumerated set of retention periods — arbitrary day counts are rejected at deploy time.
+
+#### BedrockInvocationLogKmsKeyArn
+
+Optional ARN of an existing customer managed KMS key used to encrypt the Bedrock model invocation log group. Leave empty to use CloudWatch Logs default encryption.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | Valid KMS key or alias ARN, or empty |
+| Max Length | 256 |
+| Constraint Description | Must be empty or a valid KMS key or alias ARN. |
+
+> **KMS Prerequisites:** The key must be a **symmetric** customer managed key in the same AWS region. Its key policy must grant `logs.<region>.amazonaws.com` the actions `kms:Encrypt`, `kms:Decrypt`, `kms:ReEncrypt*`, `kms:GenerateDataKey*`, and `kms:DescribeKey`. This template does not create or modify the key or its policy.
+
 #### PromotionSourceAccountIds
 
 Optional list of AWS account IDs permitted to write cross-account promotion artifacts to the account-wide artifacts bucket. When set, a bucket policy statement grants the listed accounts' `*-PromoteServiceRole` roles write/read access scoped to the `promotions/*` prefix only. Leave empty to omit the cross-account statement entirely.
@@ -279,6 +330,8 @@ Namespace prefix within the S3 module bucket. This is the path prefix where modu
 - [GitHubConnection](#githubconnection) - AWS::CodeStarConnections::Connection (Conditional: HasGitHubOrg, via AWS::Include)
 - [ApiGatewayCloudWatchLogsRole](#apigatewaycloudwatchlogsrole) - AWS::IAM::Role (Conditional: EnableApiGatewayLogging, via AWS::Include)
 - [ApiGatewayAccount](#apigatewayaccount) - AWS::ApiGateway::Account (Conditional: EnableApiGatewayLogging, via AWS::Include)
+- [BedrockModelInvocationLogGroup](#bedrockModelInvocationLogGroup) - AWS::Logs::LogGroup (Conditional: EnableBedrockInvocationLogs, via AWS::Include)
+- [BedrockCloudWatchLogsRole](#bedrockcloudwatchlogsrole) - AWS::IAM::Role (Conditional: EnableBedrockInvocationLogs, via AWS::Include)
 - [AccessLogBucketRegional](#accesslogbucketregional) - AWS::S3::Bucket (Conditional: EnableS3AccessLogBucket, via AWS::Include)
 - [AccessLogBucketPolicy](#accesslogbucketpolicy) - AWS::S3::BucketPolicy (Conditional: EnableS3AccessLogBucket, via AWS::Include)
 - [S3ArtifactsBucketRegional](#s3artifactsbucketregional) - AWS::S3::Bucket (Conditional: EnableS3ArtifactsBucket, via AWS::Include)
@@ -329,6 +382,40 @@ DependsOn: ApiGatewayCloudWatchLogsRole
 Configures the API Gateway account settings to use the CloudWatch logging role. This enables all API Gateway stages in the account/region to push execution and access logs to CloudWatch.
 
 **Module Source:** `templates/v2/modules/account-wide/apigw-cloudwatch-account.yml`
+
+### BedrockModelInvocationLogGroup
+
+Type: AWS::Logs::LogGroup (via AWS::Include)  
+Condition: EnableBedrockInvocationLogs
+
+CloudWatch Logs destination for Amazon Bedrock model invocation logs. Once model invocation logging is activated, Bedrock writes records to the log stream `aws/bedrock/modelinvocations` within this log group.
+
+**Key Configuration:**
+- **Log Group Name:** `/aws/bedrock/{OrgPrefix}-ModelInvocations`
+- **DeletionPolicy / UpdateReplacePolicy:** Retain — invocation logs are audit records containing prompt and response content and must survive stack deletion or feature disablement. This intentionally differs from the pipeline log group modules, which use Delete.
+- **RetentionInDays:** Controlled by the `BedrockInvocationLogExpirationInDays` parameter (default 180 days)
+- **KMS Encryption:** Optional — applied when `BedrockInvocationLogKmsKeyArn` is non-empty (condition `HasBedrockInvocationLogKmsKey`)
+
+**Module Source:** `templates/v2/modules/account-wide/bedrock-cloudwatch-log-group.yml`
+
+> **Activation required:** Creating this log group does **not** enable model invocation logging. Run `aws bedrock put-model-invocation-logging-configuration` with the `BedrockModelInvocationLoggingEnableCommand` output value after deployment. See [docs/admin-ops/bedrock-model-invocation-logging.md](../../../../docs/admin-ops/bedrock-model-invocation-logging.md).
+
+> **Re-enable conflict:** Because the log group is retained, if you disable and then re-enable this feature for the same `OrgPrefix` and region, the retained log group already exists. You must delete it manually or import it before re-enabling.
+
+### BedrockCloudWatchLogsRole
+
+Type: AWS::IAM::Role (via AWS::Include)  
+Condition: EnableBedrockInvocationLogs
+
+IAM role that Amazon Bedrock assumes to publish model invocation logs to the CloudWatch Logs log group. The role ARN is supplied to Bedrock via the manual activation command.
+
+**Key Configuration:**
+- **Role Name:** `{OrgPrefix}-Bedrock-CloudWatch-Role`
+- **Trust Policy:** Allows `bedrock.amazonaws.com` to assume the role, conditioned on `aws:SourceAccount` and `aws:SourceArn` to prevent confused-deputy attacks. This is intentionally tighter than the API Gateway CloudWatch role.
+- **Inline Policy:** Grants exactly `logs:CreateLogStream` and `logs:PutLogEvents`, scoped to the specific log group and the `aws/bedrock/modelinvocations` log stream.
+- **No DependsOn:** The inline policy constructs the log group ARN from parameters rather than via `Fn::GetAtt`, so the two resources are independent.
+
+**Module Source:** `templates/v2/modules/account-wide/bedrock-cloudwatch-role.yml`
 
 ### AccessLogBucketRegional
 
@@ -498,6 +585,70 @@ ARN of the IAM role used by API Gateway to push logs to CloudWatch.
 | Export Name | `{OrgPrefix}-ApiGateway-CloudWatch-Role-Arn` |
 | Example Value | `arn:aws:iam::123456789012:role/ACME-ApiGateway-CloudWatchLogs` |
 
+### BedrockModelInvocationLogGroupName
+
+Condition: EnableBedrockInvocationLogs
+
+Name of the CloudWatch log group that receives Bedrock model invocation logs. Supply this as `cloudWatchConfig.logGroupName` when running the activation command.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-Bedrock-CloudWatch-LogGroup-Name` |
+| Example Value | `/aws/bedrock/ACME-ModelInvocations` |
+
+### BedrockModelInvocationLogGroupArn
+
+Condition: EnableBedrockInvocationLogs
+
+ARN of the CloudWatch log group that receives Bedrock model invocation logs.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-Bedrock-CloudWatch-LogGroup-Arn` |
+| Example Value | `arn:aws:logs:us-east-1:123456789012:log-group:/aws/bedrock/ACME-ModelInvocations:*` |
+
+### BedrockCloudWatchLogsRoleArn
+
+Condition: EnableBedrockInvocationLogs
+
+ARN of the IAM role Amazon Bedrock assumes to publish model invocation logs to CloudWatch. Supply this as `cloudWatchConfig.roleArn` when running the activation command.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-Bedrock-CloudWatch-Role-Arn` |
+| Example Value | `arn:aws:iam::123456789012:role/ACME-Bedrock-CloudWatch-Role` |
+
+### BedrockModelInvocationLoggingEnableCommand
+
+Condition: EnableBedrockInvocationLogs
+
+Ready-to-run `--logging-config` JSON payload for the activation CLI command, with the log group name and role ARN already substituted. Copy this value and run:
+
+```bash
+aws bedrock put-model-invocation-logging-configuration \
+  --region <REGION> \
+  --logging-config '<this output value>'
+```
+
+Text and embedding delivery are enabled; image and video are disabled by default. See [docs/admin-ops/bedrock-model-invocation-logging.md](../../../../docs/admin-ops/bedrock-model-invocation-logging.md) for details on changing the delivery flags.
+
+| Attribute | Value |
+|-----------|-------|
+| Export | None (not exported) |
+
+> **Required manual step:** This stack output contains the activation payload but does **not** run the command for you. Model invocation logging remains disabled until the command is executed.
+
+### BedrockModelInvocationLogGroupConsole
+
+Condition: EnableBedrockInvocationLogs
+
+Direct link to the Bedrock model invocation log group in the CloudWatch Logs console.
+
+| Attribute | Value |
+|-----------|-------|
+| Export | None (not exported) |
+| Example Value | `https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/...` |
+
 ### S3ArtifactsBucketName
 
 Condition: EnableS3ArtifactsBucket
@@ -572,6 +723,8 @@ IAM Policies console link for quick access to view created policies.
 | EnableLegacyCloudFrontLogs | AllowLegacyCloudFrontLogs = "true" | Enables legacy CloudFront logging support on the access log bucket |
 | HasPromotionSourceAccounts | PromotionSourceAccountIds ≠ "" | Controls creation of the `AllowCrossAccountPromotionWrite` bucket policy statement |
 | EnablePromotionTrigger | EnablePromotionTrigger = "true" | Enables EventBridge notifications on the artifacts bucket for promotion receivers |
+| EnableBedrockInvocationLogs | EnableBedrockInvocationLogs = "true" | Controls creation of the Bedrock log group and CloudWatch role |
+| HasBedrockInvocationLogKmsKey | BedrockInvocationLogKmsKeyArn ≠ "" | Applies KMS encryption to the Bedrock log group when a key ARN is supplied |
 
 ## Examples
 

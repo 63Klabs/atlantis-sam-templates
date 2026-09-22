@@ -14,6 +14,14 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.43 - unreleased
+
+### Added
+- **Bedrock Model Invocation Logging** [Spec: 0-0-43-enable-account-model-logs](.kiro/specs/0-0-43-enable-account-model-logs/) - Added account-wide, opt-in Bedrock model invocation logging prerequisites to `account-wide-infrastructure.yml`. **Note:** deploying the stack does not activate logging — a post-deployment `aws bedrock put-model-invocation-logging-configuration` command is required once per account per region; the `BedrockModelInvocationLoggingEnableCommand` stack output provides the ready-to-run payload.
+  - Account: account-wide-infrastructure.yml v2.0.2 - Added `EnableBedrockInvocationLogs` (default `"true"`), `BedrockInvocationLogExpirationInDays`, and `BedrockInvocationLogKmsKeyArn` parameters; two new conditions; a new `"Bedrock Model Invocation Logs"` parameter group; two conditional `AWS::Include` resources; five conditional outputs (three exported); and a manual-activation header comment block
+  - Modules: bedrock-cloudwatch-log-group.yml - New CloudWatch Logs log group module (`/aws/bedrock/${OrgPrefix}-ModelInvocations`) with `DeletionPolicy: Retain` for audit durability and optional KMS encryption
+  - Modules: bedrock-cloudwatch-role.yml - New IAM role module (`${OrgPrefix}-Bedrock-CloudWatch-Role`) with `bedrock.amazonaws.com` trust policy (confused-deputy guards via `aws:SourceAccount` and `aws:SourceArn`) and least-privilege inline policy scoped to the log group and `aws/bedrock/modelinvocations` stream
+
 ## v0.0.42 (2026-09-03)
 
 ### Changed

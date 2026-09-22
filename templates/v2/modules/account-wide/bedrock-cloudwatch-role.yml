@@ -1,0 +1,64 @@
+# -- Bedrock CloudWatch Logs Role (Account-Wide) --
+# Parent template must define parameters: OrgPrefix, RolePath
+# Parent template must define condition: EnableBedrockInvocationLogs
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# In order for Amazon Bedrock to publish model invocation logs to CloudWatch
+# Logs, a role must exist that Bedrock can assume, granting write access to the
+# destination log group's 'aws/bedrock/modelinvocations' log stream. The role ARN
+# is supplied to Bedrock via the PutModelInvocationLoggingConfiguration API as a
+# manual post-deployment step (Bedrock has no CloudFormation resource for it).
+#
+# The trust policy includes aws:SourceAccount and aws:SourceArn conditions to
+# prevent the confused deputy problem, per AWS's documented trust policy. This
+# is intentionally tighter than apigw-cloudwatch-role.yml.
+#
+# Permissions are granted via an inline policy because AWS publishes no managed
+# policy for Bedrock invocation logging.
+#
+# KEEP IN SYNC: the log-group segment of the policy Resource ARN below must match
+# the LogGroupName in bedrock-cloudwatch-log-group.yml
+#
+# The Resource ARN is constructed rather than derived via Fn::GetAtt because
+# Fn::GetAtt on a log group returns an ARN with a trailing ':*', which cannot be
+# extended with the ':log-stream:' suffix. A consequence is that this module has
+# no dependency on the log group resource, so the parent needs no DependsOn.
+#
+# See https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html
+
+Type: AWS::IAM::Role
+Condition: EnableBedrockInvocationLogs
+Properties:
+  RoleName:
+    Fn::Sub: "${OrgPrefix}-Bedrock-CloudWatch-Role"
+  Path:
+    Ref: RolePath
+  Description: "Allows Amazon Bedrock to publish model invocation logs to CloudWatch Logs"
+  AssumeRolePolicyDocument:
+    Version: "2012-10-17"
+    Statement:
+      - Sid: AllowBedrockToAssumeRole
+        Effect: Allow
+        Principal:
+          Service: bedrock.amazonaws.com
+        Action: sts:AssumeRole
+        Condition:
+          StringEquals:
+            aws:SourceAccount:
+              Ref: "AWS::AccountId"
+          ArnLike:
+            aws:SourceArn:
+              Fn::Sub: "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:*"
+  Policies:
+    - PolicyName: BedrockModelInvocationLogsWrite
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PutBedrockModelInvocationLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/${OrgPrefix}-ModelInvocations:log-stream:aws/bedrock/modelinvocations"

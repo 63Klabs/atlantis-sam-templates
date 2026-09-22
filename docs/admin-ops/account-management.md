@@ -17,3 +17,7 @@ At the very least, create a sandbox AWS Account and experiment, learn, and under
 The administration guide provides brief instructions on setting up a self-hosted Atlantis DevOps Platform. If you follow best practices, are familiar with AWS resources and deployments, and spent time experimenting with Atlantis in a sandbox, then you should be good to go.
 
 This repository contains both GitHub Actions and CodeBuild configurations for whichever deployment pipeline you use.
+
+## Account-Wide Resource Guides
+
+- [Bedrock Model Invocation Logging](./bedrock-model-invocation-logging.md) - Activate and manage Amazon Bedrock model invocation logging after deploying the account-wide stack with `EnableBedrockInvocationLogs="true"`
