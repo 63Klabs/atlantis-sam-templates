@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.43 - unreleased
+## v0.0.43 (2026-09-22)
 
 ### Added
 - **Bedrock Model Invocation Logging** [Spec: 0-0-43-enable-account-model-logs](.kiro/specs/0-0-43-enable-account-model-logs/) - Added account-wide, opt-in Bedrock model invocation logging prerequisites to `account-wide-infrastructure.yml`. **Note:** deploying the stack does not activate logging — a post-deployment `aws bedrock put-model-invocation-logging-configuration` command is required once per account per region; the `BedrockModelInvocationLoggingEnableCommand` stack output provides the ready-to-run payload.
