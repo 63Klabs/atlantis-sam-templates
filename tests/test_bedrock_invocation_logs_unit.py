@@ -86,11 +86,11 @@ def role_module_raw():
 # ===========================================================================
 
 class TestParentTemplateVersion:
-    """Req 12.1, 12.3 — version line is v2.0.2."""
+    """Req 12.1, 12.3 — version line is v2.1.0 (bumped for v0.0.44 media logging)."""
 
-    def test_version_line_is_v2_0_2(self, parent_raw):
-        assert "# Version: v2.0.2/" in parent_raw, (
-            "Header '# Version:' line must read v2.0.2/..."
+    def test_version_line_is_v2_1_0(self, parent_raw):
+        assert "# Version: v2.1.0/" in parent_raw, (
+            "Header '# Version:' line must read v2.1.0/..."
         )
 
 
@@ -388,38 +388,64 @@ class TestParentTemplateOutputs:
     def test_console_link_output_not_exported(self, outputs):
         assert "Export" not in outputs["BedrockModelInvocationLogGroupConsole"]
 
-    def test_enable_command_json_structure(self, outputs):
-        """The Value of BedrockModelInvocationLoggingEnableCommand should resolve
-        to a valid JSON payload with the correct delivery flag settings.
-
-        CFNLoader parses !Sub as {'!Sub': '<template-string>'}, so we extract
-        the inner string before sanitising placeholders.
-        """
-        value = outputs["BedrockModelInvocationLoggingEnableCommand"].get("Value", "")
-        # CFNLoader represents !Sub 'json...' as {'!Sub': 'json...'}
-        if isinstance(value, dict) and "!Sub" in value:
-            json_template = value["!Sub"]
-        elif isinstance(value, str):
-            json_template = value
+    @staticmethod
+    def _sub_template_to_json(sub_value):
+        """Extract the JSON template string from a !Sub value (either a bare
+        string or a [template, mapping] list), sanitise ${...} placeholders,
+        and parse it as JSON."""
+        if isinstance(sub_value, dict) and "!Sub" in sub_value:
+            inner = sub_value["!Sub"]
         else:
-            pytest.fail(f"Unexpected Value type for enable-command output: {type(value)}: {value!r}")
-        # Replace ${...} CFN placeholders with a valid JSON string literal.
-        # The placeholder might be bare (${X}) or already inside JSON string quotes ("${X}"),
-        # so normalise both to "placeholder".
+            inner = sub_value
+        if isinstance(inner, list):
+            json_template = inner[0]
+        elif isinstance(inner, str):
+            json_template = inner
+        else:
+            pytest.fail(f"Unexpected !Sub inner type: {type(inner)}: {inner!r}")
         sanitised = re.sub(r'"\$\{[^}]+\}"', '"placeholder"', json_template)
         sanitised = re.sub(r"\$\{[^}]+\}", "placeholder", sanitised)
         try:
-            payload = json.loads(sanitised)
+            return json.loads(sanitised)
         except json.JSONDecodeError as exc:
             pytest.fail(
                 f"enable-command Value is not valid JSON after placeholder substitution: {exc}\n"
                 f"Sanitised string: {sanitised}"
             )
-        assert payload.get("textDataDeliveryEnabled") is True
-        assert payload.get("embeddingDataDeliveryEnabled") is True
-        assert payload.get("imageDataDeliveryEnabled") is False
-        assert payload.get("videoDataDeliveryEnabled") is False
-        assert "cloudWatchConfig" in payload
+
+    def test_enable_command_json_structure(self, outputs):
+        """The Value of BedrockModelInvocationLoggingEnableCommand is an Fn::If
+        keyed on EnableBedrockLargeObjectLogging (v0.0.44). Both branches must be
+        valid JSON: the media-OFF (else) branch keeps image/video disabled and
+        matches the v0.0.43 payload; the media-ON branch enables image/video and
+        adds cloudWatchConfig.largeDataDeliveryS3Config.
+        """
+        value = outputs["BedrockModelInvocationLoggingEnableCommand"].get("Value", "")
+        assert isinstance(value, dict) and "!If" in value, (
+            "Enable-command Value must be an Fn::If keyed on EnableBedrockLargeObjectLogging"
+        )
+        cond, media_on, media_off = value["!If"]
+        assert cond == "EnableBedrockLargeObjectLogging"
+
+        # Media-OFF branch (default): parity with v0.0.43
+        off_payload = self._sub_template_to_json(media_off)
+        assert off_payload.get("textDataDeliveryEnabled") is True
+        assert off_payload.get("embeddingDataDeliveryEnabled") is True
+        assert off_payload.get("imageDataDeliveryEnabled") is False
+        assert off_payload.get("videoDataDeliveryEnabled") is False
+        assert "cloudWatchConfig" in off_payload
+        assert "largeDataDeliveryS3Config" not in off_payload["cloudWatchConfig"]
+
+        # Media-ON branch: image/video enabled + large data delivery target
+        on_payload = self._sub_template_to_json(media_on)
+        assert on_payload.get("textDataDeliveryEnabled") is True
+        assert on_payload.get("embeddingDataDeliveryEnabled") is True
+        assert on_payload.get("imageDataDeliveryEnabled") is True
+        assert on_payload.get("videoDataDeliveryEnabled") is True
+        assert "cloudWatchConfig" in on_payload
+        large = on_payload["cloudWatchConfig"].get("largeDataDeliveryS3Config", {})
+        assert large.get("keyPrefix") == "bedrock"
+        assert "bucketName" in large
 
 
 class TestParentHeaderComment:

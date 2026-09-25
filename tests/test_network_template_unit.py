@@ -299,14 +299,16 @@ class TestCloudFrontLoggingConfiguration:
                 if_list = logging_config[if_key]
                 enabled_config = if_list[1]
                 
-                # Bucket should use !Sub with S3LogBucketName parameter
+                # v0.0.44: Bucket uses !Sub ["${LegacyBucket}.s3.amazonaws.com", {LegacyBucket: !If[...]}]
+                # so the resolved destination follows the S3LogBucketName -> import precedence.
                 bucket_value = enabled_config.get('Bucket')
                 if isinstance(bucket_value, dict):
                     sub_key = '!Sub' if '!Sub' in bucket_value else 'Fn::Sub'
                     assert sub_key in bucket_value, "Bucket should use !Sub"
-                    bucket_template = bucket_value[sub_key]
-                    assert '${S3LogBucketName}' in bucket_template, \
-                        "Bucket template should reference S3LogBucketName parameter"
+                    inner = bucket_value[sub_key]
+                    bucket_template = inner[0] if isinstance(inner, list) else inner
+                    assert '${LegacyBucket}' in bucket_template, \
+                        "Bucket template should reference the resolved LegacyBucket substitution var"
     
     def test_logging_with_maximum_length_bucket_name(self, network_template):
         """Test logging configuration with maximum length bucket name (63 chars)."""
@@ -402,12 +404,14 @@ class TestCloudFrontLoggingConfiguration:
                 bucket_value = enabled_config.get('Bucket')
                 if isinstance(bucket_value, dict):
                     sub_key = '!Sub' if '!Sub' in bucket_value else 'Fn::Sub'
-                    bucket_template = bucket_value[sub_key]
+                    inner = bucket_value[sub_key]
+                    # v0.0.44: !Sub with a [template, mapping] list resolving LegacyBucket
+                    bucket_template = inner[0] if isinstance(inner, list) else inner
                     
                     assert bucket_template.endswith('.s3.amazonaws.com'), \
                         "Bucket should end with .s3.amazonaws.com"
-                    assert '${S3LogBucketName}' in bucket_template, \
-                        "Bucket should reference S3LogBucketName parameter"
+                    assert '${LegacyBucket}' in bucket_template, \
+                        "Bucket should reference the resolved LegacyBucket substitution var"
     
     def test_logging_prefix_format(self, network_template):
         """Test that Prefix follows the correct format with cloudfront/ prefix."""
@@ -441,8 +445,8 @@ class TestCloudFrontLoggingConfiguration:
                     assert prefix_template == expected_format, \
                         f"Prefix should be '{expected_format}', got '{prefix_template}'"
     
-    def test_logging_uses_has_log_bucket_condition(self, network_template):
-        """Test that Logging property uses HasLogBucket condition."""
+    def test_logging_uses_has_v1_destination_condition(self, network_template):
+        """Test that the inline (v1) Logging property uses the HasV1Destination condition (v0.0.44)."""
         resources = network_template.get('Resources', {})
         distribution = resources.get('CloudFrontDistribution', {})
         dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
@@ -454,8 +458,8 @@ class TestCloudFrontLoggingConfiguration:
             
             if_list = logging_config[if_key]
             condition_name = if_list[0]
-            assert condition_name == 'HasLogBucket', \
-                "Logging should use HasLogBucket condition"
+            assert condition_name == 'HasV1Destination', \
+                "Logging should use HasV1Destination condition"
     
     def test_logging_returns_no_value_when_disabled(self, network_template):
         """Test that Logging returns AWS::NoValue when condition is false."""
@@ -2476,13 +2480,13 @@ class TestCloudFrontFunctionBackwardCompatibility:
     """Tests for backward compatibility.
     Requirements: 10.1, 10.2, 10.3, 11.1"""
 
-    def test_template_version_is_v0_0_18(self, network_template):
-        """Template version should be v0.0.18 after origin request policy changes. Req 11.1"""
+    def test_template_version_is_v0_1_0(self, network_template):
+        """Template version should be v0.1.0 after v0.0.44 CloudFront v1/v2 logging changes. Req 11.1"""
         # Read the raw file to check the version comment
         template_path = Path(__file__).parent.parent / "templates" / "v2" / "network" / "template-network-route53-cloudfront-s3-apigw.yml"
         content = template_path.read_text()
-        assert '# Version: v0.0.18/' in content, \
-            "Template version should be v0.0.18"
+        assert '# Version: v0.1.0/' in content, \
+            "Template version should be v0.1.0"
 
     @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
     def test_all_params_default_to_empty_string(self, network_template, param_name):

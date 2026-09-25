@@ -18,7 +18,7 @@ Properties:
   Path:
     Ref: RolePath
   RoleName:
-    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromotionSourceEventServiceRole"
+    Fn::Sub: "${Prefix}-Worker-${ProjectId}-${StageId}-PromoteSrcEventSvcRole"
   Description: "Service Role to allow Events to trigger AWS CodePipeline execution for promoted artifacts"
   PermissionsBoundary:
     Fn::If:

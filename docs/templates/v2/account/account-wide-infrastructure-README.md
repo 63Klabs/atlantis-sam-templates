@@ -2,7 +2,7 @@
 
 Account-wide resources: ABAC-scoped managed policies, shared connections, optional S3 artifacts bucket, and optional shared S3 access log bucket — Assembled from reusable modules.
 
-**Version:** v2.0.2/2026-09-22  
+**Version:** v2.1.0/2026-09-23  
 **Template:** [templates/v2/account/account-wide-infrastructure.yml](../../../../templates/v2/account/account-wide-infrastructure.yml)
 
 ## Overview
@@ -29,6 +29,55 @@ This template creates account-wide infrastructure for the Atlantis DevOps Platfo
 - This template should be deployed **once per account per region** before any project-specific templates
 - The GitHub connection requires manual authorization in the AWS Console after deployment
 - All optional resources are disabled by default — enable them via parameters
+
+## v0.0.44 Changes (Log Prefix Segmentation, Service Lockdown, and Bedrock Media Logging)
+
+v2.1.0 reorganizes the account-wide logging bucket into a provider-prefixed, per-prefix-lifecycle, per-principal-locked-down design, adds a dedicated CloudFront legacy logging bucket, and adds opt-in Bedrock large-object (media) delivery to S3. These are breaking changes applied in place (see the repository CHANGELOG).
+
+### New parameters
+
+| Parameter | Type | Default | Purpose |
+|-----------|------|---------|---------|
+| `S3AccessLogExpirationInDays` | Number (1-365) | 180 | Retention for the four `s3access/*` sub-prefix lifecycle rules on the main log bucket |
+| `EnableBedrockLargeObjectLogging` | String (`true`/`false`) | `false` | Opt in to delivering Bedrock image/video/large-binary payloads to S3 under `bedrock/`. Requires `EnableBedrockInvocationLogs=true` and a destination (see Rules) |
+| `BedrockLargeObjectLogExpirationInDays` | Number (1-365) | 90 | S3 lifecycle retention for the `bedrock/` prefix (distinct from the CloudWatch `BedrockInvocationLogExpirationInDays`) |
+| `BedrockLargeObjectLogBucketName` | String (S3 name or empty) | `""` | Optional external destination for Bedrock media logs; takes precedence over the account-wide bucket. The stack cannot attach a policy to an external bucket (you must add the `bedrock.amazonaws.com` statement yourself) |
+
+`AllowLegacyCloudFrontLogs` is **repurposed**: it no longer toggles ACLs on the main bucket. When `true` it now provisions a **separate** ACL-enabled `cloudfront-logs-legacy` bucket (see below). `LogExpirationInDays` now applies to the main bucket's `cloudfront/` prefix and to the legacy bucket.
+
+### Two-bucket logging model
+
+- **Main access log bucket** (`AccessLogBucketRegional`, ownership `BucketOwnerEnforced`, ACLs disabled): holds S3 server access logs under `s3access/<type>/<bucket-name>/` (`cf-artifacts`, `cloudfront-oac`, `devops`, `apps`), CloudFront **v2** logs under `cloudfront/`, and Bedrock media under `bedrock/`.
+- **CloudFront legacy bucket** (`CloudFrontLegacyLogBucket`, ownership `BucketOwnerPreferred`, ACLs enabled, created only when `AllowLegacyCloudFrontLogs=true`): holds CloudFront **v1** standard logs under `cloudfront/`. Isolating ACLs in a second bucket lets CloudFront v1 keep working (from any region) without weakening the main bucket, which must keep ACLs disabled for Bedrock S3 delivery.
+
+### Per-prefix lifecycle (main bucket)
+
+`cloudfront/` uses `LogExpirationInDays`; the four `s3access/*` sub-prefixes use `S3AccessLogExpirationInDays`; `bedrock/` uses `BedrockLargeObjectLogExpirationInDays` (only when Bedrock media targets the account-wide bucket).
+
+### Per-principal, per-prefix bucket policy (main bucket)
+
+- `logging.s3.amazonaws.com` -> `s3access/*` (condition `aws:SourceAccount` + `aws:SourceArn arn:aws:s3:::*-an`)
+- `delivery.logs.amazonaws.com` -> `cloudfront/*` (CloudFront v2 vended-log delivery)
+- `bedrock.amazonaws.com` -> `bedrock/AWSLogs/<account>/BedrockModelInvocationLogs/*` (conditional)
+
+> **Note:** S3 server access log delivery cannot bind the `<bucket-name>` path segment to the actual source bucket, and cannot gate a prefix by source-bucket tag. The `s3access/<type>/<bucket-name>/` structure is enforced organizationally by each producer's `LogFilePrefix`, plus account-level and naming-convention (`*-an`) scoping on the shared policy.
+
+### New Rules (validation)
+
+- `EnableBedrockLargeObjectLogging=true` requires `EnableS3AccessLogBucket=true` **or** a non-empty `BedrockLargeObjectLogBucketName`.
+- `EnableBedrockLargeObjectLogging=true` requires `EnableBedrockInvocationLogs=true` (the S3 large-object target is nested inside `cloudWatchConfig`).
+
+### New outputs (exports)
+
+- `${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name` and `-Arn` (when `AllowLegacyCloudFrontLogs=true`) — imported by the network template for CloudFront v1 logging.
+
+### Bedrock activation command
+
+When `EnableBedrockLargeObjectLogging=true`, `BedrockModelInvocationLoggingEnableCommand` includes `cloudWatchConfig.largeDataDeliveryS3Config` (bucket + `keyPrefix: bedrock`) and sets `imageDataDeliveryEnabled`/`videoDataDeliveryEnabled` to `true`. When `false`, the command is unchanged from v0.0.43. Activation remains a manual per-region CLI step. See [docs/admin-ops/bedrock-model-invocation-logging.md](../../../admin-ops/bedrock-model-invocation-logging.md).
+
+### Migration
+
+Deploy this stack first, then update producer stacks (artifacts, OAC, devops, network) to the new `s3access/<type>/` prefixes; until a producer is updated it may be briefly denied delivery to a now-disallowed prefix. No bucket is replaced (main bucket name unchanged; legacy bucket is additive).
 - Module snippets are loaded from S3 at deploy time via `AWS::Include` transforms
 - Resources use conditions for optional creation — no errors occur when features are disabled
 
@@ -232,7 +281,7 @@ Set to 'true' to create the CloudWatch Logs log group and IAM role required for 
 | Attribute | Setting |
 |-----------|---------|
 | Type | String |
-| Default | true |
+| Default | false |
 | Allowed Values | true, false |
 | Constraint Description | Must be 'true' or 'false'. |
 

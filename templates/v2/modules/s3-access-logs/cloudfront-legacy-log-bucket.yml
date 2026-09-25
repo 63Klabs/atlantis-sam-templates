@@ -1,0 +1,52 @@
+# -- CloudFront Legacy (v1) Standard-Logging Bucket (Account-Wide) --
+# Parent template must define parameters:
+#   S3BucketNameOrgPrefix, LogExpirationInDays
+# Parent template must define conditions:
+#   UseS3BucketNameOrgPrefix, EnableLegacyCloudFrontLogs
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# Creates a dedicated account-wide S3 bucket for CloudFront LEGACY (v1) standard
+# logs. CloudFront v1 delivers logs via the delivery.logs.amazonaws.com service
+# using ACL-based delivery, which requires Object Ownership BucketOwnerPreferred
+# (ACLs enabled). Because ACL enablement is a bucket-level setting, this cannot
+# coexist with the main access-log bucket (which must keep ACLs disabled for
+# Bedrock S3 delivery), so legacy CloudFront logs get their own bucket.
+#
+# Gated on EnableLegacyCloudFrontLogs independent of EnableS3AccessLogBucket:
+# an administrator may enable legacy CloudFront logging without the main bucket.
+# Logs are written under the cloudfront/ prefix.
+Type: AWS::S3::Bucket
+Condition: EnableLegacyCloudFrontLogs
+DeletionPolicy: Retain
+UpdateReplacePolicy: Retain
+Properties:
+  BucketName:
+    Fn::If:
+      - UseS3BucketNameOrgPrefix
+      - Fn::Sub: "${S3BucketNameOrgPrefix}-cloudfront-logs-legacy-${AWS::AccountId}-${AWS::Region}-an"
+      - Fn::Sub: "cloudfront-logs-legacy-${AWS::AccountId}-${AWS::Region}-an"
+  BucketNamespace: "account-regional"
+  VersioningConfiguration:
+    Status: Suspended
+  BucketEncryption:
+    ServerSideEncryptionConfiguration:
+      - BucketKeyEnabled: true
+        ServerSideEncryptionByDefault:
+          SSEAlgorithm: AES256
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls: false
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  OwnershipControls:
+    Rules:
+      - ObjectOwnership: BucketOwnerPreferred
+  LifecycleConfiguration:
+    Rules:
+      - Id: ExpireCloudFrontLegacy
+        Status: Enabled
+        Filter:
+          Prefix: "cloudfront/"
+        ExpirationInDays:
+          Ref: LogExpirationInDays

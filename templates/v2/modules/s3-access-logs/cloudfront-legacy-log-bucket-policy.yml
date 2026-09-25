@@ -1,0 +1,41 @@
+# -- CloudFront Legacy (v1) Standard-Logging Bucket Policy (Account-Wide) --
+# Parent template must define conditions:
+#   EnableLegacyCloudFrontLogs
+# Parent must name the bucket resource 'CloudFrontLegacyLogBucket'
+# NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
+#       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
+#
+# Grants the CloudFront legacy log-delivery service permission to write standard
+# (v1) logs under the cloudfront/ prefix, and denies non-secure transport.
+Type: AWS::S3::BucketPolicy
+Condition: EnableLegacyCloudFrontLogs
+Properties:
+  Bucket:
+    Ref: CloudFrontLegacyLogBucket
+  PolicyDocument:
+    Version: "2012-10-17"
+    Statement:
+      - Sid: "DenyNonSecureTransportAccess"
+        Effect: Deny
+        Principal: "*"
+        Action: "s3:*"
+        Resource:
+          - Fn::GetAtt: [CloudFrontLegacyLogBucket, Arn]
+          - Fn::Join:
+              - "/"
+              - - Fn::GetAtt: [CloudFrontLegacyLogBucket, Arn]
+                - "*"
+        Condition:
+          Bool:
+            "aws:SecureTransport": false
+
+      - Sid: "AllowCloudFrontLegacyLogDelivery"
+        Effect: Allow
+        Principal:
+          Service: delivery.logs.amazonaws.com
+        Action: "s3:PutObject"
+        Resource:
+          Fn::Sub: "${CloudFrontLegacyLogBucket.Arn}/cloudfront/*"
+        Condition:
+          StringEquals:
+            "s3:x-amz-acl": "bucket-owner-full-control"

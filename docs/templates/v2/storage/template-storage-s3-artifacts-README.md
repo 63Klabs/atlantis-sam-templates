@@ -2,7 +2,7 @@
 
 S3 for storing Artifacts for CodeBuild and CodeDeploy - Deployed using SAM
 
-**Version:** v0.0.1/2025-05-16  
+**Version:** v0.1.0/2026-09-23  
 **Template:** [templates/v2/storage/template-storage-s3-artifacts.yml](../../../../templates/v2/storage/template-storage-s3-artifacts.yml)
 
 > **NOTE:** This template is deprecated in favor of deploying account-wide during account administration set-up. Account Admins, see: [Atlantis DevOps Platform Administration Guide](https://github.com/63Klabs/atlantis-platform-admin)
@@ -32,7 +32,13 @@ This template creates an S3 bucket for storing build artifacts from CodeBuild an
 - The bucket is deleted when the stack is deleted (artifacts are not retained)
 - Access is restricted to CodePipeline, CodeBuild, and CloudFormation service roles
 
-## Parameters
+## v0.0.44 Changes (server access log destination + prefix)
+
+v0.1.0 changes how the bucket's S3 server access logs are routed:
+
+- Added an optional uppercase `OrgPrefix` parameter. When set (and `S3LogBucketName` is empty), server access logs are delivered to the account-wide access log bucket imported from `${OrgPrefix}-S3-AccessLog-Bucket-Name`.
+- Destination precedence is now: explicit `S3LogBucketName` -> imported account-wide bucket (via `OrgPrefix`) -> no logging.
+- The log prefix is now `s3access/cf-artifacts/<bucket-name>/` (previously a `cf-templates-...` slug), landing in the account-wide bucket's `s3access/` segment with its own lifecycle rule.
 
 ### Resource Naming
 

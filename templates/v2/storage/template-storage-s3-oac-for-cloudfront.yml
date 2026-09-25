@@ -5,7 +5,7 @@ Description: "CloudFront distribution with S3 origin access control (OAC). Suppo
 # Atlantis for AWS SAM Deployments
 # Storage Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.1.2/2026-05-04
+# Version: v0.2.0/2026-09-23
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -27,6 +27,7 @@ Metadata:
           - Prefix
           - ProjectId
           - S3BucketNameOrgPrefix
+          - OrgPrefix
           - RolePath
       -
         Label:
@@ -71,6 +72,13 @@ Parameters:
     Default: ""
     AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
     ConstraintDescription: "May be empty or 2 to 20 characters (8 or less recommended). Lower case alphanumeric and dashes. Must start and end with a letter or number."
+
+  OrgPrefix:
+    Type: String
+    Description: "Organization-level prefix used to import account-wide exports (e.g. the access log bucket name exported as <OrgPrefix>-S3-AccessLog-Bucket-Name by account-wide-infrastructure). Must match the OrgPrefix used when deploying account-wide-infrastructure. When set and S3LogBucketName is empty, server access logs are delivered to the account-wide access log bucket under the s3access/cloudfront-oac/ prefix. Leave empty to skip importing (server access logging then requires an explicit S3LogBucketName)."
+    Default: ""
+    AllowedPattern: "^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters. Upper case alphanumeric and dashes. Must start with a letter and end with a letter or number."
 
   RolePath:
     Type: String
@@ -126,6 +134,8 @@ Conditions:
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   # HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
   HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
+  HasOrgPrefix: !Not [!Equals [!Ref OrgPrefix, ""]]
+  UseAccountLogBucket: !And [!Not [!Condition HasLoggingBucket], !Condition HasOrgPrefix]
   HasInvalidatorArn: !Not [!Equals [!Ref InvalidatorArn, ""]]
 
 # =============================================================================
@@ -157,12 +167,19 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       LoggingConfiguration: !If
-      - HasLoggingBucket
-      - DestinationBucketName: !Ref S3LogBucketName
-        LogFilePrefix: !Sub
-          - "${OrgPrefix}${Prefix}-${ProjectId}-${AWS::Region}-${AWS::AccountId}/"
-          - OrgPrefix: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
-      - !Ref AWS::NoValue
+        - HasLoggingBucket
+        - DestinationBucketName: !Ref S3LogBucketName
+          LogFilePrefix: !Sub
+            - "s3access/cloudfront-oac/${BucketName}/"
+            - BucketName: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an", !Sub "${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an"]
+        - !If
+          - UseAccountLogBucket
+          - DestinationBucketName:
+              Fn::ImportValue: !Sub "${OrgPrefix}-S3-AccessLog-Bucket-Name"
+            LogFilePrefix: !Sub
+              - "s3access/cloudfront-oac/${BucketName}/"
+              - BucketName: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an", !Sub "${Prefix}-${ProjectId}-origin-${AWS::AccountId}-${AWS::Region}-an"]
+          - !Ref AWS::NoValue
       Tags: !If
         - HasInvalidatorArn
         - - Key: "AllowInvalidationEvents"

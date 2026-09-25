@@ -126,6 +126,7 @@ class TestParametersPreservation:
         "Prefix",
         "ProjectId",
         "S3BucketNameOrgPrefix",
+        "OrgPrefix",
         "RolePath",
         "AlarmNotificationEmail",
         "PermissionsBoundaryArn",
@@ -208,6 +209,8 @@ class TestConditionsPreservation:
     EXPECTED_CONDITIONS = [
         "UseS3BucketNameOrgPrefix",
         "HasLoggingBucket",
+        "HasOrgPrefix",
+        "UseAccountLogBucket",
         "HasInvalidatorArn",
     ]
 

@@ -2,7 +2,7 @@
 
 CloudFront distribution with S3 origin access control (OAC). Supports external invalidator services via S3 event notifications - Deployed using SAM
 
-**Version:** v0.1.2/2026-05-04  
+**Version:** v0.2.0/2026-09-23  
 **Template:** [templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml](../../../../templates/v2/storage/template-storage-s3-oac-for-cloudfront.yml)
 
 ## Overview
@@ -33,7 +33,14 @@ This template creates an S3 bucket configured for use as a CloudFront origin wit
 - Optional S3 event notifications trigger Lambda invalidator function
 - Bucket must be tagged with "AllowInvalidationEvents: true" for invalidation support
 
-## Parameters
+## v0.0.44 Changes (server access log destination + prefix)
+
+v0.2.0 changes how the origin bucket's S3 server access logs are routed:
+
+- Added an optional uppercase `OrgPrefix` parameter. When set (and `S3LogBucketName` is empty), server access logs are delivered to the account-wide access log bucket imported from `${OrgPrefix}-S3-AccessLog-Bucket-Name`.
+- Destination precedence is now: explicit `S3LogBucketName` -> imported account-wide bucket (via `OrgPrefix`) -> no logging.
+- The log prefix is now `s3access/cloudfront-oac/<origin-bucket-name>/` (previously a bare project/region/account slug), so logs land in the account-wide bucket's `s3access/` segment with its own lifecycle rule.
+- The destination account-wide bucket's policy grants `logging.s3.amazonaws.com` write access scoped to `s3access/*` for buckets following the `*-an` naming convention.
 
 ### Resource Naming
 

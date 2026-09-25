@@ -18,6 +18,10 @@ This guide covers the infrastructure provisioned by the
 `account-wide-infrastructure.yml` template (when `EnableBedrockInvocationLogs` is
 `"true"`) and the manual activation step required after deployment.
 
+> **Default:** `EnableBedrockInvocationLogs` defaults to `"false"`. Bedrock model
+> invocation logging infrastructure is opt-in — set the parameter to `"true"` to provision
+> the log group and IAM role, then run the manual activation command below.
+
 ## What the Stack Creates vs. What It Does Not Do
 
 ### What is provisioned
@@ -99,26 +103,51 @@ aws bedrock put-model-invocation-logging-configuration \
   }'
 ```
 
-### Why text and embedding only?
-
-The delivery flags above are deliberate, not an oversight:
+### Text and embedding delivery (always on)
 
 - **`textDataDeliveryEnabled: true`** and **`embeddingDataDeliveryEnabled: true`**
   capture the JSON request/response bodies for text generation and embedding
-  calls, which are the primary debugging use case.
-- **`imageDataDeliveryEnabled: false`** and **`videoDataDeliveryEnabled: false`**
-  are disabled because image and video payloads are typically binary. A CloudWatch
-  Logs destination can only carry payloads up to 100 KB; larger or binary payloads
-  require an Amazon S3 large data delivery target
-  (`cloudWatchConfig.largeDataDeliveryS3Config`), which is out of scope for this
-  feature. Enabling image or video delivery without an S3 target will not produce
-  the expected capture of binary content.
+  calls, which are the primary debugging use case. These always go to CloudWatch Logs.
+- **`imageDataDeliveryEnabled`** and **`videoDataDeliveryEnabled`** are `false` in the
+  activation command **unless** you enable S3 large-object logging (see below). Image and
+  video payloads are typically binary and larger than the 100 KB CloudWatch Logs ceiling,
+  so they require an Amazon S3 large data delivery target
+  (`cloudWatchConfig.largeDataDeliveryS3Config`). Enabling image or video delivery without
+  an S3 target will not capture the binary content.
 
-**To opt in to image or video delivery**, add the appropriate S3 target to the
-`--logging-config` JSON and update the corresponding flag to `true`. Be aware
-that your role will also need `s3:PutObject` on the S3 bucket, which is not
-granted by the role provisioned here. See the [AWS model invocation logging
-documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html)
+## Enabling S3 Large-Object (Media) Logging
+
+As of the v0.0.44 templates, image/video/large-binary payloads can be delivered to S3 as a
+first-class, opt-in feature. Set **`EnableBedrockLargeObjectLogging="true"`** on the
+account-wide stack (this also requires `EnableBedrockInvocationLogs="true"`, since the S3
+large-object target is nested inside `cloudWatchConfig`).
+
+What the stack does when enabled:
+
+- Chooses a destination bucket by precedence: an explicit `BedrockLargeObjectLogBucketName`,
+  otherwise the account-wide access log bucket (requires `EnableS3AccessLogBucket="true"`).
+- When the destination is the account-wide bucket, adds a bucket-policy statement granting
+  the **`bedrock.amazonaws.com`** service principal `s3:PutObject` scoped to
+  `bedrock/AWSLogs/<account-id>/BedrockModelInvocationLogs/*`, guarded by `aws:SourceAccount`
+  and `aws:SourceArn`. Adds an S3 lifecycle rule on the `bedrock/` prefix using
+  `BedrockLargeObjectLogExpirationInDays` (default 90).
+- Emits a `BedrockModelInvocationLoggingEnableCommand` that includes
+  `cloudWatchConfig.largeDataDeliveryS3Config` (bucket + `keyPrefix: bedrock`) and sets
+  `imageDataDeliveryEnabled`/`videoDataDeliveryEnabled` to `true`.
+
+> **Note:** S3 large-object delivery is authorized by the **destination bucket policy** on
+> the `bedrock.amazonaws.com` service principal — **not** by the CloudWatch role. The role
+> provisioned for CloudWatch delivery needs no S3 permissions.
+
+> **External bucket:** If you set `BedrockLargeObjectLogBucketName` to a bucket outside this
+> stack, the stack cannot attach the bucket policy for you. You must add the
+> `bedrock.amazonaws.com` `s3:PutObject` statement (scoped to
+> `bedrock/AWSLogs/<account-id>/BedrockModelInvocationLogs/*`) to that bucket yourself, and
+> if the bucket uses SSE-KMS, grant `bedrock.amazonaws.com` `kms:GenerateDataKey` on the key.
+
+Activation remains the same manual CLI step — run the emitted
+`BedrockModelInvocationLoggingEnableCommand` once per region. See the
+[AWS model invocation logging documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html)
 for the full `PutModelInvocationLoggingConfiguration` schema.
 
 ## Verification
@@ -214,9 +243,9 @@ These are deliberate scope decisions, not defects:
 | Limitation | Detail |
 |-----------|--------|
 | `bedrock-runtime` endpoint only | Only calls through the `bedrock-runtime` endpoint are logged. Management plane calls (e.g., `CreateModelCustomizationJob`) are not captured. |
-| 100 KB payload ceiling | A CloudWatch Logs destination carries invocation metadata and input/output JSON bodies **only up to 100 KB**. Binary data and bodies larger than 100 KB are not captured without an S3 large data delivery target, which is out of scope. |
-| Image and video delivery disabled | `imageDataDeliveryEnabled` and `videoDataDeliveryEnabled` are `false` by default because binary payloads cannot be delivered to CloudWatch Logs without the out-of-scope S3 large data delivery configuration. |
-| No S3 logging destination | This feature does not provision an S3 bucket or bucket policy for `s3Config`. Adding S3 delivery requires a separate stack change. |
+| 100 KB CloudWatch ceiling | A CloudWatch Logs destination carries invocation metadata and input/output JSON bodies **only up to 100 KB**. Binary data and bodies larger than 100 KB require the S3 large-object target, which is available via `EnableBedrockLargeObjectLogging` (see "Enabling S3 Large-Object (Media) Logging"). |
+| Image and video delivery off by default | `imageDataDeliveryEnabled` and `videoDataDeliveryEnabled` are `false` unless `EnableBedrockLargeObjectLogging` is `true`, which wires the S3 large data delivery target and flips both flags to `true` in the activation command. |
+| `s3Config` (all-logs-to-S3) not used | The templates use the hybrid `cloudWatchConfig.largeDataDeliveryS3Config` (small data to CloudWatch, large/binary to S3), not the top-level `s3Config` that would send *all* logs to S3. |
 | No metric filters or alarms | CloudWatch metric filters, alarms, and dashboards over the invocation log group are not included. Add them separately if needed. |
 | Activation is manual | There is no CloudFormation-native resource type for `PutModelInvocationLoggingConfiguration`. Activation requires a CLI command after deployment. |
 

@@ -12,7 +12,7 @@
 #      (an explicitly supplied log bucket always wins)
 #   2. else EnableS3AccessLogBucket=true -> log to the account-wide AccessLogBucketRegional
 #   3. else -> no logging configured
-# Logs are written under the "cf-artifacts/" prefix in the destination bucket.
+# Logs are written under the "s3access/cf-artifacts/<bucket-name>/" prefix in the destination bucket.
 
 Type: AWS::S3::Bucket
 Condition: EnableS3ArtifactsBucket
@@ -51,12 +51,20 @@ Properties:
       - HasLoggingBucket
       - DestinationBucketName:
           Ref: S3LogBucketName
-        LogFilePrefix: "cf-artifacts/"
+        LogFilePrefix:
+          Fn::If:
+            - UseS3BucketNameOrgPrefix
+            - Fn::Sub: "s3access/cf-artifacts/${S3BucketNameOrgPrefix}-cf-artifacts-${AWS::AccountId}-${AWS::Region}-an/"
+            - Fn::Sub: "s3access/cf-artifacts/cf-artifacts-${AWS::AccountId}-${AWS::Region}-an/"
       - Fn::If:
           - EnableS3AccessLogBucket
           - DestinationBucketName:
               Ref: AccessLogBucketRegional
-            LogFilePrefix: "cf-artifacts/"
+            LogFilePrefix:
+              Fn::If:
+                - UseS3BucketNameOrgPrefix
+                - Fn::Sub: "s3access/cf-artifacts/${S3BucketNameOrgPrefix}-cf-artifacts-${AWS::AccountId}-${AWS::Region}-an/"
+                - Fn::Sub: "s3access/cf-artifacts/cf-artifacts-${AWS::AccountId}-${AWS::Region}-an/"
           - Ref: "AWS::NoValue"
   NotificationConfiguration:
     Fn::If:

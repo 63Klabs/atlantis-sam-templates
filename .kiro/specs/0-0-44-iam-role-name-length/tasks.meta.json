@@ -1,0 +1,124 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Shorten the promotion source-event service role name": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723354
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309731885
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309762556
+      }
+    ],
+    "2. Confirm no parent-template or sibling-module changes are needed": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723477
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309765456
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309804614
+      }
+    ],
+    "3. Add the resource name-length budget to steering": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723569
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309807692
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309846478
+      }
+    ],
+    "4. Add a rendered-name length check (unit test)": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723678
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309849303
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309961320
+      }
+    ],
+    "5. Validate the template still splices and lints cleanly": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723763
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309965451
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790310099816
+      }
+    ],
+    "6. Update documentation for the modified module": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723847
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790310102664
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790310138926
+      }
+    ],
+    "7. Update CHANGELOG.md": [
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790309723941
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790310141812
+      },
+      {
+        "executionId": "1958f17c-0bfc-495b-b40d-aa021846e952",
+        "chatSessionId": "sess_2215247f-01b3-4701-9e45-91af3d3f49f7",
+        "timestamp": 1790310175903
+      }
+    ]
+  }
+}

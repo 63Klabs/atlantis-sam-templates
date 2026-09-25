@@ -1,16 +1,31 @@
 # -- S3 Access Log Bucket (Account-Wide) --
 # Parent template must define parameters:
-#   S3BucketNameOrgPrefix, LogExpirationInDays, AllowLegacyCloudFrontLogs
+#   S3BucketNameOrgPrefix, LogExpirationInDays, S3AccessLogExpirationInDays,
+#   BedrockLargeObjectLogExpirationInDays
 # Parent template must define conditions:
-#   UseS3BucketNameOrgPrefix, EnableS3AccessLogBucket, EnableLegacyCloudFrontLogs
+#   UseS3BucketNameOrgPrefix, EnableS3AccessLogBucket, BedrockMediaToAccountBucket
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
 #       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 # KEEP IN SYNC with templates/v2/storage/template-storage-s3-access-logs.yml
-#   (see .kiro/steering/s3-access-logs-module-sync.md)
+#   (see .kiro/steering/s3-access-logs-module-sync.md) - NOTE: as of v0.0.44 the
+#   account-wide side is a two-bucket superset; only shared primitives
+#   (encryption, versioning, retention policy type, secure-transport deny,
+#   ownership shape) are kept in sync with the standalone.
 #
-# Creates an account-wide S3 bucket for storing S3 server access logs.
+# Creates an account-wide S3 bucket for storing S3 server access logs, CloudFront
+# standard logging (v2), and Bedrock large-object (media) invocation logs.
 # Unlike the standalone storage template, this bucket is shared across the
-# account without Prefix or ProjectId scoping.
+# account without Prefix or ProjectId scoping. Object Ownership is always
+# BucketOwnerEnforced (ACLs disabled); legacy CloudFront (v1) logging, which
+# requires ACLs, is served by a separate cloudfront-logs-legacy bucket.
+#
+# Logs are organized by provider prefix:
+#   cloudfront/                       CloudFront standard logging (v2)
+#   s3access/cf-artifacts/<bucket>/   account-wide artifacts server access logs
+#   s3access/cloudfront-oac/<bucket>/ OAC origin server access logs
+#   s3access/devops/<bucket>/         devops bucket server access logs
+#   s3access/apps/<bucket>/           general Atlantis application server access logs
+#   bedrock/AWSLogs/<account>/...     Bedrock large-object/media invocation logs
 Type: AWS::S3::Bucket
 Condition: EnableS3AccessLogBucket
 DeletionPolicy: Retain
@@ -30,20 +45,51 @@ Properties:
         ServerSideEncryptionByDefault:
           SSEAlgorithm: AES256
   PublicAccessBlockConfiguration:
-    BlockPublicAcls:
-      Fn::If: [EnableLegacyCloudFrontLogs, false, true]
+    BlockPublicAcls: true
     BlockPublicPolicy: true
     IgnorePublicAcls: true
     RestrictPublicBuckets: true
+  OwnershipControls:
+    Rules:
+      - ObjectOwnership: BucketOwnerEnforced
   LifecycleConfiguration:
     Rules:
-      - Id: DeleteOldLogs
+      - Id: ExpireCloudFront
         Status: Enabled
+        Filter:
+          Prefix: "cloudfront/"
         ExpirationInDays:
           Ref: LogExpirationInDays
-  OwnershipControls:
-    Fn::If:
-      - EnableLegacyCloudFrontLogs
-      - Rules:
-          - ObjectOwnership: BucketOwnerPreferred
-      - Ref: "AWS::NoValue"
+      - Id: ExpireS3AccessCfArtifacts
+        Status: Enabled
+        Filter:
+          Prefix: "s3access/cf-artifacts/"
+        ExpirationInDays:
+          Ref: S3AccessLogExpirationInDays
+      - Id: ExpireS3AccessCloudFrontOac
+        Status: Enabled
+        Filter:
+          Prefix: "s3access/cloudfront-oac/"
+        ExpirationInDays:
+          Ref: S3AccessLogExpirationInDays
+      - Id: ExpireS3AccessDevops
+        Status: Enabled
+        Filter:
+          Prefix: "s3access/devops/"
+        ExpirationInDays:
+          Ref: S3AccessLogExpirationInDays
+      - Id: ExpireS3AccessApps
+        Status: Enabled
+        Filter:
+          Prefix: "s3access/apps/"
+        ExpirationInDays:
+          Ref: S3AccessLogExpirationInDays
+      - Fn::If:
+          - BedrockMediaToAccountBucket
+          - Id: ExpireBedrockMedia
+            Status: Enabled
+            Filter:
+              Prefix: "bedrock/"
+            ExpirationInDays:
+              Ref: BedrockLargeObjectLogExpirationInDays
+          - Ref: "AWS::NoValue"

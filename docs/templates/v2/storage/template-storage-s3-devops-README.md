@@ -2,7 +2,7 @@
 
 S3 for storing shared and latest (non-versioned) DevOps files (buildspec, buildscripts, reusable Lambda src) - Deployed using SAM
 
-**Version:** v0.0.1/2025-05-10  
+**Version:** v0.1.0/2026-09-23  
 **Template:** [templates/v2/storage/template-storage-s3-devops.yml](../../../../templates/v2/storage/template-storage-s3-devops.yml)
 
 ## Overview
@@ -31,7 +31,13 @@ This template creates an S3 bucket for storing shared DevOps files that are used
 - The bucket is retained on stack deletion to preserve critical infrastructure
 - No lifecycle policies (files are kept indefinitely)
 
-## Parameters
+## v0.0.44 Changes (server access log destination + prefix)
+
+v0.1.0 changes how the bucket's S3 server access logs are routed:
+
+- Added an optional uppercase `OrgPrefix` parameter. When set (and `S3LogBucketName` is empty), server access logs are delivered to the account-wide access log bucket imported from `${OrgPrefix}-S3-AccessLog-Bucket-Name`.
+- Destination precedence is now: explicit `S3LogBucketName` -> imported account-wide bucket (via `OrgPrefix`) -> no logging.
+- The log prefix is now `s3access/devops/<bucket-name>/`, landing in the account-wide bucket's `s3access/` segment with its own lifecycle rule.
 
 ### Resource Naming
 

@@ -609,6 +609,8 @@ Module: `templates/v2/modules/pipeline/promotion-source-event-service-role.yml`
 
 IAM role assumed by EventBridge to call `codepipeline:StartPipelineExecution` on this pipeline when a promoted `source.zip` arrives in the artifacts bucket.
 
+Rendered role name: `${Prefix}-Worker-${ProjectId}-${StageId}-PromoteSrcEventSvcRole` (abbreviated to stay within the 64-character IAM role name limit).
+
 ### PromotionSourceEvent
 
 Type: AWS::Events::Rule  

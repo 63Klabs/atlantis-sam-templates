@@ -60,6 +60,18 @@ In some cases, a short Resource name (lower case) may be included after `Project
 
 However, since bucket names are limited to 63 characters, and `-AccountId-Region-an` takes up about a third of that, and `S3BucketNameOrgPrefix-Prefix-ProjectId-StageId` can also take up a substantial amount, include a `Resource` descriptor only if necessary (e.g. multiple buckets in the same stack, or multiple buckets across shared Project stacks)
 
+#### Resource Name Length Budget
+
+Some AWS resource names have a maximum length. IAM role names, for example, are limited to **64 characters** (the role *path* is a separate value and does not count toward that limit).
+
+For any length-limited name built as `Prefix-ProjectId-StageId-Resource`, reserve **34 characters** for `Prefix` + `ProjectId` + `StageId` and the two hyphens that join them (assuming a reasonable footprint of `Prefix` 6, `ProjectId` 20, `StageId` 6 = 32, plus 2 hyphens). Budget the remaining characters for the static/descriptive portion of the name.
+
+For IAM role names (64-character limit) the static/descriptive portion must therefore not exceed **30 characters**.
+
+Worker roles follow the pattern `${Prefix}-Worker-${ProjectId}-${StageId}-<Suffix>`; keep `<Suffix>` to **22 characters or fewer** (the literal `Worker` plus hyphens consume the rest of the 30-character static budget).
+
+> **Note:** The 34-character reservation assumes `Prefix`/`ProjectId`/`StageId` stay within the reasonable footprint above, not their absolute maximums (8/26/8). Deployments that use the maximum-length values can still exceed a name's limit; keep `Prefix + ProjectId` at or under 28 characters (as the parameter `ConstraintDescription` recommends). Parameter `MaxLength` values are intentionally left unchanged.
+
 ### 3.3 IAM Policies – Principle of Least Privilege
 
 AI must follow these rules when generating IAM policies:

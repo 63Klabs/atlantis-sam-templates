@@ -5,7 +5,7 @@ Description: "S3 for storing shared and latest (non-versioned) DevOps files (bui
 # Atlantis for AWS SAM Deployments
 # Storage Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.2/2026-03-29
+# Version: v0.1.0/2026-09-23
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -41,6 +41,7 @@ Metadata:
           - Prefix
           - ProjectId
           - S3BucketNameOrgPrefix
+          - OrgPrefix
       -
         Label:
           default: "Supporting Resources"
@@ -83,6 +84,13 @@ Parameters:
     AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
     ConstraintDescription: "May be empty or 2 to 20 characters (8 or less recommended). Lower case alphanumeric and dashes. Must start and end with a letter or number."
 
+  OrgPrefix:
+    Type: String
+    Description: "Organization-level prefix used to import account-wide exports (e.g. the access log bucket name exported as <OrgPrefix>-S3-AccessLog-Bucket-Name by account-wide-infrastructure). Must match the OrgPrefix used when deploying account-wide-infrastructure. When set and S3LogBucketName is empty, server access logs are delivered to the account-wide access log bucket under the s3access/devops/ prefix. Leave empty to skip importing (server access logging then requires an explicit S3LogBucketName)."
+    Default: ""
+    AllowedPattern: "^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters. Upper case alphanumeric and dashes. Must start with a letter and end with a letter or number."
+
   # ---------------------------------------------------------------------------
   # Supporting Resources
 
@@ -110,6 +118,8 @@ Conditions:
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   UseBuildSourceArn: !Not [!Equals [!Ref BuildSourceArn, ""]]
   HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
+  HasOrgPrefix: !Not [!Equals [!Ref OrgPrefix, ""]]
+  UseAccountLogBucket: !And [!Not [!Condition HasLoggingBucket], !Condition HasOrgPrefix]
 
 # =============================================================================
 # RESOURCES
@@ -143,13 +153,19 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       LoggingConfiguration: !If
-      - HasLoggingBucket
-      - DestinationBucketName: !Ref S3LogBucketName
-        LogFilePrefix: !Join
-          - "-"
-          - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}", !Sub "${Prefix}" ]
-            - !Sub "${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"
-      - !Ref AWS::NoValue
+        - HasLoggingBucket
+        - DestinationBucketName: !Ref S3LogBucketName
+          LogFilePrefix: !Sub
+            - "s3access/devops/${BucketName}/"
+            - BucketName: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an", !Sub "${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"]
+        - !If
+          - UseAccountLogBucket
+          - DestinationBucketName:
+              Fn::ImportValue: !Sub "${OrgPrefix}-S3-AccessLog-Bucket-Name"
+            LogFilePrefix: !Sub
+              - "s3access/devops/${BucketName}/"
+              - BucketName: !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an", !Sub "${Prefix}-${ProjectId}-${AWS::AccountId}-${AWS::Region}-an"]
+          - !Ref AWS::NoValue
 
   BucketPolicy:
     Type: AWS::S3::BucketPolicy

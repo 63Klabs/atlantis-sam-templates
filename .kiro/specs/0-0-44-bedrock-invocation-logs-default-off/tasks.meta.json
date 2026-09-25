@@ -1,0 +1,243 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 In `account-wide-infrastructure.yml`, change the `EnableBedrockInvocationLogs` parameter `Default` from `\"true\"` to `\"false\"`; leave `Type`, `AllowedValues`, and `ConstraintDescription` unchanged _(R1.1, R1.2)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343312
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308353518
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308397893
+      }
+    ],
+    "1.2 Add \"Disabled by default.\" to the `EnableBedrockInvocationLogs` description so the parameter stays self-describing _(R2.1)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343592
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308401168
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308432954
+      }
+    ],
+    "1.3 Verify the \"BEDROCK MODEL INVOCATION LOGGING - MANUAL ACTIVATION REQUIRED\" header comment block makes no \"on by default\" claim; correct it only if such a claim exists (none expected) _(R2.2)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343682
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308436561
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308465813
+      }
+    ],
+    "1.4 Confirm no other parameter default, description, or constraint is modified _(R2.3)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343768
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308468915
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308535778
+      }
+    ],
+    "2.1 Run the repository `cfn-lint` check on `account-wide-infrastructure.yml`; confirm no new findings _(R1.5)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343855
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308538915
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308768821
+      }
+    ],
+    "2.2 Resolve/synthesize the template with `EnableBedrockInvocationLogs` unset; confirm the Bedrock log group, IAM role, and the five Bedrock-conditional outputs are ABSENT _(R1.3)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308343966
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308772356
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308830786
+      }
+    ],
+    "2.3 Resolve/synthesize with `EnableBedrockInvocationLogs=\"true\"`; confirm the log group, IAM role, and outputs are present exactly as in v0.0.43 _(R1.4)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344056
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308834180
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308929338
+      }
+    ],
+    "2.4 Confirm sibling-rule compatibility: `EnableBedrockLargeObjectLogging=\"true\"` with default `EnableBedrockInvocationLogs=\"false\"` fails the existing `Rules` assertion with its descriptive message; setting `EnableBedrockInvocationLogs=\"true\"` clears it _(R1.5)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344140
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308933071
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308982948
+      }
+    ],
+    "3.1 Reconcile the header `Version:` with the sibling media spec: fold into `v2.1.0` if released together, else bump to `v2.1.1/<date>` (patch) _(R3.1)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344226
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308986207
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309034241
+      }
+    ],
+    "3.2 Add a `### Changed` entry under `## v0.0.44 (unreleased)` in `CHANGELOG.md` referencing this spec, with the reconciled template version and the update-time role-deletion note; do not modify existing changelog text _(R3.2, R3.3)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344316
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309038194
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309086311
+      }
+    ],
+    "4.1 In `docs/templates/v2/account/account-wide-infrastructure-README.md`, change the `EnableBedrockInvocationLogs` parameter table `Default` row from `true` to `false`; preserve the following `> **Important:**` blockquote and its `=\"true\"` enablement example _(R4.1, R4.4, R4.5)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344404
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309090508
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309124136
+      }
+    ],
+    "4.2 In `docs/templates/v2/account/README.md`, confirm the \"All optional resources are disabled by default\" statement is now accurate for `EnableBedrockInvocationLogs`; edit only if a residual inconsistency remains _(R4.2)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344494
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309127669
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309162353
+      }
+    ],
+    "4.3 In `docs/admin-ops/bedrock-model-invocation-logging.md`, add an additive opt-in/default-`\"false\"` note (e.g., an Overview blockquote); preserve existing \"true\"-behavior descriptions, the prerequisites list, and the teardown section _(R4.3, R4.4, R4.5)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344606
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309168120
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309208744
+      }
+    ],
+    "4.4 Grep the affected docs to confirm no remaining `Default | true` for this parameter and no \"enabled by default\" assertion for Bedrock invocation logging _(R4.1, R4.2, R4.3)_": [
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790308344707
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309212164
+      },
+      {
+        "executionId": "9b9855d2-9970-48b4-962d-8875018b5cd1",
+        "chatSessionId": "sess_2a04a8c1-ffea-4bdd-a8e9-795cc0062ea0",
+        "timestamp": 1790309265851
+      }
+    ]
+  }
+}

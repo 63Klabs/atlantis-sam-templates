@@ -5,7 +5,7 @@ Description: "S3 for storing Artifacts for CodeBuild and CodeDeploy - Deployed u
 # Atlantis for AWS SAM Deployments
 # Storage Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.0.2/2026-03-29
+# Version: v0.1.0/2026-09-23
 
 # Deprecation Notice: It is recommended to instead EnableS3ArtifactsBucket while deploying account-wide-infrastructure at the account level. 
 
@@ -33,6 +33,7 @@ Metadata:
           - Prefix
           - ProjectId
           - S3BucketNameOrgPrefix
+          - OrgPrefix
           - RolePath
       -
         Label:
@@ -74,6 +75,13 @@ Parameters:
     AllowedPattern: "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$|^$"
     ConstraintDescription: "May be empty or 2 to 20 characters (8 or less recommended). Lower case alphanumeric and dashes. Must start and end with a letter or number."
 
+  OrgPrefix:
+    Type: String
+    Description: "Organization-level prefix used to import account-wide exports (e.g. the access log bucket name exported as <OrgPrefix>-S3-AccessLog-Bucket-Name by account-wide-infrastructure). Must match the OrgPrefix used when deploying account-wide-infrastructure. When set and S3LogBucketName is empty, server access logs are delivered to the account-wide access log bucket under the s3access/cf-artifacts/ prefix. Leave empty to skip importing (server access logging then requires an explicit S3LogBucketName)."
+    Default: ""
+    AllowedPattern: "^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$|^$"
+    ConstraintDescription: "May be empty or 2 to 20 characters. Upper case alphanumeric and dashes. Must start with a letter and end with a letter or number."
+
   RolePath:
     Type: String
     Description: "Path to use for IAM Roles and Policies. You may wish to separate out your applications from users, or create seperate paths per prefix or application. Specific paths may required by permission boundaries. Ex: /ws-hello-world-test/ or /app_role/"
@@ -108,6 +116,8 @@ Conditions:
   UseProjectPrefix: !Not [!Equals [ !Ref Prefix, "" ]]
   UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasLoggingBucket: !Not [!Equals [!Ref S3LogBucketName, ""]]
+  HasOrgPrefix: !Not [!Equals [!Ref OrgPrefix, ""]]
+  UseAccountLogBucket: !And [!Not [!Condition HasLoggingBucket], !Condition HasOrgPrefix]
 
 # =============================================================================
 # RESOURCES
@@ -150,14 +160,27 @@ Resources:
             NoncurrentVersionExpirationInDays: 30
             Status: "Enabled" # Enable so that you purge old build artifacts - they serve no use, not even for debug and it saves space and $$$
       LoggingConfiguration: !If
-      - HasLoggingBucket
-      - DestinationBucketName: !Ref S3LogBucketName
-        LogFilePrefix: !Join
-          - ""
-          - - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
-            - !If [UseProjectPrefix, !Sub "${Prefix}-", ""]
-            - !Sub "cf-templates-${AWS::Region}-${AWS::AccountId}"
-      - !Ref AWS::NoValue
+        - HasLoggingBucket
+        - DestinationBucketName: !Ref S3LogBucketName
+          LogFilePrefix: !Join
+            - ""
+            - - "s3access/cf-artifacts/"
+              - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+              - !If [UseProjectPrefix, !Sub "${Prefix}-", ""]
+              - !Sub "cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
+              - "/"
+        - !If
+          - UseAccountLogBucket
+          - DestinationBucketName:
+              Fn::ImportValue: !Sub "${OrgPrefix}-S3-AccessLog-Bucket-Name"
+            LogFilePrefix: !Join
+              - ""
+              - - "s3access/cf-artifacts/"
+                - !If [UseS3BucketNameOrgPrefix, !Sub "${S3BucketNameOrgPrefix}-", ""]
+                - !If [UseProjectPrefix, !Sub "${Prefix}-", ""]
+                - !Sub "cf-artifacts-${AWS::AccountId}-${AWS::Region}-an"
+                - "/"
+          - !Ref AWS::NoValue
   # ---------------------------------------------------------------------------
   # -- S3 Artifact Bucket Policy --
   # This policy is applied to the Amazon S3 bucket that AWS CodePipeline will use as your artifact store.

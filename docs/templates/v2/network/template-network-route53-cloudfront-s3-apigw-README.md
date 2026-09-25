@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.0.18/2026-05-01  
+**Version:** v0.1.0/2026-09-23  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -33,6 +33,18 @@ This template creates a complete network infrastructure for serving static conte
 - The template uses Origin Access Control (OAC) for S3, not the legacy Origin Access Identity (OAI)
 - Non-production stages automatically append the stage ID to subdomain names
 - DEV and TEST environments use PriceClass_100 regardless of the CloudFrontPriceClass parameter
+
+## v0.0.44 Changes (CloudFront logging v1/v2)
+
+v0.1.0 replaces the single always-on legacy logging block with a selectable `CloudFrontLoggingVersion` (`none` | `v1` | `v2`, default `v1`) and adds an `OrgPrefix` parameter for importing the account-wide log buckets.
+
+- **`v1` (legacy standard logging)** — works in **any region**. Uses the distribution's inline `Logging` block, delivering to an ACL-enabled bucket. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name` (the account-wide `cloudfront-logs-legacy` bucket) -> no logging. Objects land under the flat `cloudfront/` prefix.
+- **`v2` (standard logging v2)** — **us-east-1 only** (CloudFront delivery resources are region-pinned to us-east-1). Creates `AWS::Logs::DeliverySource`, `AWS::Logs::DeliveryDestination`, and `AWS::Logs::Delivery`. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-S3-AccessLog-Bucket-Name` (the account-wide main, ACL-disabled bucket) -> none. The `/cloudfront` suffix on the destination ARN yields keys under `cloudfront/AWSLogs/<account>/CloudFront/...`. When `v2` is selected outside us-east-1, no delivery resources are created (guarded by `IsUsEast1`).
+- **`none`** — disables CloudFront logging.
+
+The destination bucket must match the mode: **v1 requires an ACL-enabled bucket**; **v2 requires an ACL-disabled bucket in us-east-1**. A new `CloudFrontLoggingMode` output reports the effective mode (including "v2 requested but disabled" when the region/distribution/destination preconditions are not met).
+
+> **Region strategy:** for deployments outside us-east-1 (e.g. us-east-2), use `v1` with the account-wide `cloudfront-logs-legacy` bucket (enable `AllowLegacyCloudFrontLogs` on account-wide-infrastructure). Reserve `v2` for us-east-1 stacks.
 
 ## Parameters
 

@@ -4,7 +4,7 @@ Description: "Account-wide resources: ABAC-scoped managed policies and shared co
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Account-Wide Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.2/2026-09-22
+# Version: v2.1.0/2026-09-23
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/
@@ -53,7 +53,9 @@ Description: "Account-wide resources: ABAC-scoped managed policies and shared co
 #   aws bedrock get-model-invocation-logging-configuration --region <REGION>
 #
 # Repeat in every region where Bedrock is used. Text and embedding delivery are
-# enabled; image and video are deliberately disabled (see docs).
+# always enabled. Image and video (large binary) delivery are disabled by default;
+# set EnableBedrockLargeObjectLogging to 'true' to deliver them to S3 under the
+# 'bedrock/' prefix (see the S3 Bedrock Large Object Logs parameters and docs).
 #
 # Full instructions: docs/admin-ops/bedrock-model-invocation-logging.md
 # AWS docs: https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html
@@ -108,6 +110,7 @@ Metadata:
         Parameters:
           - EnableS3AccessLogBucket
           - LogExpirationInDays
+          - S3AccessLogExpirationInDays
           - AllowLegacyCloudFrontLogs
       -
         Label:
@@ -116,6 +119,13 @@ Metadata:
           - EnableBedrockInvocationLogs
           - BedrockInvocationLogExpirationInDays
           - BedrockInvocationLogKmsKeyArn
+      -
+        Label:
+          default: "S3 Bedrock Large Object Logs"
+        Parameters:
+          - EnableBedrockLargeObjectLogging
+          - BedrockLargeObjectLogExpirationInDays
+          - BedrockLargeObjectLogBucketName
       -
         Label:
           default: "Promotion"
@@ -232,7 +242,15 @@ Parameters:
 
   LogExpirationInDays:
     Type: Number
-    Description: "The number of days to keep logs in the access log bucket. Default is 90 days, max is 365. Consider exporting for longer retention. Only applies when EnableS3AccessLogBucket is 'true'."
+    Description: "The number of days to keep logs under prefixes that use the shared default retention: the 'cloudfront/' prefix on the main access log bucket and the CloudFront legacy logging bucket. Default is 180 days, max is 365. Consider exporting for longer retention. Applies when EnableS3AccessLogBucket or AllowLegacyCloudFrontLogs is 'true'."
+    Default: 180
+    MinValue: 1
+    MaxValue: 365
+    ConstraintDescription: "Must be between 1 and 365 days."
+
+  S3AccessLogExpirationInDays:
+    Type: Number
+    Description: "The number of days to keep S3 server access logs under the 's3access/' prefixes (cf-artifacts, cloudfront-oac, devops, apps) on the main access log bucket. Each sub-prefix has its own lifecycle rule sharing this value, so finer-grained per-type retention can be split out later. Default is 180 days, max is 365. Only applies when EnableS3AccessLogBucket is 'true'."
     Default: 180
     MinValue: 1
     MaxValue: 365
@@ -240,7 +258,7 @@ Parameters:
 
   AllowLegacyCloudFrontLogs:
     Type: String
-    Description: "Set to 'true' to enable legacy CloudFront standard logging support on the access log bucket. When enabled, BlockPublicAcls is set to false, ObjectOwnership is set to BucketOwnerPreferred, and a bucket policy statement is added for the CloudFront log delivery service (delivery.logs.amazonaws.com). Default is 'false' to maintain the secure configuration. Only applies when EnableS3AccessLogBucket is 'true'."
+    Description: "Set to 'true' to provision a separate, dedicated CloudFront legacy (v1) standard-logging bucket (cloudfront-logs-legacy-*). CloudFront v1 delivers logs using ACL-based delivery, which requires Object Ownership BucketOwnerPreferred (ACLs enabled); because the main access log bucket keeps ACLs disabled for Bedrock S3 delivery, legacy CloudFront logs get their own bucket. Default is 'false'. This is independent of EnableS3AccessLogBucket. For CloudFront standard logging v2 (no ACLs), use the main access log bucket instead (us-east-1 only)."
     Default: "false"
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
@@ -250,8 +268,8 @@ Parameters:
 
   EnableBedrockInvocationLogs:
     Type: String
-    Description: "Set to 'true' to create the CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. IMPORTANT: Creating these resources does NOT enable logging. After deployment you must run the AWS CLI command provided in the BedrockModelInvocationLoggingEnableCommand stack output to activate logging, because Amazon Bedrock provides no CloudFormation resource for the logging configuration."
-    Default: "true"
+    Description: "Set to 'true' to create the CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. Disabled by default. IMPORTANT: Creating these resources does NOT enable logging. After deployment you must run the AWS CLI command provided in the BedrockModelInvocationLoggingEnableCommand stack output to activate logging, because Amazon Bedrock provides no CloudFormation resource for the logging configuration."
+    Default: "false"
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."
 
@@ -269,6 +287,31 @@ Parameters:
     AllowedPattern: "^arn:[a-z0-9-]+:kms:[a-z0-9-]+:\\d{12}:(key|alias)\\/.+$|^$"
     MaxLength: 256
     ConstraintDescription: "Must be empty or a valid KMS key or alias ARN, for example arn:aws:kms:us-east-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab."
+
+  # ---------------------------------------------------------------------------
+  # S3 Bedrock Large Object Logs
+
+  EnableBedrockLargeObjectLogging:
+    Type: String
+    Description: "Set to 'true' to enable delivery of Bedrock large-object/media invocation payloads (images, video, and any payload over 100 KB) to S3 under the 'bedrock/' prefix. Text and embedding payloads continue to be delivered to CloudWatch Logs. IMPORTANT: like the CloudWatch path, enabling this does NOT activate logging by itself - after deployment you must run the AWS CLI command in the BedrockModelInvocationLoggingEnableCommand output. When 'true', either EnableS3AccessLogBucket must be 'true' or BedrockLargeObjectLogBucketName must be provided (enforced by a template rule)."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: "Must be 'true' or 'false'."
+
+  BedrockLargeObjectLogExpirationInDays:
+    Type: Number
+    Description: "The number of days to keep Bedrock large-object/media logs under the 'bedrock/' prefix on the main access log bucket. This is an S3 lifecycle value and is DISTINCT from BedrockInvocationLogExpirationInDays (which is the CloudWatch Logs retention for text/embedding logs). Media payloads can be bulky, so tune this for cost. Default is 90 days, max is 365. Only applies when Bedrock media logging targets the account-wide access log bucket."
+    Default: 90
+    MinValue: 1
+    MaxValue: 365
+    ConstraintDescription: "Must be between 1 and 365 days."
+
+  BedrockLargeObjectLogBucketName:
+    Type: String
+    Description: "Optional S3 bucket name for Bedrock large-object/media log delivery. When set, this bucket takes precedence over the account-wide access log bucket. NOTE: this template cannot attach a policy to an external bucket, so you must manually add a bucket policy allowing the bedrock.amazonaws.com service principal s3:PutObject on the 'bedrock/AWSLogs/<account>/BedrockModelInvocationLogs/*' prefix. Leave empty to use the account-wide access log bucket (requires EnableS3AccessLogBucket 'true')."
+    Default: ""
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$|^$"
+    ConstraintDescription: "Must be a valid S3 bucket name or empty. Must be between 3 and 63 characters long. Lower case alphanumeric and dashes. Must start and end with a letter or number."
 
   # ---------------------------------------------------------------------------
   # Promotion
@@ -303,6 +346,33 @@ Conditions:
   EnablePromotionTrigger: !Equals [!Ref EnablePromotionTrigger, "true"]
   EnableBedrockInvocationLogs: !Equals [!Ref EnableBedrockInvocationLogs, "true"]
   HasBedrockInvocationLogKmsKey: !Not [!Equals [!Ref BedrockInvocationLogKmsKeyArn, ""]]
+  EnableBedrockLargeObjectLogging: !Equals [!Ref EnableBedrockLargeObjectLogging, "true"]
+  HasBedrockLargeObjectLogBucket: !Not [!Equals [!Ref BedrockLargeObjectLogBucketName, ""]]
+  # Bedrock media targets the account-wide main access log bucket (not an external bucket):
+  BedrockMediaToAccountBucket: !And
+    - !Equals [!Ref EnableBedrockLargeObjectLogging, "true"]
+    - !Equals [!Ref BedrockLargeObjectLogBucketName, ""]
+    - !Equals [!Ref EnableS3AccessLogBucket, "true"]
+
+# =============================================================================
+# RULES
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
+#
+
+Rules:
+  BedrockMediaRequiresDestination:
+    RuleCondition: !Equals [!Ref EnableBedrockLargeObjectLogging, "true"]
+    Assertions:
+      - Assert: !Or
+          - !Equals [!Ref EnableS3AccessLogBucket, "true"]
+          - !Not [!Equals [!Ref BedrockLargeObjectLogBucketName, ""]]
+        AssertDescription: "When EnableBedrockLargeObjectLogging is 'true', either EnableS3AccessLogBucket must be 'true' or BedrockLargeObjectLogBucketName must be provided."
+  BedrockMediaRequiresInvocationLogs:
+    RuleCondition: !Equals [!Ref EnableBedrockLargeObjectLogging, "true"]
+    Assertions:
+      - Assert: !Equals [!Ref EnableBedrockInvocationLogs, "true"]
+        AssertDescription: "When EnableBedrockLargeObjectLogging is 'true', EnableBedrockInvocationLogs must also be 'true' - large-object (media) delivery is configured within cloudWatchConfig.largeDataDeliveryS3Config, which requires the Bedrock CloudWatch log group and role."
 
 # =============================================================================
 # RESOURCES
@@ -377,6 +447,20 @@ Resources:
       Name: AWS::Include
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/s3-access-logs/s3-access-log-bucket-policy.yml"
+
+  # -- CloudFront Legacy (v1) Log Bucket (Conditional: EnableLegacyCloudFrontLogs) --
+  CloudFrontLegacyLogBucket:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/s3-access-logs/cloudfront-legacy-log-bucket.yml"
+
+  # -- CloudFront Legacy (v1) Log Bucket Policy (Conditional: EnableLegacyCloudFrontLogs) --
+  CloudFrontLegacyLogBucketPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/s3-access-logs/cloudfront-legacy-log-bucket-policy.yml"
 
   # -- S3 Artifacts Bucket (Conditional) --
   # No explicit DependsOn on the access log resources: when the artifacts bucket logs to
@@ -491,8 +575,13 @@ Outputs:
 
   BedrockModelInvocationLoggingEnableCommand:
     Condition: EnableBedrockInvocationLogs
-    Description: "REQUIRED MANUAL STEP: run this AWS CLI command to activate Bedrock model invocation logging: aws bedrock put-model-invocation-logging-configuration --region <REGION> --logging-config '<this value>'. Deploying this stack alone does not enable logging. Text and embedding delivery are enabled deliberately; image and video are disabled because binary payloads cannot be delivered to CloudWatch Logs without an S3 large data delivery target. Must be run once per region."
-    Value: !Sub '{"cloudWatchConfig":{"logGroupName":"${BedrockModelInvocationLogGroup}","roleArn":"${BedrockCloudWatchLogsRole.Arn}"},"textDataDeliveryEnabled":true,"embeddingDataDeliveryEnabled":true,"imageDataDeliveryEnabled":false,"videoDataDeliveryEnabled":false}'
+    Description: "REQUIRED MANUAL STEP: run this AWS CLI command to activate Bedrock model invocation logging: aws bedrock put-model-invocation-logging-configuration --region <REGION> --logging-config '<this value>'. Deploying this stack alone does not enable logging. Text and embedding delivery are always enabled. When EnableBedrockLargeObjectLogging is 'true', image and video (large binary) delivery is enabled via cloudWatchConfig.largeDataDeliveryS3Config to the 'bedrock/' prefix; otherwise image and video are disabled (CloudWatch Logs cannot carry binary payloads without an S3 large data delivery target). Must be run once per region."
+    Value: !If
+      - EnableBedrockLargeObjectLogging
+      - !Sub
+        - '{"cloudWatchConfig":{"logGroupName":"${BedrockModelInvocationLogGroup}","roleArn":"${BedrockCloudWatchLogsRole.Arn}","largeDataDeliveryS3Config":{"bucketName":"${MediaBucket}","keyPrefix":"bedrock"}},"textDataDeliveryEnabled":true,"embeddingDataDeliveryEnabled":true,"imageDataDeliveryEnabled":true,"videoDataDeliveryEnabled":true}'
+        - MediaBucket: !If [HasBedrockLargeObjectLogBucket, !Ref BedrockLargeObjectLogBucketName, !Ref AccessLogBucketRegional]
+      - !Sub '{"cloudWatchConfig":{"logGroupName":"${BedrockModelInvocationLogGroup}","roleArn":"${BedrockCloudWatchLogsRole.Arn}"},"textDataDeliveryEnabled":true,"embeddingDataDeliveryEnabled":true,"imageDataDeliveryEnabled":false,"videoDataDeliveryEnabled":false}'
 
   BedrockModelInvocationLogGroupConsole:
     Condition: EnableBedrockInvocationLogs
@@ -535,6 +624,28 @@ Outputs:
     Condition: EnableS3AccessLogBucket
     Description: "S3 console link for the access log bucket"
     Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${AccessLogBucketRegional}"
+
+  # ---------------------------------------------------------------------------
+  # CloudFront Legacy (v1) Log Bucket
+
+  CloudFrontLegacyLogBucketName:
+    Condition: EnableLegacyCloudFrontLogs
+    Description: "Name of the account-wide CloudFront legacy (v1) standard-logging bucket. Supply as the CloudFront logging destination (or import this export) when using CloudFront standard logging v1."
+    Value: !Ref CloudFrontLegacyLogBucket
+    Export:
+      Name: !Sub "${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name"
+
+  CloudFrontLegacyLogBucketArn:
+    Condition: EnableLegacyCloudFrontLogs
+    Description: "ARN of the account-wide CloudFront legacy (v1) standard-logging bucket"
+    Value: !GetAtt CloudFrontLegacyLogBucket.Arn
+    Export:
+      Name: !Sub "${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Arn"
+
+  CloudFrontLegacyLogBucketConsole:
+    Condition: EnableLegacyCloudFrontLogs
+    Description: "S3 console link for the CloudFront legacy log bucket"
+    Value: !Sub "https://s3.console.aws.amazon.com/s3/buckets/${CloudFrontLegacyLogBucket}"
 
   # ---------------------------------------------------------------------------
   # Console Links

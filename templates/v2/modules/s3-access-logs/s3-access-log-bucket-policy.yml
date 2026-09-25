@@ -1,16 +1,22 @@
 # -- S3 Access Log Bucket Policy (Account-Wide) --
-# Parent template must define parameters: (none)
 # Parent template must define conditions:
-#   EnableS3AccessLogBucket, EnableLegacyCloudFrontLogs
-#   Pseudo-parameters: AWS::AccountId
+#   EnableS3AccessLogBucket, BedrockMediaToAccountBucket
+#   Pseudo-parameters: AWS::AccountId, AWS::Partition
 # Parent must name the bucket resource 'AccessLogBucketRegional'
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
 #       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 # KEEP IN SYNC with templates/v2/storage/template-storage-s3-access-logs.yml
-#   (see .kiro/steering/s3-access-logs-module-sync.md)
+#   (see .kiro/steering/s3-access-logs-module-sync.md) - NOTE: as of v0.0.44 the
+#   account-wide policy is a prefix-scoped, multi-principal superset; only the
+#   DenyNonSecureTransportAccess primitive is kept in sync with the standalone.
 #
-# Grants the S3 log delivery service permission to write server access logs
-# to the account-wide access log bucket and denies non-secure transport.
+# Grants log-delivery principals write access scoped to their own prefix and
+# denies non-secure transport:
+#   logging.s3.amazonaws.com   -> s3access/*   (S3 server access logs)
+#   delivery.logs.amazonaws.com -> cloudfront/* (CloudFront standard logging v2)
+#   bedrock.amazonaws.com       -> bedrock/...  (Bedrock large-object media logs, conditional)
+# Legacy CloudFront (v1, ACL-based) delivery is handled by the separate
+# cloudfront-logs-legacy bucket policy, not here.
 Type: AWS::S3::BucketPolicy
 Condition: EnableS3AccessLogBucket
 Properties:
@@ -32,28 +38,54 @@ Properties:
         Condition:
           Bool:
             "aws:SecureTransport": false
-      - Sid: "AllowS3LogDelivery"
+
+      - Sid: "AllowS3AccessLogDelivery"
         Effect: Allow
         Principal:
           Service: logging.s3.amazonaws.com
         Action:
           - "s3:PutObject"
         Resource:
-          Fn::Sub: "${AccessLogBucketRegional.Arn}/*"
+          Fn::Sub: "${AccessLogBucketRegional.Arn}/s3access/*"
         Condition:
           StringEquals:
             "aws:SourceAccount":
               Ref: "AWS::AccountId"
+          ArnLike:
+            "aws:SourceArn": "arn:aws:s3:::*-an"
+
+      - Sid: "AllowCloudFrontV2LogDelivery"
+        Effect: Allow
+        Principal:
+          Service: delivery.logs.amazonaws.com
+        Action:
+          - "s3:PutObject"
+        Resource:
+          Fn::Sub: "${AccessLogBucketRegional.Arn}/cloudfront/*"
+        Condition:
+          StringEquals:
+            "s3:x-amz-acl": "bucket-owner-full-control"
+            "aws:SourceAccount":
+              Ref: "AWS::AccountId"
+          ArnLike:
+            "aws:SourceArn":
+              Fn::Sub: "arn:${AWS::Partition}:logs:us-east-1:${AWS::AccountId}:delivery-source:*"
+
       - Fn::If:
-          - EnableLegacyCloudFrontLogs
-          - Sid: "AllowCloudFrontLogDelivery"
+          - BedrockMediaToAccountBucket
+          - Sid: "AllowBedrockLargeObjectDelivery"
             Effect: Allow
             Principal:
-              Service: delivery.logs.amazonaws.com
-            Action: "s3:PutObject"
+              Service: bedrock.amazonaws.com
+            Action:
+              - "s3:PutObject"
             Resource:
-              Fn::Sub: "${AccessLogBucketRegional.Arn}/*"
+              Fn::Sub: "${AccessLogBucketRegional.Arn}/bedrock/AWSLogs/${AWS::AccountId}/BedrockModelInvocationLogs/*"
             Condition:
               StringEquals:
-                "s3:x-amz-acl": "bucket-owner-full-control"
+                "aws:SourceAccount":
+                  Ref: "AWS::AccountId"
+              ArnLike:
+                "aws:SourceArn":
+                  Fn::Sub: "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:*"
           - Ref: "AWS::NoValue"
