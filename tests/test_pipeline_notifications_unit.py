@@ -24,6 +24,10 @@ from tests.cfn_test_utils import load_template
 
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "v2" / "pipeline"
 
+# Directory holding the AWS::Include notification rule modules that the parent
+# pipeline templates reference via Fn::Transform.
+MODULE_DIR = Path(__file__).parent.parent / "templates" / "v2" / "modules" / "pipeline"
+
 TEMPLATE_FILES = [
     "template-pipeline.yml",
     "template-pipeline-github.yml",
@@ -35,6 +39,13 @@ RULE_NAMES = [
     "PipelineSucceededRule",
     "PipelineFailedRule",
 ]
+
+# Maps each notification rule to its shared AWS::Include module filename.
+RULE_MODULE_FILES = {
+    "PipelineStartedRule": "pipeline-notification-started-rule.yml",
+    "PipelineSucceededRule": "pipeline-notification-succeeded-rule.yml",
+    "PipelineFailedRule": "pipeline-notification-failed-rule.yml",
+}
 
 STATE_MAP = {
     "PipelineStartedRule": "STARTED",
@@ -61,14 +72,35 @@ REQUIRED_LABELS = [
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_input_template_str(template, rule_name):
-    """Extract the raw InputTemplate string from a parsed template."""
+def _module_location(template, rule_name):
+    """Return the raw Location string for a rule's AWS::Include transform."""
     rule = template["Resources"][rule_name]
-    target = rule["Properties"]["Targets"][0]
+    transform = rule["Fn::Transform"]
+    assert transform.get("Name") == "AWS::Include", (
+        f"{rule_name} should use AWS::Include"
+    )
+    location = transform["Parameters"]["Location"]
+    # Location is {'!Sub': 's3://.../<module>.yml'} in the parent template
+    if isinstance(location, dict):
+        location = location.get("!Sub", location.get("Fn::Sub"))
+    return location
+
+
+def _load_rule_module(template, rule_name):
+    """Resolve the rule's module file from its Location and load it."""
+    location = _module_location(template, rule_name)
+    module_file = location.rsplit("/", 1)[-1]
+    return load_template(MODULE_DIR / module_file)
+
+
+def _get_input_template_str(template, rule_name):
+    """Extract the raw InputTemplate Fn::Sub string from the rule's module."""
+    module = _load_rule_module(template, rule_name)
+    target = module["Properties"]["Targets"][0]
     input_template = target["InputTransformer"]["InputTemplate"]
-    # InputTemplate is {'!Sub': '<json_string>'} after CFNLoader parsing
-    assert isinstance(input_template, dict), "InputTemplate should be a dict with !Sub key"
-    return input_template["!Sub"]
+    assert isinstance(input_template, dict), "InputTemplate should be a mapping"
+    # Module uses long-form Fn::Sub; accept !Sub as a fallback for robustness
+    return input_template.get("Fn::Sub", input_template.get("!Sub"))
 
 
 def _parse_input_template(template, rule_name):
@@ -78,10 +110,9 @@ def _parse_input_template(template, rule_name):
 
 
 def _get_input_paths_map(template, rule_name):
-    """Extract the InputPathsMap from a parsed template."""
-    rule = template["Resources"][rule_name]
-    target = rule["Properties"]["Targets"][0]
-    return target["InputTransformer"]["InputPathsMap"]
+    """Extract the InputPathsMap from the rule's module."""
+    module = _load_rule_module(template, rule_name)
+    return module["Properties"]["Targets"][0]["InputTransformer"]["InputPathsMap"]
 
 
 # ---------------------------------------------------------------------------
@@ -299,60 +330,30 @@ class TestNoJsonArtifacts:
 # ===========================================================================
 
 class TestTemplateParity:
-    """InputTemplate structure is identical across all three pipeline templates."""
+    """All three pipeline templates reference the identical shared notification module.
+
+    Because the notification rule bodies now live in shared AWS::Include modules,
+    content parity across the three parent templates (InputTemplate, InputPathsMap,
+    message labels) is guaranteed by construction: each parent points at the same
+    module file. The meaningful invariant is therefore that every parent references
+    the identical module Location per rule, and that the Location resolves to the
+    expected module filename.
+    """
 
     @pytest.mark.parametrize("rule_name", RULE_NAMES)
-    def test_input_template_identical_across_templates(self, all_templates, rule_name):
-        """InputTemplate JSON structure matches across all three templates for each rule."""
-        templates_list = list(all_templates.values())
-        names_list = list(all_templates.keys())
-
-        reference = _parse_input_template(templates_list[0], rule_name)
-
-        for i in range(1, len(templates_list)):
-            other = _parse_input_template(templates_list[i], rule_name)
-            assert reference.keys() == other.keys(), (
-                f"Key mismatch between {names_list[0]} and {names_list[i]} for {rule_name}"
-            )
-            # Subject format must match (ignoring CloudFormation Sub variables)
-            assert reference["Subject"] == other["Subject"], (
-                f"Subject mismatch between {names_list[0]} and {names_list[i]} for {rule_name}"
-            )
-
-    @pytest.mark.parametrize("rule_name", RULE_NAMES)
-    def test_input_paths_map_identical_across_templates(self, all_templates, rule_name):
-        """InputPathsMap is identical across all three templates for each rule."""
-        templates_list = list(all_templates.values())
-        names_list = list(all_templates.keys())
-
-        reference = _get_input_paths_map(templates_list[0], rule_name)
-
-        for i in range(1, len(templates_list)):
-            other = _get_input_paths_map(templates_list[i], rule_name)
-            assert reference == other, (
-                f"InputPathsMap mismatch between {names_list[0]} and {names_list[i]} for {rule_name}"
-            )
-
-    @pytest.mark.parametrize("rule_name", RULE_NAMES)
-    def test_message_labels_identical_across_templates(self, all_templates, rule_name):
-        """Message labels and field order match across all three templates."""
-        templates_list = list(all_templates.values())
-        names_list = list(all_templates.keys())
-
-        def extract_labels(message):
-            """Extract label lines from the message for comparison."""
-            lines = message.split("\\n")
-            return [l.strip().split(":")[0] + ":" for l in lines if ":" in l and l.strip()]
-
-        ref_msg = _parse_input_template(templates_list[0], rule_name)["Message"]
-        ref_labels = extract_labels(ref_msg)
-
-        for i in range(1, len(templates_list)):
-            other_msg = _parse_input_template(templates_list[i], rule_name)["Message"]
-            other_labels = extract_labels(other_msg)
-            assert ref_labels == other_labels, (
-                f"Label order mismatch between {names_list[0]} and {names_list[i]} for {rule_name}"
-            )
+    def test_all_templates_reference_identical_module_location(self, all_templates, rule_name):
+        """All parents reference the same module Location, resolving to the expected file."""
+        locations = {
+            name: _module_location(tmpl, rule_name)
+            for name, tmpl in all_templates.items()
+        }
+        distinct = set(locations.values())
+        assert len(distinct) == 1, (
+            f"Parents reference differing module Locations for {rule_name}: {locations}"
+        )
+        # And it resolves to the expected module filename
+        module_file = next(iter(distinct)).rsplit("/", 1)[-1]
+        assert module_file == RULE_MODULE_FILES[rule_name]
 
 
 # ===========================================================================
@@ -362,23 +363,18 @@ class TestTemplateParity:
 class TestYamlBlockScalar:
     """InputTemplate uses >- folded block scalar to avoid trailing newline."""
 
-    @pytest.mark.parametrize("template_file", TEMPLATE_FILES)
-    @pytest.mark.parametrize("rule_name", RULE_NAMES)
-    def test_input_template_uses_folded_strip_scalar(self, template_file, rule_name):
-        """Raw YAML uses >- (folded, strip) for InputTemplate, not | (literal)."""
-        filepath = TEMPLATE_DIR / template_file
-        content = filepath.read_text(encoding="utf-8")
+    @pytest.mark.parametrize(
+        "module_file", list(RULE_MODULE_FILES.values()), ids=list(RULE_MODULE_FILES.keys())
+    )
+    def test_input_template_uses_folded_strip_scalar(self, module_file):
+        """Raw module YAML uses long-form 'Fn::Sub: >-' (folded, strip) for InputTemplate."""
+        content = (MODULE_DIR / module_file).read_text(encoding="utf-8")
 
-        # Find all InputTemplate lines and verify they use >-
-        # Pattern: InputTemplate: !Sub >-
-        matches = re.findall(r"InputTemplate:\s*!Sub\s+(.+)", content)
-        assert len(matches) >= 3, (
-            f"Expected at least 3 InputTemplate declarations in {template_file}"
+        # The block scalar now lives in the AWS::Include module as a long-form
+        # intrinsic: `InputTemplate:` followed by `Fn::Sub: >-`.
+        assert re.search(r"InputTemplate:\s*\n\s*Fn::Sub:\s*>-", content), (
+            f"{module_file} InputTemplate should use folded-strip 'Fn::Sub: >-'"
         )
-        for match in matches:
-            assert match.strip().startswith(">-"), (
-                f"InputTemplate should use >- block scalar, found: {match.strip()}"
-            )
 
     @pytest.mark.parametrize("template_file", TEMPLATE_FILES)
     def test_no_trailing_newline_in_input_template(self, template_file):

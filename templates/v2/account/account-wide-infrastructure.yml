@@ -268,7 +268,7 @@ Parameters:
 
   EnableBedrockInvocationLogs:
     Type: String
-    Description: "Set to 'true' to create the CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. Disabled by default. IMPORTANT: Creating these resources does NOT enable logging. After deployment you must run the AWS CLI command provided in the BedrockModelInvocationLoggingEnableCommand stack output to activate logging, because Amazon Bedrock provides no CloudFormation resource for the logging configuration."
+    Description: "WARNING: This logs ALL input and output to and from ALL models which may contain private, sensitive, user-provided data. Enable ONLY IF the consequences of private data collection is understood and approved. If enabled, use of a customer managed KMS Key is highly recommended. Set to 'true' to create the CloudWatch Logs log group and IAM role required for Amazon Bedrock model invocation logging. This is a one-time, per-account, per-region setup. Disabled by default. IMPORTANT: Creating these resources does NOT enable logging. After deployment you must run the AWS CLI command provided in the BedrockModelInvocationLoggingEnableCommand stack output to activate logging, because Amazon Bedrock provides no CloudFormation resource for the logging configuration."
     Default: "false"
     AllowedValues: ["true", "false"]
     ConstraintDescription: "Must be 'true' or 'false'."

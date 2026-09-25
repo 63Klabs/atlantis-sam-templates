@@ -46,7 +46,7 @@ SERVICE_ROLE_STORAGE_PATH = (
 
 # Expected bumped header version (major.minor.patch) for each template.
 EXPECTED_VERSIONS = {
-    PREFIX_BASED_PATH: "v0.0.2",
+    PREFIX_BASED_PATH: "v2.0.1",
     SERVICE_ROLE_PIPELINE_PATH: "v0.0.19",
     SERVICE_ROLE_STORAGE_PATH: "v0.0.4",
 }

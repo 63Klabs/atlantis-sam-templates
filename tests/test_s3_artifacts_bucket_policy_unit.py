@@ -359,10 +359,20 @@ class TestPreservationStructure:
         policy_doc = template["Properties"]["PolicyDocument"]
         assert policy_doc["Id"] == "SSEAndSSLPolicy"
 
-    def test_exactly_three_statements(self, statements):
-        """Policy must have exactly 3 statements: DenyNonSecureTransportAccess, WhitelistedGet, WhitelistedPut."""
-        assert len(statements) == 3, f"Expected 3 statements, got {len(statements)}"
-        sids = [stmt.get("Sid") for stmt in statements]
-        assert "DenyNonSecureTransportAccess" in sids
-        assert "WhitelistedGet" in sids
-        assert "WhitelistedPut" in sids
+    def test_three_base_statements_plus_optional_promotion(self, statements):
+        """Policy has the 3 base statements; the optional 4th is a conditional promotion statement."""
+        base = [s for s in statements if isinstance(s, dict) and "Sid" in s and "Fn::If" not in s]
+        conditional = [s for s in statements if isinstance(s, dict) and "Fn::If" in s]
+
+        base_sids = [s.get("Sid") for s in base]
+        assert set(base_sids) == {
+            "DenyNonSecureTransportAccess", "WhitelistedGet", "WhitelistedPut"
+        }, f"Unexpected base statement Sids: {base_sids}"
+
+        # Zero or one optional promotion statement, gated on HasPromotionSourceAccounts
+        assert len(conditional) <= 1
+        if conditional:
+            cond_name, true_branch, false_branch = conditional[0]["Fn::If"]
+            assert cond_name == "HasPromotionSourceAccounts"
+            assert true_branch.get("Sid") == "AllowCrossAccountPromotionWrite"
+            assert false_branch == {"Ref": "AWS::NoValue"}
