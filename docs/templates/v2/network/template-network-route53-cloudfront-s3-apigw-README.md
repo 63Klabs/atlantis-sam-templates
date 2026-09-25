@@ -46,6 +46,8 @@ The destination bucket must match the mode: **v1 requires an ACL-enabled bucket*
 
 > **Region strategy:** for deployments outside us-east-1 (e.g. us-east-2), use `v1` with the account-wide `cloudfront-logs-legacy` bucket (enable `AllowLegacyCloudFrontLogs` on account-wide-infrastructure). Reserve `v2` for us-east-1 stacks.
 
+> **Service role prerequisite for `v1`:** legacy logging is ACL-based. When the distribution is created or updated, CloudFront rewrites the destination bucket's ACL to grant the `awslogsdelivery` account `FULL_CONTROL`, so the deploying principal needs `s3:GetBucketAcl` and `s3:PutBucketAcl` on that bucket. The network CloudFormation service role grants these via the `S3BucketAclForCloudFrontLegacyLogging` statement in `network-cloudfront-mgmt-policy.yml`. If your service-role stack predates that statement, redeploy it before deploying with `CloudFrontLoggingVersion="v1"`. See [Troubleshooting](#access-denied-on-the-cloudfront-log-bucket-v1).
+
 ## Parameters
 
 ### Application Resource Naming
@@ -1216,6 +1218,28 @@ CloudFront distributions typically take 15-20 minutes to deploy or update. This 
 ### 403 Forbidden Errors from S3
 
 Check that the S3 bucket policy grants access to the CloudFront Origin Access Control. The storage template should have configured this automatically.
+
+### Access Denied on the CloudFront Log Bucket (v1)
+
+Stack creation or update fails with:
+
+```text
+Resource handler returned message: "Access denied for operation 'You don't have permission to
+access the S3 bucket for CloudFront logs: cloudfront-logs-legacy-<account>-<region>-an.s3.amazonaws.com
+If you're using IAM, you need s3:GetBucketAcl and s3:PutBucketAcl permissions to create a
+distribution or to update log settings for an existing distribution. In addition, the S3 ACL for
+the bucket must grant you FULL_CONTROL. (Service: CloudFront, Status Code: 403 ...)'."
+(HandlerErrorCode: AccessDenied)
+```
+
+CloudFront standard logging v1 is ACL-based: when logging is enabled, CloudFront updates the destination bucket's ACL to give the `awslogsdelivery` account `FULL_CONTROL`. That call is made as the deploying principal, so it needs `s3:GetBucketAcl` and `s3:PutBucketAcl` on the log bucket. Work through these in order:
+
+1. **Redeploy the network service role.** The permissions come from the `S3BucketAclForCloudFrontLegacyLogging` statement in `network-cloudfront-mgmt-policy.yml`. Update `template-service-role-network-cloudfront.yml`, `template-service-role-network-full.yml`, or `prefix-based-infrastructure.yml` (whichever created your role) so the role picks up the current module, then retry the network stack. Because modules are pulled from S3 at deploy time, self-hosted module buckets must be re-synced first.
+2. **Confirm ACLs are enabled on the destination bucket.** The bucket needs Object Ownership `BucketOwnerPreferred` and `BlockPublicAcls: false`. The account-wide `cloudfront-logs-legacy` bucket is configured this way; the main `access-logs` bucket is `BucketOwnerEnforced` (ACLs off) and **cannot** be used for v1. Pointing `S3LogBucketName` at an ACL-disabled bucket produces the same 403.
+3. **Confirm the bucket is in the deploying account.** The bucket ACL must grant the caller `FULL_CONTROL`, which the bucket owner has by default. For a cross-account log bucket, the bucket owner must add that grant manually.
+4. **Alternative:** switch to `CloudFrontLoggingVersion="v2"` (us-east-1 only, no ACLs) or `"none"`.
+
+> **Tip:** if logs stop arriving later, check whether the `awslogsdelivery` ACL grant was removed from the bucket. Disabling and re-enabling logging on the distribution restores it.
 
 ### Custom Domain Not Resolving
 

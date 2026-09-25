@@ -179,6 +179,47 @@ Properties:
                   - Fn::Sub: "${Prefix}"
 
       # ------------------------------------------------------------------
+      # S3 Bucket ACL (for CloudFront legacy/v1 standard logging)
+      # ------------------------------------------------------------------
+      # CloudFront standard logging (legacy, a.k.a. v1) is ACL-based. On
+      # CreateDistribution/UpdateDistribution with logging enabled, CloudFront
+      # rewrites the destination bucket's ACL to grant the awslogsdelivery
+      # account FULL_CONTROL, so the CALLING principal (this CloudFormation
+      # service role) must hold s3:GetBucketAcl and s3:PutBucketAcl on that
+      # bucket. Without them the distribution fails with:
+      #   "Access denied ... You don't have permission to access the S3 bucket
+      #    for CloudFront logs ... you need s3:GetBucketAcl and s3:PutBucketAcl"
+      # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logging-legacy-s3.html
+      #
+      # Scoped to the two destinations the network template can target for v1:
+      #   1. the account-wide cloudfront-logs-legacy bucket (provisioned by
+      #      account-wide-infrastructure when AllowLegacyCloudFrontLogs='true'
+      #      and imported via OrgPrefix), and
+      #   2. buckets inside this prefix's namespace, for an explicit
+      #      S3LogBucketName override.
+      # Not needed for standard logging v2, which delivers through CloudWatch
+      # Logs and does not touch bucket ACLs.
+
+      - Sid: S3BucketAclForCloudFrontLegacyLogging
+        Effect: Allow
+        Action:
+          - s3:GetBucketAcl
+          - s3:PutBucketAcl
+        Resource:
+          - Fn::Sub: "arn:aws:s3:::cloudfront-logs-legacy-${AWS::AccountId}-${AWS::Region}-an"
+          - Fn::If:
+              - UseS3BucketNameOrgPrefix
+              - Fn::Sub: "arn:aws:s3:::${S3BucketNameOrgPrefix}-cloudfront-logs-legacy-${AWS::AccountId}-${AWS::Region}-an"
+              - Ref: AWS::NoValue
+          - Fn::Sub:
+            - "arn:aws:s3:::${BucketPrefix}-*"
+            - BucketPrefix:
+                Fn::If:
+                  - UseS3BucketNameOrgPrefix
+                  - Fn::Sub: "${S3BucketNameOrgPrefix}-${Prefix}"
+                  - Fn::Sub: "${Prefix}"
+
+      # ------------------------------------------------------------------
       # ACM Certificate Read (for CloudFront and API Gateway)
       # ------------------------------------------------------------------
 
