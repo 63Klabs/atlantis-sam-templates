@@ -56,40 +56,34 @@ Properties:
     Rules:
       - Id: ExpireCloudFront
         Status: Enabled
-        Filter:
-          Prefix: "cloudfront/"
+        Prefix: "cloudfront/"
         ExpirationInDays:
           Ref: LogExpirationInDays
       - Id: ExpireS3AccessCfArtifacts
         Status: Enabled
-        Filter:
-          Prefix: "s3access/cf-artifacts/"
+        Prefix: "s3access/cf-artifacts/"
         ExpirationInDays:
           Ref: S3AccessLogExpirationInDays
       - Id: ExpireS3AccessCloudFrontOac
         Status: Enabled
-        Filter:
-          Prefix: "s3access/cloudfront-oac/"
+        Prefix: "s3access/cloudfront-oac/"
         ExpirationInDays:
           Ref: S3AccessLogExpirationInDays
       - Id: ExpireS3AccessDevops
         Status: Enabled
-        Filter:
-          Prefix: "s3access/devops/"
+        Prefix: "s3access/devops/"
         ExpirationInDays:
           Ref: S3AccessLogExpirationInDays
       - Id: ExpireS3AccessApps
         Status: Enabled
-        Filter:
-          Prefix: "s3access/apps/"
+        Prefix: "s3access/apps/"
         ExpirationInDays:
           Ref: S3AccessLogExpirationInDays
       - Fn::If:
           - BedrockMediaToAccountBucket
           - Id: ExpireBedrockMedia
             Status: Enabled
-            Filter:
-              Prefix: "bedrock/"
+            Prefix: "bedrock/"
             ExpirationInDays:
               Ref: BedrockLargeObjectLogExpirationInDays
           - Ref: "AWS::NoValue"

@@ -46,7 +46,6 @@ Properties:
     Rules:
       - Id: ExpireCloudFrontLegacy
         Status: Enabled
-        Filter:
-          Prefix: "cloudfront/"
+        Prefix: "cloudfront/"
         ExpirationInDays:
           Ref: LogExpirationInDays
