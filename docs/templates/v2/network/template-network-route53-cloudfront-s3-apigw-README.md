@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.1.0/2026-09-23  
+**Version:** v0.1.0/2026-09-26  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -38,9 +38,23 @@ This template creates a complete network infrastructure for serving static conte
 
 v0.1.0 replaces the single always-on legacy logging block with a selectable `CloudFrontLoggingVersion` (`none` | `v1` | `v2`, default `v1`) and adds an `OrgPrefix` parameter for importing the account-wide log buckets.
 
-- **`v1` (legacy standard logging)** — works in **any region**. Uses the distribution's inline `Logging` block, delivering to an ACL-enabled bucket. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name` (the account-wide `cloudfront-logs-legacy` bucket) -> no logging. Objects land under the flat `cloudfront/` prefix.
-- **`v2` (standard logging v2)** — **us-east-1 only** (CloudFront delivery resources are region-pinned to us-east-1). Creates `AWS::Logs::DeliverySource`, `AWS::Logs::DeliveryDestination`, and `AWS::Logs::Delivery`. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-S3-AccessLog-Bucket-Name` (the account-wide main, ACL-disabled bucket) -> none. The `/cloudfront` suffix on the destination ARN yields keys under `cloudfront/AWSLogs/<account>/CloudFront/...`. When `v2` is selected outside us-east-1, no delivery resources are created (guarded by `IsUsEast1`).
+- **`v1` (legacy standard logging)** — works in **any region**. Uses the distribution's inline `Logging` block, delivering to an ACL-enabled bucket. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name` (the account-wide `cloudfront-logs-legacy` bucket) -> no logging. The distribution's `Logging.Prefix` is `cloudfront/<Prefix>-<ProjectId>-<StageId>/`, so log objects land under that path.
+- **`v2` (standard logging v2)** — **us-east-1 only** (CloudFront delivery resources are region-pinned to us-east-1). Creates `AWS::Logs::DeliverySource`, `AWS::Logs::DeliveryDestination`, and `AWS::Logs::Delivery`. Destination precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-S3-AccessLog-Bucket-Name` (the account-wide main, ACL-disabled bucket) -> none. The destination prefix appended to the delivery destination ARN (`cloudfront/<Prefix>-<ProjectId>-<StageId>`, no trailing slash) sets the leading path of delivered objects and **replaces** the default `AWSLogs/<account>/<service>/` path, so delivered object keys land under `cloudfront/<Prefix>-<ProjectId>-<StageId>/`. When `v2` is selected outside us-east-1, no delivery resources are created (guarded by `IsUsEast1`).
 - **`none`** — disables CloudFront logging.
+
+Both `v1` and `v2` therefore produce the same layout in their respective destination bucket:
+
+```text
+cloudfront/
+  myorg-webapp-prod/
+    E1ABCDEF2GHIJK.2026-09-25-14.a1b2c3d4.gz
+  myorg-webapp-test/
+    E9ZYXWVU8TSRQP.2026-09-25-14.e5f6g7h8.gz
+```
+
+The `<Prefix>-<ProjectId>-<StageId>` segment sits **after** `cloudfront/`, so the account-wide log bucket lifecycle rules and bucket-policy scopes that match on `cloudfront/` continue to apply unchanged.
+
+> **Note:** log objects written before this change remain under the flat `cloudfront/` prefix. They are not moved, and they expire under the same lifecycle rule. Only newly delivered objects use the identity path.
 
 The destination bucket must match the mode: **v1 requires an ACL-enabled bucket**; **v2 requires an ACL-disabled bucket in us-east-1**. A new `CloudFrontLoggingMode` output reports the effective mode (including "v2 requested but disabled" when the region/distribution/destination preconditions are not met).
 
@@ -79,7 +93,7 @@ Settings that control deployment behavior and resource configurations based on e
 Configure cache policies for CloudFront distribution origins. Choose between AWS managed policies, custom default policies, or custom ARN-based policies.
 
 - [CloudFrontStaticCachePolicy](#cloudfrontstaticcachepolicy)
-- [CloudFrontStaticCustomCachePolicyArn](#cloudfrontstaticustomcachepolicyarn)
+- [CloudFrontStaticCustomCachePolicyArn](#cloudfrontstaticcustomcachepolicyarn)
 - [CloudFrontApiCachePolicy](#cloudfrontapicachepolicy)
 - [CloudFrontApiCustomCachePolicyArn](#cloudfrontapicustomcachepolicyarn)
 
@@ -103,9 +117,11 @@ Associate existing CloudFront Functions with API origin cache behaviors. CloudFr
 
 ### Supporting Resources
 
-Optional references to external resources that support the infrastructure.
+Optional references to external resources that support the infrastructure, and the CloudFront access logging mode.
 
+- [CloudFrontLoggingVersion](#cloudfrontloggingversion)
 - [S3LogBucketName](#s3logbucketname)
+- [OrgPrefix](#orgprefix)
 
 ### Routing for CloudFront
 
@@ -428,9 +444,31 @@ CloudFront Function ARN for origin-response event on API behaviors. Leave empty 
 
 > **Note:** CloudFront Functions are lightweight JavaScript functions that run at CloudFront edge locations. They are created as separate resources outside this template. Use these parameters to associate existing functions with cache behaviors for tasks such as URL rewriting, header manipulation, and request/response transformations. This does not cover Lambda@Edge associations.
 
+#### CloudFrontLoggingVersion
+
+CloudFront access logging mode. `v1` = legacy standard logging (works in any region; delivers to an ACL-enabled bucket such as the account-wide `cloudfront-logs-legacy` bucket created by `account-wide-infrastructure` when `AllowLegacyCloudFrontLogs` is `true`). `v2` = standard logging v2 via CloudWatch Logs delivery (REQUIRES this stack be deployed in us-east-1 and an ACL-disabled bucket such as the account-wide main access log bucket in us-east-1). `none` disables CloudFront logging. When `v2` is selected outside us-east-1, no CloudFront logging is configured.
+
+Either mode writes objects under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` in the destination bucket (see [v0.0.44 Changes (CloudFront logging v1/v2)](#v0044-changes-cloudfront-logging-v1v2)). The effective mode is reported by the [CloudFrontLoggingMode](#cloudfrontloggingmode) output.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | v1 |
+| Allowed Values | none, v1, v2 |
+| Constraint Description | Must be 'none', 'v1', or 'v2'. |
+
+**Allowed Values:**
+- **none**: CloudFront logging is disabled. No inline `Logging` block and no delivery resources.
+- **v1**: Legacy standard logging via the distribution's inline `Logging` block. Any region. Requires an ACL-enabled destination bucket.
+- **v2**: Standard logging v2 via `AWS::Logs::DeliverySource`, `AWS::Logs::DeliveryDestination`, and `AWS::Logs::Delivery`. us-east-1 only. Requires an ACL-disabled destination bucket.
+
+> **Silent no-op cases:** selecting `v2` outside us-east-1, or selecting `v1`/`v2` without a resolvable destination (neither `S3LogBucketName` nor `OrgPrefix` supplied), leaves logging unconfigured rather than failing the deployment. Check the [CloudFrontLoggingMode](#cloudfrontloggingmode) output after deployment to confirm what was actually applied.
+
 #### S3LogBucketName
 
-The name of the S3 bucket used for CloudFront logging. Leave empty to disable logging. Must be a valid S3 bucket name (without .s3.amazonaws.com suffix).
+Optional override S3 bucket name for CloudFront logging (without the `.s3.amazonaws.com` suffix). For `v1` this must be an ACL-enabled bucket (Object Ownership `BucketOwnerPreferred`); for `v2` this must be an ACL-disabled bucket in us-east-1. Leave empty to import the account-wide bucket via `OrgPrefix` (v1 -> `CloudFront-Legacy-Log-Bucket-Name`, v2 -> `S3-AccessLog-Bucket-Name`), or to disable logging when `OrgPrefix` is also empty.
+
+When supplied, this bucket takes precedence over the account-wide log bucket imported via `OrgPrefix`. Either way, log objects land under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` in the destination bucket (see [v0.0.44 Changes (CloudFront logging v1/v2)](#v0044-changes-cloudfront-logging-v1v2)), and the effective path is reported by the [CloudFrontLogPrefix](#cloudfrontlogprefix) output.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -442,6 +480,19 @@ The name of the S3 bucket used for CloudFront logging. Leave empty to disable lo
 > **Important:** The S3 log bucket must exist before deploying this template and must have a bucket policy that allows CloudFront to write logs. The bucket should be in a region that supports CloudFront logging. For more information, see [AWS CloudFront Logging Documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/AccessLogs.html).
 
 > **Cost Consideration:** Enabling CloudFront logging incurs S3 storage costs for the log files. Consider implementing lifecycle policies on the log bucket to manage costs.
+
+#### OrgPrefix
+
+Organization-level prefix used to import account-wide CloudFront log bucket exports. For `v1`, imports `<OrgPrefix>-CloudFront-Legacy-Log-Bucket-Name`; for `v2`, imports `<OrgPrefix>-S3-AccessLog-Bucket-Name`. Must match the `OrgPrefix` used when deploying `account-wide-infrastructure`. Ignored when `S3LogBucketName` is provided. Leave empty to require an explicit `S3LogBucketName` for logging.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[A-Z][A-Z0-9-]{0,18}[A-Z0-9]$\|^$` |
+| Constraint Description | May be empty or 2 to 20 characters. Upper case alphanumeric and dashes. Must start with a letter and end with a letter or number. |
+
+> **Important:** `OrgPrefix` is **upper case**, unlike `Prefix`/`ProjectId`/`StageId`. It must exactly match the `OrgPrefix` given to `account-wide-infrastructure`, because the value is used to build `Fn::ImportValue` export names. A mismatch fails the stack with an unresolved-export error rather than silently disabling logging.
 
 #### DomainForCloudFront
 
@@ -545,6 +596,9 @@ The Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
 ## Resources
 
 - [CloudFrontDistribution](#cloudfrontdistribution) - AWS::CloudFront::Distribution (Conditional: CreateDistribution)
+- [CloudFrontDeliverySource](#cloudfrontdeliverysource) - AWS::Logs::DeliverySource (Conditional: CreateV2Delivery)
+- [CloudFrontDeliveryDestination](#cloudfrontdeliverydestination) - AWS::Logs::DeliveryDestination (Conditional: CreateV2Delivery)
+- [CloudFrontDelivery](#cloudfrontdelivery) - AWS::Logs::Delivery (Conditional: CreateV2Delivery)
 - [CloudFrontOriginAccessControl](#cloudfrontoriginaccesscontrol) - AWS::CloudFront::OriginAccessControl (Conditional: HasStaticOrigin)
 - [CloudFrontCachePolicyStatic](#cloudfrontcachepolicystatic) - AWS::CloudFront::CachePolicy (Conditional: CreateCustomStaticCachePolicy)
 - [CloudFrontCachePolicyApi](#cloudfrontcachepolicyapi) - AWS::CloudFront::CachePolicy (Conditional: CreateCustomApiCachePolicy)
@@ -558,7 +612,7 @@ The Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
 Type: AWS::CloudFront::Distribution  
 Condition: CreateDistribution
 
-Creates a CloudFront distribution that serves content from S3 and/or API Gateway origins. The distribution is configured with HTTPS redirection, IPv6 support, and HTTP/2. It includes custom error responses for single-page applications (403/404 redirect to index.html) when serving static content. Optional logging can be enabled by providing an S3 log bucket name.
+Creates a CloudFront distribution that serves content from S3 and/or API Gateway origins. The distribution is configured with HTTPS redirection, IPv6 support, and HTTP/2. It includes custom error responses for single-page applications (403/404 redirect to index.html) when serving static content. Access logging is controlled by `CloudFrontLoggingVersion`: `v1` configures the distribution's inline `Logging` block (shown below), `v2` uses the separate CloudWatch Logs delivery resources instead, and `none` disables logging.
 
 **Cache Policy Selection:**
 
@@ -583,13 +637,68 @@ API cache behaviors (both the default behavior when API is root and the path-bas
 - Compression enabled for all content
 - Environment-specific cache behaviors (longer TTLs in PROD, CachingDisabled in DEV/TEST)
 - Custom domain support with ACM certificates
-- Optional access logging to S3 bucket with organized prefix structure
+- Optional v1 access logging to S3 under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` (resolves to `AWS::NoValue` when no v1 destination is available)
 - Flexible cache policy selection (managed, custom default, or custom ARN)
 - AllViewerExceptHostHeader origin request policy on API behaviors for header forwarding
 
 **Cost Consideration:** CloudFront distributions incur costs based on data transfer and requests. Price class affects the number of edge locations used.
 
 **Dependencies:** Requires CloudFrontOriginAccessControl (for S3), and optionally CloudFrontCachePolicyStatic and/or CloudFrontCachePolicyApi (when using CustomDefault)
+
+### CloudFrontDeliverySource
+
+Type: AWS::Logs::DeliverySource  
+Condition: CreateV2Delivery
+
+Registers the CloudFront distribution as a vended-log source for CloudFront standard logging v2. This is the first of three CloudWatch Logs delivery resources that replace the distribution's inline `Logging` block when `CloudFrontLoggingVersion` is `v2`.
+
+**Key Properties:**
+- Name: `${Prefix}-${ProjectId}-${StageId}-cf-access-logs`
+- `ResourceArn` points at the distribution created by this stack
+- `LogType: ACCESS_LOGS`
+
+**Conditional Creation:**
+
+Created only when all of the following hold (`CreateV2Delivery`):
+- `CloudFrontLoggingVersion` is `v2`
+- The stack region is us-east-1 (`IsUsEast1`) — CloudFront delivery resources are region-pinned
+- A distribution exists (`CreateDistribution`)
+- A destination bucket is resolvable (`S3LogBucketName` or `OrgPrefix` is supplied)
+
+**Dependencies:** Requires CloudFrontDistribution.
+
+### CloudFrontDeliveryDestination
+
+Type: AWS::Logs::DeliveryDestination  
+Condition: CreateV2Delivery
+
+Defines the S3 destination for v2 log delivery, including the destination prefix that determines where objects land.
+
+**Key Properties:**
+- Name: `${Prefix}-${ProjectId}-${StageId}-cf-s3-dest`
+- `DestinationResourceArn`: `arn:${AWS::Partition}:s3:::<DestBucket>/cloudfront/${Prefix}-${ProjectId}-${StageId}` (no trailing slash)
+- Destination bucket precedence: explicit `S3LogBucketName` -> imported `${OrgPrefix}-S3-AccessLog-Bucket-Name`
+
+The destination prefix appended to the bucket ARN sets the leading path of delivered objects and **replaces** the default `AWSLogs/<account>/<service>/` path, so object keys land under `cloudfront/<Prefix>-<ProjectId>-<StageId>/`.
+
+**Security Note:** The destination bucket must be ACL-disabled (Object Ownership `BucketOwnerEnforced`) and must have a bucket policy allowing the log delivery service to write under `cloudfront/*`. The account-wide main access log bucket is configured this way.
+
+> **Update behavior:** `DestinationResourceArn` cannot be updated in place — changing it replaces this resource and, through the reference, `CloudFrontDelivery`. Both are stateless, so expect a brief gap in log delivery rather than data loss.
+
+### CloudFrontDelivery
+
+Type: AWS::Logs::Delivery  
+Condition: CreateV2Delivery
+
+Binds the delivery source to the delivery destination, which is what actually starts log delivery.
+
+**Key Properties:**
+- `DeliverySourceName` references CloudFrontDeliverySource
+- `DeliveryDestinationArn` references CloudFrontDeliveryDestination
+
+**Cost Consideration:** Vended log delivery to S3 is billed per GB delivered in addition to S3 storage costs for the delivered objects.
+
+**Dependencies:** Requires CloudFrontDeliverySource and CloudFrontDeliveryDestination.
 
 ### CloudFrontOriginAccessControl
 
@@ -706,6 +815,23 @@ Creates an A record alias in Route53 pointing to the API Gateway regional domain
 
 ## Outputs
 
+### CloudFrontLoggingMode
+
+Effective CloudFront logging mode after evaluating region, distribution, and destination availability.
+
+**Example Values:**
+
+| Value | Meaning |
+|-------|---------|
+| `v2 (CloudWatch Logs delivery to S3, us-east-1)` | v2 delivery resources were created; logging is active |
+| `v1 (legacy standard logging)` | A v1 destination was resolved; logging is active via the inline `Logging` block |
+| `v2 requested but no destination resolved (set S3LogBucketName or OrgPrefix)` | Region and distribution preconditions met, but no destination bucket was resolvable |
+| `v2 requested but disabled (requires deployment in us-east-1 with a distribution)` | `v2` selected outside us-east-1, or no distribution is created |
+| `v1 requested but no destination resolved (set S3LogBucketName or OrgPrefix)` | `v1` selected with neither `S3LogBucketName` nor `OrgPrefix` |
+| `none` | `CloudFrontLoggingVersion` is `none` |
+
+**Usage:** This output is unconditional, so it is always present. Because the template silently skips logging when preconditions are not met, read this output after deployment to confirm logging is actually active rather than assuming the requested mode was applied.
+
 ### CloudFrontDomain
 
 Condition: CreateDistribution
@@ -796,7 +922,7 @@ Custom domain and path for API.
 
 Condition: HasLogBucket
 
-The S3 bucket name used for CloudFront logging.
+The S3 bucket name used for CloudFront access logs.
 
 **Example Value:** `my-cloudfront-logs`
 
@@ -804,13 +930,15 @@ The S3 bucket name used for CloudFront logging.
 
 ### CloudFrontLogPrefix
 
-Condition: HasLogBucket
+Condition: HasCloudFrontLogging
 
-The complete prefix used for CloudFront log files in the S3 bucket.
+The prefix used for CloudFront log files in the destination S3 bucket. Applies to both v1 and v2 logging.
 
-**Example Value:** `cloudfront/myorg-webapp-prod`
+**Example Value:** `cloudfront/myorg-webapp-prod/`
 
-**Usage:** The prefix path where CloudFront logs are organized within the S3 bucket. Logs are organized by service type (cloudfront), application ownership (Prefix-ProjectId), and deployment stage (StageId) for easy filtering and analysis.
+**Usage:** The prefix path where CloudFront logs are organized within the destination bucket. Logs are organized by service type (cloudfront), application ownership (Prefix-ProjectId), and deployment stage (StageId) for easy filtering and analysis. Use it as the starting path when browsing the bucket, when writing an S3 Select or Athena location, or when scoping an analytics job to one deployment.
+
+> **Note:** this output is emitted whenever CloudFront logging is effectively active — a `v1` destination was resolved (explicit `S3LogBucketName` **or** the imported account-wide legacy bucket) or the `v2` delivery resources were created. It is not tied to `S3LogBucketName` being supplied. `CloudFrontLogBucket`, by contrast, still reports only an explicitly supplied `S3LogBucketName`; when the destination comes from the account-wide import, the prefix is reported without a bucket name.
 
 ## Conditions
 
@@ -839,6 +967,21 @@ The template uses several conditions to control resource creation:
 - **HasApiFunctionViewerResponse**: True when CloudFrontApiFunctionViewerResponse is provided (non-empty)
 - **HasApiFunctionOriginRequest**: True when CloudFrontApiFunctionOriginRequest is provided (non-empty)
 - **HasApiFunctionOriginResponse**: True when CloudFrontApiFunctionOriginResponse is provided (non-empty)
+
+### CloudFront Logging Conditions
+
+These conditions resolve the logging mode, the destination, and which logging resources and outputs are produced:
+
+- **IsUsEast1**: True when the stack region is us-east-1. Required for the v2 delivery resources, which are region-pinned.
+- **HasOrgPrefix**: True when OrgPrefix is provided (non-empty), making the account-wide log bucket exports importable.
+- **CfLogV1**: True when CloudFrontLoggingVersion is `v1`
+- **HasV1Destination**: True when `CfLogV1` and a destination is resolvable (`HasLogBucket` **or** `HasOrgPrefix`). Gates the distribution's inline `Logging` block; when false the block resolves to `AWS::NoValue`.
+- **CfLogV2Requested**: True when CloudFrontLoggingVersion is `v2`, regardless of whether v2 is usable
+- **CfLogV2**: True when `CfLogV2Requested`, `IsUsEast1`, and `CreateDistribution` all hold — that is, v2 is requested and the region/distribution preconditions are met
+- **CreateV2Delivery**: True when `CfLogV2` and a destination is resolvable (`HasLogBucket` **or** `HasOrgPrefix`). Gates all three `AWS::Logs::*` delivery resources.
+- **HasCloudFrontLogging**: True when `HasV1Destination` **or** `CreateV2Delivery` — that is, whenever CloudFront logging is effectively active in either mode. Gates the [CloudFrontLogPrefix](#cloudfrontlogprefix) output.
+
+> **Note:** the `CfLogV2Requested` / `CfLogV2` split exists so the [CloudFrontLoggingMode](#cloudfrontloggingmode) output can distinguish "v2 requested but disabled by region or missing distribution" from "v2 requested but no destination resolved". Neither case fails the deployment.
 
 ## AWS Managed Cache Policies
 
@@ -1054,7 +1197,7 @@ Parameters:
 
 Result: 
 - Static website accessible at `www.example.com`
-- CloudFront access logs stored in `myorg-cloudfront-logs` bucket with prefix `cloudfront/myorg-marketing-site-prod`
+- CloudFront access logs stored in the `myorg-cloudfront-logs` bucket under the prefix `cloudfront/myorg-marketing-site-prod/`
 
 ### Example 7: Combined Static and API with Logging Disabled
 
@@ -1077,7 +1220,7 @@ Parameters:
 Result: 
 - Static content at `app-test.example.com`
 - API at `app-test.example.com/api`
-- No CloudFront logging (S3LogBucketName is empty)
+- No CloudFront logging: `CloudFrontLoggingVersion` defaults to `v1`, but neither `S3LogBucketName` nor `OrgPrefix` is supplied, so no destination resolves and the inline `Logging` block is omitted. `CloudFrontLoggingMode` reports `v1 requested but no destination resolved (set S3LogBucketName or OrgPrefix)`. Set `CloudFrontLoggingVersion: none` to state the intent explicitly.
 
 ### Example 8: Using AWS Managed Cache Policies
 

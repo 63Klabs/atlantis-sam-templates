@@ -414,36 +414,46 @@ class TestCloudFrontLoggingConfiguration:
                         "Bucket should reference the resolved LegacyBucket substitution var"
     
     def test_logging_prefix_format(self, network_template):
-        """Test that Prefix follows the correct format with cloudfront/ prefix."""
+        """Test that Prefix includes the deployment identity under cloudfront/ (v0.0.44).
+
+        The assertions are unconditional on purpose: an earlier `isinstance` guard
+        allowed this test to pass vacuously when the prefix was a plain string.
+        """
         resources = network_template.get('Resources', {})
         distribution = resources.get('CloudFrontDistribution', {})
         dist_config = distribution.get('Properties', {}).get('DistributionConfig', {})
         logging_config = dist_config.get('Logging')
         
-        if isinstance(logging_config, dict):
-            if_key = '!If' if '!If' in logging_config else 'Fn::If'
-            if if_key in logging_config:
-                if_list = logging_config[if_key]
-                enabled_config = if_list[1]
-                
-                prefix_value = enabled_config.get('Prefix')
-                if isinstance(prefix_value, dict):
-                    sub_key = '!Sub' if '!Sub' in prefix_value else 'Fn::Sub'
-                    prefix_template = prefix_value[sub_key]
-                    
-                    assert prefix_template.startswith('cloudfront/'), \
-                        "Prefix should start with 'cloudfront/'"
-                    assert '${Prefix}' in prefix_template, \
-                        "Prefix should reference Prefix parameter"
-                    assert '${ProjectId}' in prefix_template, \
-                        "Prefix should reference ProjectId parameter"
-                    assert '${StageId}' in prefix_template, \
-                        "Prefix should reference StageId parameter"
-                    
-                    # Verify the format is exactly as specified
-                    expected_format = "cloudfront/${Prefix}-${ProjectId}-${StageId}"
-                    assert prefix_template == expected_format, \
-                        f"Prefix should be '{expected_format}', got '{prefix_template}'"
+        assert isinstance(logging_config, dict), \
+            "Logging should be an intrinsic function mapping"
+        
+        if_key = '!If' if '!If' in logging_config else 'Fn::If'
+        assert if_key in logging_config, "Logging should use !If conditional"
+        
+        enabled_config = logging_config[if_key][1]
+        prefix_value = enabled_config.get('Prefix')
+        
+        assert isinstance(prefix_value, dict), \
+            "Logging Prefix should use !Sub to include the deployment identity"
+        
+        sub_key = '!Sub' if '!Sub' in prefix_value else 'Fn::Sub'
+        assert sub_key in prefix_value, "Logging Prefix should use !Sub"
+        
+        prefix_template = prefix_value[sub_key]
+        
+        assert prefix_template.startswith('cloudfront/'), \
+            "Prefix should start with 'cloudfront/' so account-wide lifecycle rules still match"
+        assert '${Prefix}' in prefix_template, \
+            "Prefix should reference Prefix parameter"
+        assert '${ProjectId}' in prefix_template, \
+            "Prefix should reference ProjectId parameter"
+        assert '${StageId}' in prefix_template, \
+            "Prefix should reference StageId parameter"
+        
+        # Verify the format is exactly as specified (trailing slash yields a browsable folder)
+        expected_format = "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
+        assert prefix_template == expected_format, \
+            f"Prefix should be '{expected_format}', got '{prefix_template}'"
     
     def test_logging_uses_has_v1_destination_condition(self, network_template):
         """Test that the inline (v1) Logging property uses the HasV1Destination condition (v0.0.44)."""
@@ -507,13 +517,13 @@ class TestConditionalOutputs:
             "CloudFrontLogBucket should use HasLogBucket condition"
     
     def test_cloudfront_log_prefix_has_condition(self, network_template):
-        """Test that CloudFrontLogPrefix output has HasLogBucket condition."""
+        """Test that CloudFrontLogPrefix output has the HasCloudFrontLogging condition (v0.0.44)."""
         outputs = get_template_section(network_template, 'Outputs')
         output = outputs['CloudFrontLogPrefix']
         
         assert 'Condition' in output, "CloudFrontLogPrefix should have a Condition"
-        assert output['Condition'] == 'HasLogBucket', \
-            "CloudFrontLogPrefix should use HasLogBucket condition"
+        assert output['Condition'] == 'HasCloudFrontLogging', \
+            "CloudFrontLogPrefix should use HasCloudFrontLogging condition so it is emitted for v1 and v2"
     
     def test_cloudfront_log_bucket_value(self, network_template):
         """Test that CloudFrontLogBucket output value references S3LogBucketName."""
@@ -531,22 +541,24 @@ class TestConditionalOutputs:
                 "CloudFrontLogBucket should reference S3LogBucketName parameter"
     
     def test_cloudfront_log_prefix_value(self, network_template):
-        """Test that CloudFrontLogPrefix output value has correct format."""
+        """Test that CloudFrontLogPrefix output reports the identity-segmented prefix (v0.0.44)."""
         outputs = get_template_section(network_template, 'Outputs')
         output = outputs['CloudFrontLogPrefix']
         
         assert 'Value' in output, "CloudFrontLogPrefix should have a Value"
         value = output['Value']
         
-        # Value should be !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}"
-        if isinstance(value, dict):
-            sub_key = '!Sub' if '!Sub' in value else 'Fn::Sub'
-            assert sub_key in value, "CloudFrontLogPrefix value should use !Sub"
-            
-            prefix_template = value[sub_key]
-            expected_format = "cloudfront/${Prefix}-${ProjectId}-${StageId}"
-            assert prefix_template == expected_format, \
-                f"CloudFrontLogPrefix should be '{expected_format}', got '{prefix_template}'"
+        # Value should be !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
+        assert isinstance(value, dict), \
+            "CloudFrontLogPrefix value should be a !Sub intrinsic mapping"
+        
+        sub_key = '!Sub' if '!Sub' in value else 'Fn::Sub'
+        assert sub_key in value, "CloudFrontLogPrefix value should use !Sub"
+        
+        prefix_template = value[sub_key]
+        expected_format = "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
+        assert prefix_template == expected_format, \
+            f"CloudFrontLogPrefix should be '{expected_format}', got '{prefix_template}'"
     
     def test_cloudfront_log_bucket_description(self, network_template):
         """Test that CloudFrontLogBucket output has a description."""
@@ -568,23 +580,92 @@ class TestConditionalOutputs:
         assert 'prefix' in output['Description'].lower(), \
             "Description should mention 'prefix'"
     
-    def test_outputs_are_conditional(self, network_template):
-        """Test that both outputs are conditional and only appear when HasLogBucket is true."""
+    def test_log_bucket_output_is_conditional_on_has_log_bucket(self, network_template):
+        """Test that CloudFrontLogBucket only appears when S3LogBucketName is supplied."""
         outputs = get_template_section(network_template, 'Outputs')
-        
         log_bucket_output = outputs['CloudFrontLogBucket']
-        log_prefix_output = outputs['CloudFrontLogPrefix']
         
-        # Both should have the same condition
         assert log_bucket_output.get('Condition') == 'HasLogBucket', \
             "CloudFrontLogBucket should be conditional on HasLogBucket"
-        assert log_prefix_output.get('Condition') == 'HasLogBucket', \
-            "CloudFrontLogPrefix should be conditional on HasLogBucket"
         
         # Verify the condition exists in the template
         conditions = get_template_section(network_template, 'Conditions')
         assert 'HasLogBucket' in conditions, \
-            "HasLogBucket condition should exist for outputs to reference"
+            "HasLogBucket condition should exist for the output to reference"
+    
+    def test_log_prefix_output_is_conditional_on_has_cloudfront_logging(self, network_template):
+        """Test that CloudFrontLogPrefix appears whenever CloudFront logging is active (v0.0.44).
+        
+        The prefix applies to both v1 and v2 logging, so its condition is widened beyond
+        HasLogBucket (which only covers an explicitly supplied S3LogBucketName).
+        """
+        outputs = get_template_section(network_template, 'Outputs')
+        log_prefix_output = outputs['CloudFrontLogPrefix']
+        
+        assert log_prefix_output.get('Condition') == 'HasCloudFrontLogging', \
+            "CloudFrontLogPrefix should be conditional on HasCloudFrontLogging"
+        
+        # Verify the condition exists in the template
+        conditions = get_template_section(network_template, 'Conditions')
+        assert 'HasCloudFrontLogging' in conditions, \
+            "HasCloudFrontLogging condition should exist for the output to reference"
+    
+    def test_v2_delivery_destination_includes_identity_prefix(self, network_template):
+        """Test that the v2 delivery destination ARN carries the identity destination prefix.
+        
+        The destination prefix appended to the bucket ARN sets the leading path of
+        delivered objects, so it must include cloudfront/<Prefix>-<ProjectId>-<StageId>
+        and, per the documented destination-prefix form, carry no trailing slash.
+        """
+        resources = get_template_section(network_template, 'Resources')
+        destination = resources['CloudFrontDeliveryDestination']
+        arn_value = destination.get('Properties', {}).get('DestinationResourceArn')
+        
+        assert isinstance(arn_value, dict), \
+            "DestinationResourceArn should be a !Sub intrinsic mapping"
+        
+        sub_key = '!Sub' if '!Sub' in arn_value else 'Fn::Sub'
+        assert sub_key in arn_value, "DestinationResourceArn should use !Sub"
+        
+        # !Sub may be a plain string or a [template, {vars}] list; the destination
+        # bucket is resolved through a substitution variable, so expect the list form.
+        inner = arn_value[sub_key]
+        arn_template = inner[0] if isinstance(inner, list) else inner
+        
+        expected_segment = "/cloudfront/${Prefix}-${ProjectId}-${StageId}"
+        assert expected_segment in arn_template, \
+            f"DestinationResourceArn should contain '{expected_segment}', got '{arn_template}'"
+        assert not arn_template.endswith('/'), \
+            f"v2 destination prefix should not end with a slash, got '{arn_template}'"
+    
+    def test_has_cloudfront_logging_condition_exists(self, network_template):
+        """Test that HasCloudFrontLogging is an !Or over the v1 and v2 logging conditions."""
+        conditions = get_template_section(network_template, 'Conditions')
+        
+        assert 'HasCloudFrontLogging' in conditions, \
+            "HasCloudFrontLogging condition not found in template"
+        
+        condition = conditions['HasCloudFrontLogging']
+        assert isinstance(condition, dict), "HasCloudFrontLogging should be an intrinsic mapping"
+        
+        or_key = '!Or' if '!Or' in condition else 'Fn::Or'
+        assert or_key in condition, "HasCloudFrontLogging should use !Or"
+        
+        operands = condition[or_key]
+        assert len(operands) == 2, \
+            f"HasCloudFrontLogging should have exactly 2 operands, got {len(operands)}"
+        
+        referenced = []
+        for operand in operands:
+            assert isinstance(operand, dict), \
+                f"HasCloudFrontLogging operand should be a !Condition mapping, got {operand!r}"
+            cond_key = '!Condition' if '!Condition' in operand else 'Condition'
+            assert cond_key in operand, \
+                f"HasCloudFrontLogging operand should use !Condition, got {operand!r}"
+            referenced.append(operand[cond_key])
+        
+        assert set(referenced) == {'HasV1Destination', 'CreateV2Delivery'}, \
+            f"HasCloudFrontLogging should OR HasV1Destination and CreateV2Delivery, got {referenced}"
 
 
 # =============================================================================

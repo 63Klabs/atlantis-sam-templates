@@ -98,8 +98,10 @@ class TestLoggingConfigurationFormatProperty:
     
     For any valid S3LogBucketName (non-empty), Prefix, ProjectId, and StageId combination,
     when the template is rendered, the CloudFront distribution Logging property should have
-    IncludeCookies set to false, Bucket set to {S3LogBucketName}.s3.amazonaws.com, and
-    Prefix set to cloudfront/{Prefix}-{ProjectId}-{StageId}.
+    IncludeCookies set to false, Bucket set to the resolved legacy log bucket's
+    {bucket}.s3.amazonaws.com domain, and Prefix set to
+    cloudfront/{Prefix}-{ProjectId}-{StageId}/ so that each deployment's log objects are
+    segmented by deployment identity within the shared account-wide legacy bucket.
     """
     
     @given(
@@ -130,7 +132,7 @@ class TestLoggingConfigurationFormatProperty:
         assert logging_config is not None, "Logging property should exist in template"
         
         # The logging config should be an !If intrinsic function
-        # Structure: !If [HasLogBucket, {config}, !Ref AWS::NoValue]
+        # Structure: !If [HasV1Destination, {config}, !Ref AWS::NoValue]
         if isinstance(logging_config, dict):
             if_key = '!If' if '!If' in logging_config else 'Fn::If'
             assert if_key in logging_config, "Logging should use !If conditional"
@@ -141,7 +143,7 @@ class TestLoggingConfigurationFormatProperty:
             
             # First element should be the condition name
             condition_name = if_list[0]
-            assert condition_name == 'HasLogBucket', "Condition should be HasLogBucket"
+            assert condition_name == 'HasV1Destination', "Condition should be HasV1Destination"
             
             # Second element should be the logging configuration when enabled
             enabled_config = if_list[1]
@@ -155,25 +157,28 @@ class TestLoggingConfigurationFormatProperty:
             assert 'Bucket' in enabled_config, "Bucket should be present"
             bucket_value = enabled_config['Bucket']
             
-            # Bucket should be a !Sub with pattern "${S3LogBucketName}.s3.amazonaws.com"
+            # Bucket should be a !Sub resolving the legacy bucket to its S3 website domain.
+            # The template uses the list form of !Sub so the bucket name can come from
+            # S3LogBucketName or the account-wide legacy bucket import.
             if isinstance(bucket_value, dict):
                 sub_key = '!Sub' if '!Sub' in bucket_value else 'Fn::Sub'
                 assert sub_key in bucket_value, "Bucket should use !Sub"
-                bucket_template = bucket_value[sub_key]
-                assert bucket_template == "${S3LogBucketName}.s3.amazonaws.com", \
-                    f"Bucket template should be '${{S3LogBucketName}}.s3.amazonaws.com', got '{bucket_template}'"
+                bucket_sub = bucket_value[sub_key]
+                bucket_template = bucket_sub[0] if isinstance(bucket_sub, list) else bucket_sub
+                assert bucket_template.endswith(".s3.amazonaws.com"), \
+                    f"Bucket template should end with '.s3.amazonaws.com', got '{bucket_template}'"
             
             # Verify Prefix format
             assert 'Prefix' in enabled_config, "Prefix should be present"
             prefix_value = enabled_config['Prefix']
             
-            # Prefix should be a !Sub with pattern "cloudfront/${Prefix}-${ProjectId}-${StageId}"
+            # Prefix should be a !Sub with pattern "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
             if isinstance(prefix_value, dict):
                 sub_key = '!Sub' if '!Sub' in prefix_value else 'Fn::Sub'
                 assert sub_key in prefix_value, "Prefix should use !Sub"
                 prefix_template = prefix_value[sub_key]
-                assert prefix_template == "cloudfront/${Prefix}-${ProjectId}-${StageId}", \
-                    f"Prefix template should be 'cloudfront/${{Prefix}}-${{ProjectId}}-${{StageId}}', got '{prefix_template}'"
+                assert prefix_template == "cloudfront/${Prefix}-${ProjectId}-${StageId}/", \
+                    f"Prefix template should be 'cloudfront/${{Prefix}}-${{ProjectId}}-${{StageId}}/', got '{prefix_template}'"
             
             # Third element should be !Ref AWS::NoValue (when disabled)
             disabled_value = if_list[2]
@@ -227,11 +232,11 @@ class TestLoggingDisabledProperty:
             if_list = logging_config[if_key]
             assert len(if_list) == 3, "!If should have 3 elements"
             
-            # The condition should be HasLogBucket
+            # The condition should be HasV1Destination
             condition_name = if_list[0]
-            assert condition_name == 'HasLogBucket', "Condition should be HasLogBucket"
+            assert condition_name == 'HasV1Destination', "Condition should be HasV1Destination"
             
-            # When condition is false (empty bucket name), should return AWS::NoValue
+            # When condition is false (no v1 destination resolved), should return AWS::NoValue
             disabled_value = if_list[2]
             if isinstance(disabled_value, dict):
                 ref_key = '!Ref' if '!Ref' in disabled_value else 'Ref'

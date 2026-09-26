@@ -1,0 +1,328 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 `template-network-route53-cloudfront-s3-apigw.yml` is at v0.1.0 (PATCH = 0, development mode, unreleased) — do **not** increment the version; update the header date to the change date only _(R6.1)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436258761
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436269509
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436306962
+      }
+    ],
+    "2.1 Change the v1 inline `DistributionConfig.Logging.Prefix` from `\"cloudfront/\"` to `!Sub \"cloudfront/${Prefix}-${ProjectId}-${StageId}/\"`, leaving `HasV1Destination`, bucket resolution, and the `AWS::NoValue` fallback unchanged _(R1.1, R1.2, R1.3, R1.4)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436259216
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436315163
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436361333
+      }
+    ],
+    "2.2 Change `CloudFrontDeliveryDestination.DestinationResourceArn` to append the destination prefix `cloudfront/${Prefix}-${ProjectId}-${StageId}` (no trailing slash), keeping the `DestBucket` precedence mapping and `CreateV2Delivery` gating unchanged _(R2.1, R2.2, R2.3, R2.4)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436259452
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436368903
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436430750
+      }
+    ],
+    "2.3 Correct the comment block above `CloudFrontDeliverySource`: the destination prefix sets the leading path of delivered objects and replaces the default `AWSLogs/<account>/<service>/` path, yielding keys under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` _(R3.1)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436259672
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436434593
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436476433
+      }
+    ],
+    "3.1 Add condition `HasCloudFrontLogging: !Or [!Condition HasV1Destination, !Condition CreateV2Delivery]`, placed with the other CloudFront logging conditions after `CreateV2Delivery` _(R4.2)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436259942
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436482236
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436545693
+      }
+    ],
+    "3.2 Update the `CloudFrontLogPrefix` output: condition `HasCloudFrontLogging`, value `!Sub \"cloudfront/${Prefix}-${ProjectId}-${StageId}/\"`, description noting it applies to both v1 and v2. Leave `CloudFrontLogBucket` unchanged _(R4.1, R4.2, R4.3)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436260164
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436551114
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436591084
+      }
+    ],
+    "4.1 `tests/test_network_template_unit.py` — `test_logging_prefix_format`: remove the `isinstance(prefix_value, dict)` guard (which made the test pass vacuously once the prefix became a plain string) and assert the exact new `!Sub` value _(R5.1)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436260479
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436599273
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436840364
+      }
+    ],
+    "4.2 `tests/test_network_template_unit.py` — update `test_cloudfront_log_prefix_has_condition` to `HasCloudFrontLogging`, update `test_cloudfront_log_prefix_value` to the trailing-slash value without a type guard, and split `test_cloudfront_log_bucket_and_prefix_consistency` so the bucket output keeps `HasLogBucket` while the prefix output expects `HasCloudFrontLogging` _(R5.3)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436260643
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436603393
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436844754
+      }
+    ],
+    "4.3 `tests/test_network_template_unit.py` — add `test_v2_delivery_destination_includes_identity_prefix` asserting the `DestinationResourceArn` `!Sub` template contains `/cloudfront/${Prefix}-${ProjectId}-${StageId}` and has no trailing slash _(R5.2)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436260884
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436619593
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436848642
+      }
+    ],
+    "4.4 `tests/test_network_template_unit.py` — add `test_has_cloudfront_logging_condition_exists` asserting the condition is an `!Or` over `HasV1Destination` and `CreateV2Delivery` _(R5.3)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436261082
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436623223
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436852542
+      }
+    ],
+    "4.5 `tests/test_network_template_property.py` — update the expected v1 prefix and docstring in the existing property test; add no new property-based tests _(R5.4)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436261233
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436626609
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436856059
+      }
+    ],
+    "5.1 Run `cfn-lint` on the network template; confirm no new findings _(design §8)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436261475
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436861162
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438438694
+      }
+    ],
+    "5.2 Run the full `pytest tests/` suite green _(R5.5)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436261692
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436864668
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438442268
+      }
+    ],
+    "5.3 Confirm no file under `templates/v2/account/` or `templates/v2/modules/` required modification _(design §1.1)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436261912
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436868141
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438445922
+      }
+    ],
+    "6.1 Update `docs/templates/v2/network/template-network-route53-cloudfront-s3-apigw-README.md` \"v0.0.44 Changes (CloudFront logging v1/v2)\" section: replace the flat-`cloudfront/` statement (v1 bullet) and the incorrect `cloudfront/AWSLogs/<account>/CloudFront/...` claim (v2 bullet) with the shared `cloudfront/<Prefix>-<ProjectId>-<StageId>/` layout _(R3.2, R3.3)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436262142
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438452311
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438638792
+      }
+    ],
+    "6.2 Update the `CloudFrontLogPrefix` output section (example value, condition, usage prose) and any parameter prose referencing the flat prefix _(R3.3, R4)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436262454
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438456320
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438642353
+      }
+    ],
+    "6.3 Update the examples that name a log path (Example 6, and Example 7 or any other affected example) _(R3.3)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436262663
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438459792
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438646444
+      }
+    ],
+    "6.4 Verify all documented parameters, resources, outputs, and conditions match the final template, and confirm every pre-existing blockquote (including the region-strategy note) is preserved _(R3, documentation steering)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436262912
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790438650028
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790439011136
+      }
+    ],
+    "7.1 Add an entry under the existing `## v0.0.44 (unreleased)` section referencing this spec: CloudFront log objects (v1 and v2) now land under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` instead of a flat `cloudfront/`; `CloudFrontLogPrefix` output condition widened to `HasCloudFrontLogging`; corrected v2 object-key documentation. Note that pre-existing objects under the flat prefix stay put and that updating a v2 stack replaces the delivery destination/delivery resources. Do not modify existing entries _(R6.2)_": [
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790436263113
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790439015787
+      },
+      {
+        "executionId": "e4b4156e-01ae-4e26-9586-36f1d37a1c4a",
+        "chatSessionId": "sess_b11ba324-0a55-43c5-8f89-5c9a7c71b91d",
+        "timestamp": 1790439115679
+      }
+    ]
+  }
+}

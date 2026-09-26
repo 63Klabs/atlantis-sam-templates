@@ -108,8 +108,10 @@ class TestEnableBedrockInvocationLogsParameter:
     def test_type_is_string(self, param):
         assert param["Type"] == "String"
 
-    def test_default_is_true(self, param):
-        assert param["Default"] == "true"
+    def test_default_is_false(self, param):
+        # v0.0.44 (spec 0-0-44-bedrock-invocation-logs-default-off, R1.1) flipped the
+        # default from "true" to "false" so the Bedrock logging infrastructure is opt-in.
+        assert param["Default"] == "false"
 
     def test_allowed_values_are_true_false(self, param):
         assert param["AllowedValues"] == ["true", "false"]
@@ -817,14 +819,16 @@ class TestRoleModuleHygiene:
 class TestAdminOpsDocumentation:
     """Req 10.1, 10.2, 10.12, 10.13 — admin-ops docs exist and contain key content."""
 
+    # NOTE: the "copy-over note" blockquote naming the external atlantis-platform-admin
+    # repository was intentionally removed from the admin-ops doc by the maintainer, so the
+    # assertion that previously required that repo name here has been dropped. The doc's
+    # current blockquotes (default/opt-in, data sensitivity, media-logging notes) are the
+    # authoritative content. Do not re-add a copy-over-note assertion.
+
     def test_admin_ops_doc_exists(self):
         assert ADMIN_OPS_DOC.exists(), (
             f"Admin-ops doc not found at {ADMIN_OPS_DOC}"
         )
-
-    def test_admin_ops_doc_mentions_atlantis_platform_admin_repo(self):
-        text = ADMIN_OPS_DOC.read_text(encoding="utf-8")
-        assert "atlantis-platform-admin" in text
 
     def test_admin_ops_doc_contains_activation_command(self):
         text = ADMIN_OPS_DOC.read_text(encoding="utf-8")

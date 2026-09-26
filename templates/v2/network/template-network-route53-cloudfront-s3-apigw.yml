@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.1.0/2026-09-23
+# Version: v0.1.0/2026-09-26
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -633,6 +633,9 @@ Conditions:
   CreateV2Delivery: !And
     - !Condition CfLogV2
     - !Or [!Condition HasLogBucket, !Condition HasOrgPrefix]
+  HasCloudFrontLogging: !Or
+    - !Condition HasV1Destination
+    - !Condition CreateV2Delivery
 
 # =============================================================================
 # RESOURCES
@@ -670,7 +673,7 @@ Resources:
                   - HasLogBucket
                   - !Ref S3LogBucketName
                   - Fn::ImportValue: !Sub "${OrgPrefix}-CloudFront-Legacy-Log-Bucket-Name"
-            Prefix: "cloudfront/"
+            Prefix: !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
           - !Ref AWS::NoValue
 
         Origins:
@@ -913,8 +916,10 @@ Resources:
   # CloudFront standard logging v2 (CloudWatch Logs vended-log delivery to S3).
   # Only created when CloudFrontLoggingVersion is 'v2', the stack region is us-east-1
   # (CloudFront delivery resources are us-east-1 only), a distribution exists, and a
-  # destination bucket is resolvable. The '/cloudfront' suffix on the destination ARN
-  # yields object keys under cloudfront/AWSLogs/<account>/CloudFront/...
+  # destination bucket is resolvable. The destination prefix appended to the delivery
+  # destination ARN sets the leading path of delivered objects and replaces the default
+  # AWSLogs/<account>/<service>/ path, so object keys land under
+  # cloudfront/<Prefix>-<ProjectId>-<StageId>/
   CloudFrontDeliverySource:
     Type: AWS::Logs::DeliverySource
     Condition: CreateV2Delivery
@@ -929,7 +934,7 @@ Resources:
     Properties:
       Name: !Sub "${Prefix}-${ProjectId}-${StageId}-cf-s3-dest"
       DestinationResourceArn: !Sub
-        - "arn:${AWS::Partition}:s3:::${DestBucket}/cloudfront"
+        - "arn:${AWS::Partition}:s3:::${DestBucket}/cloudfront/${Prefix}-${ProjectId}-${StageId}"
         - DestBucket: !If
             - HasLogBucket
             - !Ref S3LogBucketName
@@ -1160,6 +1165,6 @@ Outputs:
     Value: !Ref S3LogBucketName
 
   CloudFrontLogPrefix:
-    Condition: HasLogBucket
-    Description: The prefix used for CloudFront log files in the S3 bucket
-    Value: !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}"
+    Condition: HasCloudFrontLogging
+    Description: "The prefix used for CloudFront log files in the destination S3 bucket. Applies to both v1 and v2 logging."
+    Value: !Sub "cloudfront/${Prefix}-${ProjectId}-${StageId}/"
