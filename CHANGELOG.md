@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.44 (unreleased)
+## v0.0.44 (2026-09-28)
 
 ### Added
 - **Bedrock Large Object (Media) Logging to S3** [Spec: 0-0-44-bedrock-media-and-log-prefix-segmentation](.kiro/specs/0-0-44-bedrock-media-and-log-prefix-segmentation/) - Added opt-in delivery of Bedrock image/video/large-binary invocation payloads to S3 (text/embedding continue to CloudWatch), filling the v0.0.43 gap where image/video delivery was disabled. Activation remains a manual per-region CLI step; the `BedrockModelInvocationLoggingEnableCommand` output now includes `cloudWatchConfig.largeDataDeliveryS3Config` (keyPrefix `bedrock`) and enables image/video when `EnableBedrockLargeObjectLogging` is `true`.
