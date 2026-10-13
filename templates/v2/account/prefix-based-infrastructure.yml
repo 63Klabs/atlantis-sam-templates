@@ -4,7 +4,7 @@ Description: "Combined prefix-based IAM Service Roles and Managed Policies for P
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Prefix-Based Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.1/2026-08-20
+# Version: v2.0.2/2026-10-13
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/
@@ -67,6 +67,11 @@ Metadata:
           - GroupNames
           - UserNames
           - RoleNames
+      -
+        Label:
+          default: "GitHub Connection Access"
+        Parameters:
+          - EnableGitHubConnectionAccess
       -
         Label:
           default: "Cache-Data"
@@ -205,6 +210,16 @@ Parameters:
     Default: "TRUE"
 
   # ---------------------------------------------------------------------------
+  # GitHub Connection Access
+
+  EnableGitHubConnectionAccess:
+    Type: String
+    Description: "Set to 'true' to grant this prefix's Pipeline Management service role permission to pass and use the account-wide GitHub CodeConnections connection (required to deploy template-pipeline-github.yml). Requires OrgPrefix to be set and the account-wide GitHub connection (GitHubOrg) to have been created, because the connection ARN is imported from the account-wide export '<OrgPrefix>-GitHub-Connection-Arn'. Leave 'false' for prefixes that do not deploy GitHub-sourced pipelines."
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    ConstraintDescription: "Must be 'true' or 'false'."
+
+  # ---------------------------------------------------------------------------
   # Module Source
 
   S3ModuleLocation:
@@ -241,6 +256,7 @@ Conditions:
   CreateCacheDataManagedPolicy: !And
     - !Condition CreateCacheData
     - !Equals [!Ref CreateManagedCacheDataLambdaExecutionRolePolicy, "TRUE"]
+  HasGitHubConnection: !Equals [!Ref EnableGitHubConnectionAccess, "true"]
 
 # =============================================================================
 # RESOURCES

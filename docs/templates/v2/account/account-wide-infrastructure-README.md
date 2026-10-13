@@ -603,6 +603,8 @@ ARN of the GitHub connection. Pass this to pipeline templates via the `GitHubCon
 
 > **Note:** You must manually complete the connection in the AWS Console before it can be used by pipeline templates.
 
+> **Consumed by the prefix Pipeline Management role:** When a prefix is provisioned via [prefix-based-infrastructure](./prefix-based-infrastructure-README.md) with `EnableGitHubConnectionAccess = "true"`, that stack imports this export (`${OrgPrefix}-GitHub-Connection-Arn`) to grant its Pipeline Management service role `codestar-connections:PassConnection` on this specific connection — required for the role to deploy `template-pipeline-github.yml`. Setting the toggle without this export existing causes the prefix stack to fail at deploy.
+
 ### GitHubConnectionStatus
 
 Condition: HasGitHubOrg

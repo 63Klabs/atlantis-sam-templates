@@ -14,6 +14,16 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.45 (unreleased)
+
+### Added
+- **Opt-in GitHub Connection Access for Pipeline Management Role** [Spec: 0-0-45-codestar-connection-pipeline-permissions](.kiro/specs/0-0-45-codestar-connection-pipeline-permissions/)
+  - Account: prefix-based-infrastructure.yml v2.0.2 - Added `EnableGitHubConnectionAccess` parameter (default `"false"`), a `"GitHub Connection Access"` parameter group, and a `HasGitHubConnection` condition
+  - Modules: pipeline-mgmt-role.yml - Added a conditional `codestar-connections`/`codeconnections` statement granting `PassConnection`, `UseConnection`, `GetConnection`, `GetConnectionToken`, and `ListTagsForResource` scoped to the account-wide connection ARN imported from `${OrgPrefix}-GitHub-Connection-Arn` and constrained to CodePipeline via the `PassedToService` condition; emitted only when `EnableGitHubConnectionAccess="true"`
+
+### Fixed
+- **GitHub Pipeline deploy failed with `codestar-connections:PassConnection` AccessDenied** [Spec: 0-0-45-codestar-connection-pipeline-permissions](.kiro/specs/0-0-45-codestar-connection-pipeline-permissions/) - The prefix Pipeline Management service role (`${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management`) had no `codestar-connections`/`codeconnections` permissions, so CloudFormation could not pass the account-wide GitHub connection to CodePipeline when creating `template-pipeline-github.yml`. The grant is now available per prefix (opt-in, least-privilege, scoped to the single imported connection ARN) via `EnableGitHubConnectionAccess`. Default behavior is unchanged for prefixes that leave the toggle `"false"`.
+
 ## v0.0.44 (2026-09-28)
 
 ### Added

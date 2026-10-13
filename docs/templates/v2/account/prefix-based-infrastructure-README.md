@@ -2,7 +2,7 @@
 
 Combined prefix-based IAM Service Roles and Managed Policies for Pipeline and Storage management, plus optional shared Cache-Data resources — Assembled from reusable modules.
 
-**Version:** v0.0.2/2026-08-10  
+**Version:** v2.0.2/2026-10-13  
 **Template:** [templates/v2/account/prefix-based-infrastructure.yml](../../../../templates/v2/account/prefix-based-infrastructure.yml)
 
 ## Overview
@@ -63,6 +63,12 @@ Optional existing IAM principals to attach the managed policies to.
 - [GroupNames](#groupnames)
 - [UserNames](#usernames)
 - [RoleNames](#rolenames)
+
+### GitHub Connection Access
+
+Opt-in permission for this prefix's Pipeline Management role to use the account-wide GitHub connection.
+
+- [EnableGitHubConnectionAccess](#enablegithubconnectionaccess)
 
 ### Cache-Data
 
@@ -215,6 +221,23 @@ Optional. Friendly Name (not ARN) of an existing IAM Role to attach the managed 
 | Default | "" (empty) |
 | Allowed Pattern | `^[\w+=,_.@\-]+$\|^$` |
 | Constraint Description | Must be empty or a comma delimited list of valid IAM Role names. |
+
+#### EnableGitHubConnectionAccess
+
+Set to `'true'` to grant this prefix's Pipeline Management service role permission to pass and use the account-wide GitHub CodeConnections connection. This is required before a developer can deploy [template-pipeline-github.yml](../pipeline/template-pipeline-github-README.md) under this prefix: when CloudFormation (acting as the Pipeline Management role) creates the pipeline's Source action, CodePipeline requires the caller to hold `codestar-connections:PassConnection` on the connection. The grant is scoped to the single connection ARN imported from the account-wide export `${OrgPrefix}-GitHub-Connection-Arn` and is constrained to CodePipeline via the `PassedToService` condition.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | false |
+| Allowed Values | true, false |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Note:** When `false` (the default), the Pipeline Management role is rendered exactly as before — no `codestar-connections` / `codeconnections` permissions are added. Leave it `false` for prefixes that do not deploy GitHub-sourced pipelines.
+
+> **Prerequisite / fail-loudly:** Enabling this requires `OrgPrefix` to be set and the account-wide GitHub connection to already exist (deploy [account-wide-infrastructure](./account-wide-infrastructure-README.md) with a non-empty `GitHubOrg` first). The gate intentionally checks only this toggle — if you set it to `'true'` without a resolvable `${OrgPrefix}-GitHub-Connection-Arn` export, the stack fails at deploy with a "No export named" error so the misconfiguration is obvious rather than silently granting nothing.
+
+> **Scoping note:** CodeConnections connection ARNs are account-wide UUIDs that do not follow the `${Prefix}-*` naming convention, so this statement is a deliberate exception to prefix-based ARN scoping. It is instead scoped to the exact imported connection ARN. Both the `codestar-connections` (legacy) and `codeconnections` (current) namespaces are granted for compatibility, covering `PassConnection`, `UseConnection`, `GetConnection`, `GetConnectionToken`, and `ListTagsForResource`.
 
 #### EnableCacheData
 

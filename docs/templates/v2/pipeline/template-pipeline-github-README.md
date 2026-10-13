@@ -51,6 +51,8 @@ This template creates a complete CI/CD pipeline for AWS SAM applications using G
 
 > **Important:** You must create a GitHub connection in AWS CodeConnections before deploying this template. The connection ARN is required as a parameter.
 
+> **Deployer-role prerequisite:** The CloudFormation Pipeline Management service role that deploys this stack (`${PrefixUpper}-CloudFormation-Service-Role-Pipeline-Management`) must be authorized to pass the GitHub connection to CodePipeline (`codestar-connections:PassConnection`), otherwise stack creation fails with an AccessDenied on `PassConnection`. Provision the prefix via [prefix-based-infrastructure](../account/prefix-based-infrastructure-README.md) with `EnableGitHubConnectionAccess = "true"` (and a valid `OrgPrefix`) before deploying this pipeline. This is distinct from the connection permission the pipeline's own runtime role carries — see the CodePipelineServiceRole note below.
+
 ## Parameters
 
 ### Application Resource Naming
@@ -483,6 +485,8 @@ Service role for CodePipeline to access resources during pipeline execution.
 - **SNS**: sns:Publish to the pipeline notification topic (for manual approval action notifications)
 
 > **Important:** This role includes permissions for both CodeConnections and the deprecated CodeStar Connections. The Pipeline Source Stage currently only works with CodeStar Connections provider, though CodeConnections is the recommended approach.
+
+> **Two different roles use the connection.** This `CodePipelineServiceRole` is the pipeline's **runtime** role — it holds `UseConnection` and is what CodePipeline assumes when the Source action runs. It is *not* the role that fails the deploy if connection permissions are missing. At **deploy time**, CloudFormation acts as the separate **Pipeline Management** service role to create the pipeline, and CodePipeline requires that role to hold `codestar-connections:PassConnection` on the connection. That `PassConnection` grant lives on the Pipeline Management role and is enabled per prefix via `EnableGitHubConnectionAccess` on [prefix-based-infrastructure](../account/prefix-based-infrastructure-README.md) — not in this template.
 
 ### CodeBuildServiceRole
 

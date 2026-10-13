@@ -5,7 +5,14 @@
 #   S3ModuleLocation, S3ModuleNamespace, S3ArtifactsBucket, OrgPrefix
 # Parent template must define conditions:
 #   UseS3BucketNameOrgPrefix, HasPermissionsBoundaryArn,
-#   HasGroupNames, HasRoleNames, HasUserNames, HasS3ArtifactsBucketOverride
+#   HasGroupNames, HasRoleNames, HasUserNames, HasS3ArtifactsBucketOverride,
+#   HasGitHubConnection
+# NOTE: When HasGitHubConnection is true, the parent's OrgPrefix MUST resolve a valid
+#       '${OrgPrefix}-GitHub-Connection-Arn' export from account-wide-infrastructure.yml.
+#       If the export does not exist (empty OrgPrefix, or the account-wide GitHub
+#       connection was never created), the stack fails at deploy time (intended
+#       fail-loudly behavior). The connection grant is scoped to that imported ARN only
+#       (connection ARNs do not follow the ${Prefix}-* naming convention).
 # NOTE: AWS::Include does not support YAML shorthand tags (!Sub, !Ref, etc.)
 #       All intrinsic functions must use long-form syntax (Fn::Sub, Ref, etc.)
 
@@ -175,6 +182,38 @@ Properties:
         - codebuild:*
         Resource:
           Fn::Sub: "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${Prefix}-*"
+
+      # Grant permission to PASS and USE the account-wide GitHub CodeConnections
+      # connection to CodePipeline when creating/updating template-pipeline-github.yml.
+      # Only emitted when the parent sets EnableGitHubConnectionAccess=true (condition
+      # HasGitHubConnection). Connection ARNs are account-wide UUIDs that do NOT follow
+      # the ${Prefix}-* naming convention, so this is a deliberate exception: the Resource
+      # is scoped to the exact connection ARN imported from the account-wide export
+      # ${OrgPrefix}-GitHub-Connection-Arn, and PassConnection is constrained to CodePipeline
+      # via the PassedToService condition. Both the codestar-connections (legacy) and
+      # codeconnections (current) namespaces are granted for compatibility.
+      - Fn::If:
+        - HasGitHubConnection
+        - Sid: PassGitHubConnectionForPipelines
+          Effect: Allow
+          Action:
+          - codestar-connections:PassConnection
+          - codestar-connections:UseConnection
+          - codestar-connections:GetConnection
+          - codestar-connections:GetConnectionToken
+          - codestar-connections:ListTagsForResource
+          - codeconnections:PassConnection
+          - codeconnections:UseConnection
+          - codeconnections:GetConnection
+          - codeconnections:GetConnectionToken
+          - codeconnections:ListTagsForResource
+          Resource:
+          - Fn::ImportValue:
+              Fn::Sub: "${OrgPrefix}-GitHub-Connection-Arn"
+          Condition:
+            StringEquals:
+              codestar-connections:PassedToService: codepipeline.amazonaws.com
+        - Ref: "AWS::NoValue"
 
       - Sid: PassAndDeleteWorkerRolesByResourcePrefix
         Effect: Allow
