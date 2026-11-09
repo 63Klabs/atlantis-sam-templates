@@ -10,7 +10,9 @@ Network templates handle the routing and distribution layer of your serverless a
 
 ### [template-network-route53-cloudfront-s3-apigw](./template-network-route53-cloudfront-s3-apigw-README.md)
 
-Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53).
+**Version:** v0.2.0 | **Last Updated:** 2026-11-09
+
+Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53). As of v0.2.0 the template can optionally protect the API origin with a secret header, and exposes the viewer minimum TLS version.
 
 **Use Cases:**
 - Static website hosting with custom domain
@@ -24,6 +26,9 @@ Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain 
 - Environment-specific cache policies and TTLs
 - Automatic stage-based subdomain naming for non-production environments
 - Support for both CloudFront-backed and standalone API Gateway domains
+- Optional API origin protection (`ApiOriginProtection`): CloudFront adds an origin secret header that the API can verify, so requests that bypass CloudFront can be rejected. See the [API Ingress Standard](../../../end-user/api-ingress-standard.md)
+- Configurable `ViewerMinimumTlsVersion` for viewer connections to CloudFront
+- The four origin-request and origin-response CloudFront Function association parameters (static and API) are deprecated and ignored, because CloudFront Functions run only on viewer events; they are retained so existing stacks still update
 
 **Prerequisites:**
 - Existing S3 bucket (for static content)

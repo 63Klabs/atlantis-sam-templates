@@ -2,11 +2,11 @@
 
 AWS CodePipeline triggered by a promoted source artifact arriving in S3 - the "receiving" side of cross-account (or same-account) stage-to-stage promotion.
 
-**Version:** v0.0.0  
-**Last Updated:** 2026-08-15  
+**Version:** v2.0.1  
+**Last Updated:** 2026-11-09  
 **Template:** [templates/v2/pipeline/template-pipeline-s3-source.yml](../../../../templates/v2/pipeline/template-pipeline-s3-source.yml)
 
-> **Development mode:** This template is at v0.0.0 (PATCH = 0), meaning it has not yet been deployed to any environment. Breaking changes may occur without a new versioned file until it reaches v0.0.1.
+> **Released template:** This template is at v2.0.1 and is no longer in development mode (it is past PATCH = 0). Changes are released as PATCH increments (or a new versioned file for breaking changes) rather than applied in place.
 
 ## Overview
 
@@ -592,6 +592,15 @@ Type: AWS::IAM::Role
 Module: `templates/v2/modules/pipeline/cloudformation-svc-role.yml`
 
 Service role for CloudFormation to create and manage the application infrastructure stack. Same module used by the origin templates.
+
+**Secrets Manager Access:**
+The role includes two Secrets Manager policy statements:
+- `SecretsManagerCRUDThisDeploymentOnly`: `secretsmanager:CreateSecret`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:DescribeSecret`, `secretsmanager:TagResource`, and `secretsmanager:UntagResource` on `arn:aws:secretsmanager:<region>:<account>:secret:<Prefix>-<ProjectId>-<StageId>-*`
+- `SecretsManagerGetRandomPassword`: `secretsmanager:GetRandomPassword` on `*` (this action has no resource type). It supports `GenerateSecretString` when the application stack creates a secret.
+
+> **Note:** `secretsmanager:GetSecretValue` is intentionally **not** granted. The role can create and manage the secrets of this deployment but cannot read their values. This enables the application stack to create the `<Prefix>-<ProjectId>-<StageId>-OriginSecret` secret that the network template reads for `ApiOriginProtection` (see [template-network-route53-cloudfront-s3-apigw](../network/template-network-route53-cloudfront-s3-apigw-README.md)).
+>
+> Applications receive these statements at their next pipeline stack update (the role is created by each pipeline stack), not when the service roles are updated.
 
 ### PromoteServiceRole
 

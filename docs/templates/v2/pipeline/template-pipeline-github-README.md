@@ -2,8 +2,8 @@
 
 AWS CodePipeline for automated SAM deployments from GitHub repositories using AWS CodeConnections.
 
-**Version:** v2.0.5  
-**Last Updated:** 2026-08-15  
+**Version:** v2.0.6  
+**Last Updated:** 2026-11-09  
 **Template:** [templates/v2/pipeline/template-pipeline-github.yml](../../../../templates/v2/pipeline/template-pipeline-github.yml)
 
 ## Overview
@@ -533,7 +533,17 @@ Service role for CloudFormation to create and manage application infrastructure 
 - **DynamoDB**: Full CRUD for tables
 - **CloudWatch**: Limited CRUD for dashboards, alarms, and log groups
 - **SSM**: Read-only access to Parameter Store
+- **Secrets Manager**: Create, update, delete, and tag secrets named for this deployment (no read of secret values)
 - **Lambda Layers**: Access to AWS-provided Lambda Insights and Parameters/Secrets extensions
+
+**Secrets Manager Access:**
+The role includes two Secrets Manager policy statements:
+- `SecretsManagerCRUDThisDeploymentOnly`: `secretsmanager:CreateSecret`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:DescribeSecret`, `secretsmanager:TagResource`, and `secretsmanager:UntagResource` on `arn:aws:secretsmanager:<region>:<account>:secret:<Prefix>-<ProjectId>-<StageId>-*`
+- `SecretsManagerGetRandomPassword`: `secretsmanager:GetRandomPassword` on `*` (this action has no resource type). It supports `GenerateSecretString` when the application stack creates a secret.
+
+> **Note:** `secretsmanager:GetSecretValue` is intentionally **not** granted. The role can create and manage the secrets of this deployment but cannot read their values. This enables the application stack to create the `<Prefix>-<ProjectId>-<StageId>-OriginSecret` secret that the network template reads for `ApiOriginProtection` (see [template-network-route53-cloudfront-s3-apigw](../network/template-network-route53-cloudfront-s3-apigw-README.md)).
+>
+> Applications receive these statements at their next pipeline stack update (the role is created by each pipeline stack), not when the service roles are updated.
 
 ### CodeBuildProject
 

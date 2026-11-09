@@ -14,6 +14,37 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.46 (unreleased)
+
+### Added
+- **API Origin Protection (Origin Secret Header)** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/) - Added opt-in protection for an API Gateway origin behind CloudFront. When enabled, CloudFront adds the `X-Atlantis-Origin-Secret` header to every origin request to the API, overwriting any viewer-sent header of the same name. The value comes from the Secrets Manager secret `<Prefix>-<ProjectId>-<StageId>-OriginSecret`, which the application stack creates; the application accepts requests only when the header matches. Default behavior is unchanged (`ApiOriginProtection="false"`).
+  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.2.0 - Added `ApiOriginProtection` (default `"false"`), the `ApiOriginSecretRevision` rotation parameter (optional; when set, it is included in the distribution `Comment` so that changing it makes CloudFormation re-resolve the secret), an `API Origin Protection` parameter group, a `UseApiOriginProtection` condition, a `Rules` section requiring `ApiGatewayId` and an empty `DomainForApiGateway` when protection is enabled, and `OriginCustomHeaders` on the API origin using a versionless `{{resolve:secretsmanager:...}}` dynamic reference
+  - Modules: network-cloudfront-mgmt-policy.yml - Added the `SecretsManagerOriginSecretRead` statement granting `secretsmanager:GetSecretValue` on `${Prefix}-*-OriginSecret-??????` in the stack's account and region, so the network service role can resolve the dynamic reference
+  - Modules: cloudformation-svc-role.yml - Added the `SecretsManagerCRUDThisDeploymentOnly` statement (create, update, delete, put value, describe, tag, and untag on `${Prefix}-${ProjectId}-${StageId}-*` secrets; no `GetSecretValue`) and the `SecretsManagerGetRandomPassword` statement (`secretsmanager:GetRandomPassword`, which has no resource type), so the application stack can create its origin secret with `GenerateSecretString`
+  - Pipeline: template-pipeline.yml v2.0.24, template-pipeline-github.yml v2.0.6, template-pipeline-s3-source.yml v2.0.1 - Version bumps for the `cloudformation-svc-role.yml` module change
+  - Documentation: docs/end-user/api-ingress-standard.md - New API ingress page covering Regional vs edge-optimized APIs, viewer address handling, the origin secret pattern, rotation steps, who can read the value, and optional web ACL enforcement
+
+### Changed
+- **Viewer Minimum TLS Version** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/)
+  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.2.0 - Added the `ViewerMinimumTlsVersion` parameter (default `TLSv1.2_2021`) in the `Routing for CloudFront` group; it sets `MinimumProtocolVersion` on the `ViewerCertificate` when a custom domain (alias certificate) is used. See Breaking Changes
+- **Documentation of the Distribution-Wide 403/404 Error Rewrite** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/)
+  - Documentation: template-network-route53-cloudfront-s3-apigw-README.md, api-ingress-standard.md - Documented that the `CustomErrorResponses` rewrite of 403 and 404 responses applies to the whole distribution when a static origin exists, including API responses
+- **Removed Origin-Event Function Associations** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/)
+  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.2.0 - Removed the `origin-request` and `origin-response` `FunctionAssociations` from the static and API behaviors, because CloudFront Functions run only on viewer events and these associations never worked, and removed the four conditions that referenced them (`HasStaticFunctionOriginRequest`, `HasStaticFunctionOriginResponse`, `HasApiFunctionOriginRequest`, `HasApiFunctionOriginResponse`). Viewer-request and viewer-response associations are unchanged
+
+### Deprecated
+- **Origin-Event CloudFront Function Parameters** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/)
+  - Network: template-network-route53-cloudfront-s3-apigw.yml v0.2.0 - `CloudFrontStaticFunctionOriginRequest`, `CloudFrontStaticFunctionOriginResponse`, `CloudFrontApiFunctionOriginRequest`, and `CloudFrontApiFunctionOriginResponse` are deprecated and their values are ignored. The parameters remain defined so existing stacks and parameter files continue to work
+
+### Breaking Changes
+- **Network: template-network-route53-cloudfront-s3-apigw.yml v0.2.0** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/) - For distributions with a custom domain, the minimum viewer TLS version changes from the implicit `TLSv1` to `TLSv1.2_2021` (the new `ViewerMinimumTlsVersion` default). Clients that do not support TLS 1.2 stop connecting. Set `ViewerMinimumTlsVersion="TLSv1"` to keep the previous behavior. Applied in place per the template's development-mode governance (v0.x with PATCH 0); no new versioned file.
+
+### Update-Time Notes
+- **API Origin Protection deployment order** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/)
+  - Redeploy the network service role (`prefix-based-infrastructure.yml`, `template-service-role-network-cloudfront.yml`, or `template-service-role-network-full.yml`) BEFORE updating the network stack with `ApiOriginProtection="true"`. Without `SecretsManagerOriginSecretRead`, CloudFormation cannot resolve the secret and the update fails with `AccessDenied`
+  - The `cloudformation-svc-role.yml` change reaches an application at its next pipeline stack update; the application stack must create the origin secret before the network stack is updated with `ApiOriginProtection="true"`
+  - Updating only the secret value does not update the distribution. Change `ApiOriginSecretRevision` to make CloudFormation re-resolve the secret
+
 ## v0.0.45 (2026-10-13)
 
 ### Added

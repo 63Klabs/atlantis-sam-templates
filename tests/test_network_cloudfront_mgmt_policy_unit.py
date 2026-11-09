@@ -311,3 +311,82 @@ class TestExistingStatementsUnchanged:
         if isinstance(actions, str):
             actions = [actions]
         assert sorted(actions) == sorted(EXPECTED_API_GATEWAY_V2_DOMAIN_CRUD_ACTIONS)
+
+
+# --- Task 7.5: SecretsManagerOriginSecretRead ---
+
+# Description text as it exists at HEAD. Changing the managed policy
+# Description forces resource replacement on update, so it must not change.
+EXPECTED_POLICY_DESCRIPTION = (
+    "Allows CloudFormation service roles to manage CloudFront distributions, "
+    "OAC, cache policies, and API Gateway V2 custom domains for prefix ${Prefix}"
+)
+
+EXPECTED_ORIGIN_SECRET_RESOURCE = (
+    "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}"
+    ":secret:${Prefix}-*-OriginSecret-??????"
+)
+
+
+class TestSecretsManagerOriginSecretRead:
+    """Verify SecretsManagerOriginSecretRead and that origin request policy
+    permissions remain read-only."""
+
+    def test_statement_exists(self, statements):
+        """SecretsManagerOriginSecretRead statement must exist."""
+        stmt = find_statement_by_sid(statements, "SecretsManagerOriginSecretRead")
+        assert stmt is not None, "SecretsManagerOriginSecretRead statement not found"
+
+    def test_effect_is_allow(self, statements):
+        """SecretsManagerOriginSecretRead must have Effect: Allow."""
+        stmt = find_statement_by_sid(statements, "SecretsManagerOriginSecretRead")
+        assert stmt["Effect"] == "Allow"
+
+    def test_action_is_only_get_secret_value(self, statements):
+        """SecretsManagerOriginSecretRead must grant exactly secretsmanager:GetSecretValue."""
+        stmt = find_statement_by_sid(statements, "SecretsManagerOriginSecretRead")
+        actions = stmt["Action"]
+        if isinstance(actions, str):
+            actions = [actions]
+        assert actions == ["secretsmanager:GetSecretValue"]
+
+    def test_resource_is_convention_scoped_fn_sub(self, statements):
+        """Resource must be the single Fn::Sub origin secret ARN pattern."""
+        stmt = find_statement_by_sid(statements, "SecretsManagerOriginSecretRead")
+        resource = stmt["Resource"]
+        if isinstance(resource, dict):
+            resource = [resource]
+        assert resource == [{"Fn::Sub": EXPECTED_ORIGIN_SECRET_RESOURCE}]
+
+    def test_origin_request_policy_read_actions_unchanged(self, statements):
+        """CloudFrontOriginRequestPolicyRead must keep exactly its three read actions."""
+        stmt = find_statement_by_sid(statements, "CloudFrontOriginRequestPolicyRead")
+        actions = stmt["Action"]
+        if isinstance(actions, str):
+            actions = [actions]
+        assert sorted(actions) == sorted([
+            "cloudfront:GetOriginRequestPolicy",
+            "cloudfront:GetOriginRequestPolicyConfig",
+            "cloudfront:ListOriginRequestPolicies",
+        ])
+
+    @pytest.mark.parametrize("forbidden_action", [
+        "CreateOriginRequestPolicy",
+        "UpdateOriginRequestPolicy",
+        "DeleteOriginRequestPolicy",
+    ])
+    def test_no_origin_request_policy_write_actions(self, statements, forbidden_action):
+        """No statement may grant create, update, or delete origin request policy actions."""
+        for stmt in statements:
+            actions = stmt.get("Action", [])
+            if isinstance(actions, str):
+                actions = [actions]
+            for action in actions:
+                assert forbidden_action not in action, (
+                    f"Statement {stmt.get('Sid')} must not contain {forbidden_action}"
+                )
+
+    def test_managed_policy_description_unchanged(self, template):
+        """Description must match HEAD exactly (a change forces policy replacement)."""
+        description = template["Properties"]["Description"]
+        assert description == {"Fn::Sub": EXPECTED_POLICY_DESCRIPTION}

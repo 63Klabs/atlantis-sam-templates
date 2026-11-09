@@ -9,14 +9,14 @@ Pipeline templates provide continuous integration and continuous deployment (CI/
 ## Available Templates
 
 ### [template-pipeline.yml](template-pipeline-README.md)
-**Version:** v2.0.23 | **Last Updated:** 2026-08-15
+**Version:** v2.0.24 | **Last Updated:** 2026-11-09
 
 Full-featured CI/CD pipeline for AWS SAM deployments using AWS CodeCommit as the source repository. Includes Source, Build, Deploy, optional PostDeploy, and optional promotion (Approve-to-Promote + Promote) stages.
 
 **Key Features:**
 - CodeCommit repository integration with branch-specific triggers
 - CodeBuild for building and packaging SAM applications
-- CloudFormation deployment with changeset execution
+- CloudFormation deployment with changeset execution; the CloudFormation role can create, update, and delete deployment-scoped Secrets Manager secrets (for example, an API origin protection secret)
 - Optional PostDeploy stage for integration tests and configuration export
 - Optional, default-off promotion to a downstream stage (same or cross account/region)
 - Pipeline notifications via SNS and EventBridge
@@ -29,14 +29,14 @@ Full-featured CI/CD pipeline for AWS SAM deployments using AWS CodeCommit as the
 - Multi-stage promotion pipelines (e.g. test → beta → prod)
 
 ### [template-pipeline-github.yml](template-pipeline-github-README.md)
-**Version:** v2.0.5 | **Last Updated:** 2026-08-15
+**Version:** v2.0.6 | **Last Updated:** 2026-11-09
 
 CI/CD pipeline for AWS SAM deployments using GitHub as the source repository via AWS CodeConnections. Includes optional promotion (Approve-to-Promote + Promote) stages.
 
 **Key Features:**
 - GitHub repository integration via CodeConnections
 - CodeBuild for building and packaging SAM applications
-- CloudFormation deployment with changeset execution
+- CloudFormation deployment with changeset execution; the CloudFormation role can create, update, and delete deployment-scoped Secrets Manager secrets (for example, an API origin protection secret)
 - Optional, default-off promotion to a downstream stage (same or cross account/region)
 - Pipeline notifications via SNS and EventBridge
 - Comprehensive IAM roles with least-privilege permissions
@@ -66,14 +66,14 @@ Simplified pipeline with only Source and Build stages (no CloudFormation deploym
 - Custom deployment workflows handled outside the pipeline
 
 ### [template-pipeline-s3-source.yml](template-pipeline-s3-source-README.md)
-**Version:** v0.0.0 | **Last Updated:** 2026-08-15
+**Version:** v2.0.1 | **Last Updated:** 2026-11-09
 
 S3-triggered "receiving" pipeline for cross-account (or same-account) promotion. Triggered by an EventBridge rule when an origin pipeline's Promote stage writes a promoted source archive (`source.zip`) into the account-wide artifacts bucket under `promotions/*`. Rebuilds and deploys from that archive with the same Build behavior as the origin pipelines, and can itself chain promotion onward (e.g. `beta` → `prod`).
 
 **Key Features:**
 - S3 Source action watching a stable, per-target trigger key (no polling)
 - Optional `ApproveRelease` manual approval gate before Build (default-on)
-- Deploy stage optional/skippable (`DeployStageEnabled`) for build-only-style receiving workloads
+- Deploy stage optional/skippable (`DeployStageEnabled`) for build-only-style receiving workloads; when deploying, the CloudFormation role can create, update, and delete deployment-scoped Secrets Manager secrets
 - Supports its own optional PostDeploy and promotion (Approve-to-Promote + Promote) stages for chained promotion
 - Pipeline notifications via SNS and EventBridge
 

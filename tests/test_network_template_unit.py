@@ -2102,27 +2102,33 @@ API_FUNCTION_PARAMS = [
 
 ALL_FUNCTION_PARAMS = STATIC_FUNCTION_PARAMS + API_FUNCTION_PARAMS
 
+# Viewer-only parameters (the only ones referenced by FunctionAssociations;
+# origin-request/origin-response parameters are deprecated and ignored)
+STATIC_VIEWER_PARAMS = [p for p in STATIC_FUNCTION_PARAMS if 'Viewer' in p]
+API_VIEWER_PARAMS = [p for p in API_FUNCTION_PARAMS if 'Viewer' in p]
+
 STATIC_CONDITIONS = [
     'HasStaticFunctionViewerRequest',
     'HasStaticFunctionViewerResponse',
-    'HasStaticFunctionOriginRequest',
-    'HasStaticFunctionOriginResponse',
 ]
 
 API_CONDITIONS = [
     'HasApiFunctionViewerRequest',
     'HasApiFunctionViewerResponse',
-    'HasApiFunctionOriginRequest',
-    'HasApiFunctionOriginResponse',
 ]
 
 ALL_CONDITIONS = STATIC_CONDITIONS + API_CONDITIONS
 
-# Mapping from condition to its parameter
-CONDITION_TO_PARAM = dict(zip(ALL_CONDITIONS, ALL_FUNCTION_PARAMS))
+# Mapping from condition to its parameter (viewer conditions only)
+CONDITION_TO_PARAM = {
+    'HasStaticFunctionViewerRequest': 'CloudFrontStaticFunctionViewerRequest',
+    'HasStaticFunctionViewerResponse': 'CloudFrontStaticFunctionViewerResponse',
+    'HasApiFunctionViewerRequest': 'CloudFrontApiFunctionViewerRequest',
+    'HasApiFunctionViewerResponse': 'CloudFrontApiFunctionViewerResponse',
+}
 
-# Event types in order
-EVENT_TYPES = ['viewer-request', 'viewer-response', 'origin-request', 'origin-response']
+# Event types in order (origin-request/origin-response are no longer associated)
+EVENT_TYPES = ['viewer-request', 'viewer-response']
 
 EXPECTED_ARN_PATTERN = "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
 
@@ -2298,6 +2304,18 @@ class TestCloudFrontFunctionConditions:
         assert equals_list[1] == '', \
             f"{condition_name} should compare against empty string"
 
+    @pytest.mark.parametrize("condition_name", [
+        'HasStaticFunctionOriginRequest',
+        'HasStaticFunctionOriginResponse',
+        'HasApiFunctionOriginRequest',
+        'HasApiFunctionOriginResponse',
+    ])
+    def test_origin_condition_is_absent(self, network_template, condition_name):
+        """Origin-event conditions were removed with the origin-event associations."""
+        conditions = network_template.get('Conditions', {})
+        assert condition_name not in conditions, \
+            f"Condition {condition_name} should not exist"
+
 
 def _get_default_cache_behavior(template):
     """Helper to extract DefaultCacheBehavior from the distribution."""
@@ -2348,24 +2366,24 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         assert fa[if_key][0] == 'StaticOriginIsRoot', \
             "Top-level condition should be StaticOriginIsRoot"
 
-    def test_static_branch_has_4_items(self, network_template):
+    def test_static_branch_has_2_items(self, network_template):
         dcb = _get_default_cache_behavior(network_template)
         fa = dcb['FunctionAssociations']
         if_key = '!If' if '!If' in fa else 'Fn::If'
         static_branch = fa[if_key][1]  # true branch = static
         assert isinstance(static_branch, list)
-        assert len(static_branch) == 4, "Static branch should have 4 function association items"
+        assert len(static_branch) == 2, "Static branch should have 2 function association items (viewer-request, viewer-response)"
 
-    def test_api_branch_has_4_items(self, network_template):
+    def test_api_branch_has_2_items(self, network_template):
         dcb = _get_default_cache_behavior(network_template)
         fa = dcb['FunctionAssociations']
         if_key = '!If' if '!If' in fa else 'Fn::If'
         api_branch = fa[if_key][2]  # false branch = API
         assert isinstance(api_branch, list)
-        assert len(api_branch) == 4, "API branch should have 4 function association items"
+        assert len(api_branch) == 2, "API branch should have 2 function association items (viewer-request, viewer-response)"
 
     def test_static_branch_event_types(self, network_template):
-        """Static branch should have all 4 event types in order."""
+        """Static branch should have only the viewer event types, in order."""
         dcb = _get_default_cache_behavior(network_template)
         fa = dcb['FunctionAssociations']
         if_key = '!If' if '!If' in fa else 'Fn::If'
@@ -2375,7 +2393,7 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         assert actual_event_types == EVENT_TYPES
 
     def test_api_branch_event_types(self, network_template):
-        """API branch should have all 4 event types in order."""
+        """API branch should have only the viewer event types, in order."""
         dcb = _get_default_cache_behavior(network_template)
         fa = dcb['FunctionAssociations']
         if_key = '!If' if '!If' in fa else 'Fn::If'
@@ -2392,7 +2410,7 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         static_branch = fa[if_key][1]
         items = _extract_function_associations_from_if_branch(static_branch)
         param_refs = [i['param_ref'] for i in items]
-        assert param_refs == STATIC_FUNCTION_PARAMS
+        assert param_refs == STATIC_VIEWER_PARAMS
 
     def test_api_branch_references_api_params(self, network_template):
         """API branch should reference API function parameters."""
@@ -2402,7 +2420,7 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         api_branch = fa[if_key][2]
         items = _extract_function_associations_from_if_branch(api_branch)
         param_refs = [i['param_ref'] for i in items]
-        assert param_refs == API_FUNCTION_PARAMS
+        assert param_refs == API_VIEWER_PARAMS
 
     def test_static_branch_uses_static_conditions(self, network_template):
         """Static branch items should use static Has* conditions."""
@@ -2432,7 +2450,7 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         static_branch = fa[if_key][1]
         items = _extract_function_associations_from_if_branch(static_branch)
         for item in items:
-            assert item['param_ref'] not in API_FUNCTION_PARAMS, \
+            assert item['param_ref'] not in API_VIEWER_PARAMS, \
                 f"Static branch should not reference API param {item['param_ref']}"
 
     def test_no_static_refs_in_api_branch(self, network_template):
@@ -2443,7 +2461,7 @@ class TestDefaultCacheBehaviorFunctionAssociations:
         api_branch = fa[if_key][2]
         items = _extract_function_associations_from_if_branch(api_branch)
         for item in items:
-            assert item['param_ref'] not in STATIC_FUNCTION_PARAMS, \
+            assert item['param_ref'] not in STATIC_VIEWER_PARAMS, \
                 f"API branch should not reference static param {item['param_ref']}"
 
 
@@ -2486,17 +2504,19 @@ class TestPathBasedCacheBehaviorFunctionAssociations:
         assert 'FunctionAssociations' in api_behavior, \
             "API path behavior should have FunctionAssociations"
 
-    def test_static_path_has_4_items(self, network_template):
+    def test_static_path_has_2_items(self, network_template):
+        """Static path behavior should have 2 items (viewer-request, viewer-response)."""
         behaviors = _get_cache_behaviors(network_template)
         static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
         fa = static_behavior['FunctionAssociations']
-        assert isinstance(fa, list) and len(fa) == 4
+        assert isinstance(fa, list) and len(fa) == 2
 
-    def test_api_path_has_4_items(self, network_template):
+    def test_api_path_has_2_items(self, network_template):
+        """API path behavior should have 2 items (viewer-request, viewer-response)."""
         behaviors = _get_cache_behaviors(network_template)
         api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
         fa = api_behavior['FunctionAssociations']
-        assert isinstance(fa, list) and len(fa) == 4
+        assert isinstance(fa, list) and len(fa) == 2
 
     def test_static_path_event_types(self, network_template):
         behaviors = _get_cache_behaviors(network_template)
@@ -2517,14 +2537,14 @@ class TestPathBasedCacheBehaviorFunctionAssociations:
         static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
         items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
         param_refs = [i['param_ref'] for i in items]
-        assert param_refs == STATIC_FUNCTION_PARAMS
+        assert param_refs == STATIC_VIEWER_PARAMS
 
     def test_api_path_references_api_params(self, network_template):
         behaviors = _get_cache_behaviors(network_template)
         api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
         items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
         param_refs = [i['param_ref'] for i in items]
-        assert param_refs == API_FUNCTION_PARAMS
+        assert param_refs == API_VIEWER_PARAMS
 
     def test_static_path_uses_static_conditions(self, network_template):
         behaviors = _get_cache_behaviors(network_template)
@@ -2546,7 +2566,7 @@ class TestPathBasedCacheBehaviorFunctionAssociations:
         static_behavior = _find_path_behavior(behaviors, 'HasRouteForStaticOrigin')
         items = _extract_function_associations_from_if_branch(static_behavior['FunctionAssociations'])
         for item in items:
-            assert item['param_ref'] not in API_FUNCTION_PARAMS
+            assert item['param_ref'] not in API_VIEWER_PARAMS
 
     def test_no_static_refs_in_api_path(self, network_template):
         """Isolation: API path should not reference static params. Req 9.3"""
@@ -2554,20 +2574,20 @@ class TestPathBasedCacheBehaviorFunctionAssociations:
         api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
         items = _extract_function_associations_from_if_branch(api_behavior['FunctionAssociations'])
         for item in items:
-            assert item['param_ref'] not in STATIC_FUNCTION_PARAMS
+            assert item['param_ref'] not in STATIC_VIEWER_PARAMS
 
 
 class TestCloudFrontFunctionBackwardCompatibility:
     """Tests for backward compatibility.
     Requirements: 10.1, 10.2, 10.3, 11.1"""
 
-    def test_template_version_is_v0_1_0(self, network_template):
-        """Template version should be v0.1.0 after v0.0.44 CloudFront v1/v2 logging changes. Req 11.1"""
+    def test_template_version_is_v0_2_0(self, network_template):
+        """Template version should be v0.2.0 after v0.0.46 ApiOriginProtection origin changes. Req 10.1"""
         # Read the raw file to check the version comment
         template_path = Path(__file__).parent.parent / "templates" / "v2" / "network" / "template-network-route53-cloudfront-s3-apigw.yml"
         content = template_path.read_text()
-        assert '# Version: v0.1.0/' in content, \
-            "Template version should be v0.1.0"
+        assert '# Version: v0.2.0/' in content, \
+            "Template version should be v0.2.0"
 
     @pytest.mark.parametrize("param_name", ALL_FUNCTION_PARAMS)
     def test_all_params_default_to_empty_string(self, network_template, param_name):
@@ -2575,3 +2595,430 @@ class TestCloudFrontFunctionBackwardCompatibility:
         param = network_template['Parameters'][param_name]
         assert param['Default'] == '', \
             f"{param_name} must default to empty string for backward compatibility"
+
+
+# =============================================================================
+# API Origin Protection - Parameter, Metadata, Condition, Rule (v0.0.46, task 7.1)
+# Requirements: R1.1-R1.5, R10.2
+# =============================================================================
+
+class TestApiOriginProtectionParameter:
+    """Tests for the ApiOriginProtection parameter definition.
+    Requirements: R1.1, R1.2"""
+
+    def test_parameter_exists(self, network_template):
+        assert 'ApiOriginProtection' in network_template['Parameters']
+
+    def test_type_is_string(self, network_template):
+        param = network_template['Parameters']['ApiOriginProtection']
+        assert param['Type'] == 'String'
+
+    def test_default_is_false_string(self, network_template):
+        param = network_template['Parameters']['ApiOriginProtection']
+        assert param['Default'] == 'false'
+
+    def test_allowed_values_are_true_and_false(self, network_template):
+        param = network_template['Parameters']['ApiOriginProtection']
+        assert param['AllowedValues'] == ['true', 'false']
+
+    def test_description_names_secret_and_header(self, network_template):
+        desc = ' '.join(network_template['Parameters']['ApiOriginProtection']['Description'].split())
+        assert '<Prefix>-<ProjectId>-<StageId>-OriginSecret' in desc
+        assert 'X-Atlantis-Origin-Secret' in desc
+
+
+class TestApiOriginProtectionMetadata:
+    """Tests for the API Origin Protection parameter group.
+    Requirements: R1.3"""
+
+    GROUP_LABEL = 'API Origin Protection'
+
+    def _groups(self, template):
+        interface = template.get('Metadata', {}).get('AWS::CloudFormation::Interface', {})
+        return interface.get('ParameterGroups', [])
+
+    def _labels(self, template):
+        return [g.get('Label', {}).get('default') for g in self._groups(template)]
+
+    def test_group_exists(self, network_template):
+        assert self.GROUP_LABEL in self._labels(network_template)
+
+    def test_group_contains_both_parameters(self, network_template):
+        group = self._groups(network_template)[self._labels(network_template).index(self.GROUP_LABEL)]
+        assert group['Parameters'] == ['ApiOriginProtection', 'ApiOriginSecretRevision']
+
+    def test_group_after_api_routing_and_before_deprecated_forwarding(self, network_template):
+        labels = self._labels(network_template)
+        group_idx = labels.index(self.GROUP_LABEL)
+        routing_idx = labels.index('Routing for API Gateway')
+        forwarding_idx = next(i for i, label in enumerate(labels)
+                              if label and 'Deprecated' in label and 'Forwarding' in label)
+        assert routing_idx < group_idx < forwarding_idx
+
+
+class TestApiOriginProtectionCondition:
+    """Tests for the UseApiOriginProtection condition.
+    Requirements: R1.4"""
+
+    def test_condition_exists(self, network_template):
+        assert 'UseApiOriginProtection' in network_template['Conditions']
+
+    def test_condition_is_and_of_two_clauses(self, network_template):
+        condition = network_template['Conditions']['UseApiOriginProtection']
+        assert '!And' in condition
+        assert len(condition['!And']) == 2
+
+    def test_first_clause_is_protection_equals_true(self, network_template):
+        clause = network_template['Conditions']['UseApiOriginProtection']['!And'][0]
+        assert clause == {'!Equals': [{'!Ref': 'ApiOriginProtection'}, 'true']}
+
+    def test_second_clause_is_api_behind_cloudfront(self, network_template):
+        clause = network_template['Conditions']['UseApiOriginProtection']['!And'][1]
+        assert clause == {'!Condition': 'ApiIsBehindCloudFront'}
+
+
+class TestApiOriginProtectionRule:
+    """Tests for the ApiOriginProtectionRequiresApiBehindCloudFront rule.
+    Requirements: R1.5"""
+
+    RULE_NAME = 'ApiOriginProtectionRequiresApiBehindCloudFront'
+
+    def test_rules_section_exists(self, network_template):
+        assert 'Rules' in network_template
+
+    def test_rule_exists(self, network_template):
+        assert self.RULE_NAME in network_template['Rules']
+
+    def test_rule_condition_is_protection_equals_true(self, network_template):
+        rule = network_template['Rules'][self.RULE_NAME]
+        assert rule['RuleCondition'] == {'!Equals': [{'!Ref': 'ApiOriginProtection'}, 'true']}
+
+    def test_rule_has_assert_with_non_empty_description(self, network_template):
+        assertions = network_template['Rules'][self.RULE_NAME]['Assertions']
+        assert len(assertions) >= 1
+        for assertion in assertions:
+            assert assertion.get('Assert'), "Assertion must define Assert"
+            description = assertion.get('AssertDescription')
+            assert isinstance(description, str) and description.strip(), \
+                "Assertion must have a non-empty AssertDescription"
+
+
+# =============================================================================
+# v0.0.46 ViewerMinimumTlsVersion tests (spec 0-0-46, task 7.3)
+# =============================================================================
+
+class TestViewerMinimumTlsVersion:
+    """Tests for the ViewerMinimumTlsVersion parameter and its use in ViewerCertificate.
+    Requirements: 6.1, 6.2, 6.3, 10.2"""
+
+    EXPECTED_ALLOWED_VALUES = [
+        'TLSv1',
+        'TLSv1_2016',
+        'TLSv1.1_2016',
+        'TLSv1.2_2018',
+        'TLSv1.2_2019',
+        'TLSv1.2_2021',
+        'TLSv1.2_2025',
+        'TLSv1.3_2025',
+    ]
+
+    def test_parameter_exists_with_string_type(self, network_template):
+        param = network_template['Parameters']['ViewerMinimumTlsVersion']
+        assert param['Type'] == 'String'
+
+    def test_default_is_tlsv1_2_2021(self, network_template):
+        param = network_template['Parameters']['ViewerMinimumTlsVersion']
+        assert param['Default'] == 'TLSv1.2_2021'
+
+    def test_allowed_values_in_order(self, network_template):
+        param = network_template['Parameters']['ViewerMinimumTlsVersion']
+        assert param['AllowedValues'] == self.EXPECTED_ALLOWED_VALUES
+
+    def test_default_is_an_allowed_value(self, network_template):
+        param = network_template['Parameters']['ViewerMinimumTlsVersion']
+        assert param['Default'] in param['AllowedValues']
+
+    def test_description_mentions_tlsv1_opt_out(self, network_template):
+        description = network_template['Parameters']['ViewerMinimumTlsVersion']['Description']
+        assert 'Set TLSv1' in description, \
+            "Description should tell users to set TLSv1 to keep earlier behavior"
+        assert 'earlier template versions' in description
+
+    def test_has_constraint_description(self, network_template):
+        param = network_template['Parameters']['ViewerMinimumTlsVersion']
+        assert param.get('ConstraintDescription'), "ConstraintDescription should not be empty"
+
+    def test_in_routing_for_cloudfront_group_after_acm_certificate(self, network_template):
+        groups = network_template['Metadata']['AWS::CloudFormation::Interface']['ParameterGroups']
+        group = next(
+            (g for g in groups if g.get('Label', {}).get('default') == 'Routing for CloudFront'),
+            None
+        )
+        assert group is not None, "Routing for CloudFront group should exist"
+        params = group['Parameters']
+        assert 'ViewerMinimumTlsVersion' in params
+        assert 'AcmCertificateArnForCloudFront' in params
+        assert params.index('ViewerMinimumTlsVersion') == params.index('AcmCertificateArnForCloudFront') + 1, \
+            "ViewerMinimumTlsVersion should immediately follow AcmCertificateArnForCloudFront"
+
+    def test_in_no_other_parameter_group(self, network_template):
+        groups = network_template['Metadata']['AWS::CloudFormation::Interface']['ParameterGroups']
+        holders = [
+            g['Label']['default'] for g in groups
+            if 'ViewerMinimumTlsVersion' in g.get('Parameters', [])
+        ]
+        assert holders == ['Routing for CloudFront']
+
+    def test_minimum_protocol_version_expression(self, network_template):
+        """MinimumProtocolVersion is !If [CreateDnsRecordForCloudFront, !Ref ViewerMinimumTlsVersion, AWS::NoValue]."""
+        viewer_cert = network_template['Resources']['CloudFrontDistribution']['Properties'] \
+            ['DistributionConfig']['ViewerCertificate']
+        assert viewer_cert['MinimumProtocolVersion'] == {
+            '!If': [
+                'CreateDnsRecordForCloudFront',
+                {'!Ref': 'ViewerMinimumTlsVersion'},
+                {'!Ref': 'AWS::NoValue'},
+            ]
+        }
+
+
+# =============================================================================
+# Origin Request Policy Unchanged and Deprecated Function Parameters Tests
+# Spec: 0-0-46-network-template-apioriginprotection-origin (task 7.4)
+# =============================================================================
+
+MANAGED_ALL_VIEWER_EXCEPT_HOST_HEADER_ID = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+
+DEPRECATED_FUNCTION_PARAMS = [
+    'CloudFrontStaticFunctionOriginRequest',
+    'CloudFrontStaticFunctionOriginResponse',
+    'CloudFrontApiFunctionOriginRequest',
+    'CloudFrontApiFunctionOriginResponse',
+]
+
+
+class TestApiOriginRequestPolicyUnchanged:
+    """Tests that the managed origin request policy is still used as before.
+    Requirements: 8.1, 8.2, 10.2"""
+
+    def test_default_behavior_origin_request_policy_id(self, network_template):
+        """Default behavior: !If [StaticOriginIsRoot, NoValue, <managed id>]."""
+        dcb = _get_default_cache_behavior(network_template)
+        policy = dcb['OriginRequestPolicyId']
+        if_key = '!If' if '!If' in policy else 'Fn::If'
+        assert if_key in policy, "OriginRequestPolicyId should use !If"
+        condition, true_value, false_value = policy[if_key]
+        assert condition == 'StaticOriginIsRoot'
+        ref_key = '!Ref' if '!Ref' in true_value else 'Ref'
+        assert true_value == {ref_key: 'AWS::NoValue'}, \
+            "Static root origin should not set an origin request policy"
+        assert false_value == MANAGED_ALL_VIEWER_EXCEPT_HOST_HEADER_ID
+
+    def test_api_path_behavior_origin_request_policy_id(self, network_template):
+        behaviors = _get_cache_behaviors(network_template)
+        api_behavior = _find_path_behavior(behaviors, 'HasRouteForApiInCloudFront')
+        assert api_behavior is not None, "API path behavior should exist"
+        assert api_behavior['OriginRequestPolicyId'] == MANAGED_ALL_VIEWER_EXCEPT_HOST_HEADER_ID
+
+    def test_no_origin_request_policy_resource(self, network_template):
+        """The template must not create its own origin request policy."""
+        resources = network_template.get('Resources', {})
+        offenders = [
+            name for name, res in resources.items()
+            if isinstance(res, dict) and res.get('Type') == 'AWS::CloudFront::OriginRequestPolicy'
+        ]
+        assert offenders == [], \
+            f"No AWS::CloudFront::OriginRequestPolicy resource expected, found {offenders}"
+
+
+class TestDeprecatedFunctionParameters:
+    """Tests that the origin-event function parameters are deprecated but still accepted.
+    Requirements: 7.1, 7.2, 7.3, 10.2"""
+
+    @pytest.mark.parametrize("param_name", DEPRECATED_FUNCTION_PARAMS)
+    def test_parameter_still_exists(self, network_template, param_name):
+        assert param_name in network_template['Parameters']
+
+    @pytest.mark.parametrize("param_name", DEPRECATED_FUNCTION_PARAMS)
+    def test_description_starts_with_deprecated(self, network_template, param_name):
+        description = network_template['Parameters'][param_name]['Description']
+        assert description.startswith('DEPRECATED'), \
+            f"{param_name} description should start with DEPRECATED"
+
+    @pytest.mark.parametrize("param_name", DEPRECATED_FUNCTION_PARAMS)
+    def test_default_is_empty_string(self, network_template, param_name):
+        assert network_template['Parameters'][param_name]['Default'] == ''
+
+    @pytest.mark.parametrize("param_name", DEPRECATED_FUNCTION_PARAMS)
+    def test_allowed_pattern_unchanged(self, network_template, param_name):
+        assert network_template['Parameters'][param_name]['AllowedPattern'] == EXPECTED_ARN_PATTERN
+
+    def test_no_origin_events_in_any_function_associations(self, network_template):
+        """No FunctionAssociations value may mention origin-request or origin-response."""
+        import json
+
+        function_associations = [
+            _get_default_cache_behavior(network_template)['FunctionAssociations']
+        ]
+        for behavior in _get_cache_behaviors(network_template):
+            if_key = '!If' if '!If' in behavior else 'Fn::If'
+            branch = behavior[if_key][1] if if_key in behavior else behavior
+            if isinstance(branch, dict) and 'FunctionAssociations' in branch:
+                function_associations.append(branch['FunctionAssociations'])
+
+        assert len(function_associations) == 3, \
+            "Expected FunctionAssociations on the default, static path, and API path behaviors"
+        for fa in function_associations:
+            serialized = json.dumps(fa)
+            assert 'origin-request' not in serialized
+            assert 'origin-response' not in serialized
+
+
+# =============================================================================
+# v0.0.46 API ORIGIN PROTECTION: ORIGIN CUSTOM HEADERS AND SECRET REVISION (task 7.2)
+# Requirements: R2.1-R2.6, R3.1-R3.4, R10.2
+# =============================================================================
+
+ORIGIN_SECRET_HEADER_NAME = 'X-Atlantis-Origin-Secret'
+ORIGIN_SECRET_HEADER_VALUE = '{{resolve:secretsmanager:${Prefix}-${ProjectId}-${StageId}-OriginSecret}}'
+
+
+def _get_distribution_config(template):
+    """Helper to extract DistributionConfig from the distribution."""
+    distribution = template.get('Resources', {}).get('CloudFrontDistribution', {})
+    return distribution.get('Properties', {}).get('DistributionConfig', {})
+
+
+def _get_origin_entries(template):
+    """Helper returning (condition, origin_definition) for each !If origin entry."""
+    entries = []
+    for origin in _get_distribution_config(template).get('Origins', []):
+        if_list = origin['!If']
+        entries.append((if_list[0], if_list[1]))
+    return entries
+
+
+def _get_origin_by_id(template, origin_id):
+    """Helper to find an origin definition by its Id."""
+    for _condition, definition in _get_origin_entries(template):
+        if definition.get('Id') == origin_id:
+            return definition
+    raise AssertionError(f"Origin {origin_id} not found")
+
+
+class TestOriginCustomHeaders:
+    """Tests for the ApiGatewayOrigin OriginCustomHeaders property.
+    Requirements: R2.1-R2.6, R10.2"""
+
+    def test_api_origin_has_origin_custom_headers_if(self, network_template):
+        """OriginCustomHeaders is !If [UseApiOriginProtection, [one header], NoValue]. R2.1"""
+        api_origin = _get_origin_by_id(network_template, 'ApiGatewayOrigin')
+        assert 'OriginCustomHeaders' in api_origin
+        if_list = api_origin['OriginCustomHeaders']['!If']
+        assert len(if_list) == 3
+        assert if_list[0] == 'UseApiOriginProtection'
+        assert isinstance(if_list[1], list) and len(if_list[1]) == 1
+        assert if_list[2] == {'!Ref': 'AWS::NoValue'}
+
+    def test_header_name(self, network_template):
+        """The header name is X-Atlantis-Origin-Secret. R2.2"""
+        api_origin = _get_origin_by_id(network_template, 'ApiGatewayOrigin')
+        header = api_origin['OriginCustomHeaders']['!If'][1][0]
+        assert header['HeaderName'] == ORIGIN_SECRET_HEADER_NAME
+
+    def test_header_value_is_sub_of_versionless_dynamic_reference(self, network_template):
+        """The value is a !Sub of the exact dynamic reference with no version segment. R2.3"""
+        api_origin = _get_origin_by_id(network_template, 'ApiGatewayOrigin')
+        header = api_origin['OriginCustomHeaders']['!If'][1][0]
+        value = header['HeaderValue']
+        assert list(value.keys()) == ['!Sub']
+        assert value['!Sub'] == ORIGIN_SECRET_HEADER_VALUE
+
+    def test_dynamic_reference_has_no_version_segment(self, network_template):
+        """Secret name is followed directly by the closing braces (no :SecretString:json-key:stage:version). R2.3"""
+        api_origin = _get_origin_by_id(network_template, 'ApiGatewayOrigin')
+        header = api_origin['OriginCustomHeaders']['!If'][1][0]
+        value = header['HeaderValue']['!Sub']
+        reference = value[len('{{resolve:'):-len('}}')]
+        # Only "secretsmanager:<secret-id>" is allowed: exactly one colon
+        assert reference.count(':') == 1, f"Unexpected version segments in {value}"
+        assert value.endswith('-OriginSecret}}')
+
+    def test_no_other_origin_carries_origin_custom_headers(self, network_template):
+        """Only the API origin has OriginCustomHeaders. R2.4"""
+        entries = _get_origin_entries(network_template)
+        assert len(entries) == 2
+        for _condition, definition in entries:
+            if definition.get('Id') != 'ApiGatewayOrigin':
+                assert 'OriginCustomHeaders' not in definition, \
+                    f"Origin {definition.get('Id')} must not carry OriginCustomHeaders"
+
+    def test_origin_custom_headers_only_on_api_origin_in_template(self, network_template):
+        """Only one OriginCustomHeaders appears in the distribution config. R2.4"""
+        dist_config = _get_distribution_config(network_template)
+        assert str(dist_config).count('OriginCustomHeaders') == 1
+
+    def test_no_secret_or_dynamic_reference_in_outputs(self, network_template):
+        """Outputs never expose the secret value or a dynamic reference. R2.5"""
+        outputs_text = str(network_template.get('Outputs', {}))
+        assert 'resolve:' not in outputs_text
+        assert 'secretsmanager' not in outputs_text
+        assert 'OriginSecret' not in outputs_text
+        assert ORIGIN_SECRET_HEADER_NAME not in outputs_text
+
+    def test_no_parameter_for_secret_name(self, network_template):
+        """The secret name is by convention; no parameter carries it. R2.6"""
+        for name in network_template['Parameters']:
+            if 'Secret' in name:
+                assert name == 'ApiOriginSecretRevision', \
+                    f"Unexpected secret-related parameter {name}"
+
+
+class TestApiOriginSecretRevision:
+    """Tests for the ApiOriginSecretRevision parameter, Comment, and condition.
+    Requirements: R3.1-R3.4"""
+
+    def test_parameter_default_empty(self, network_template):
+        """Parameter defaults to empty string. R3.1"""
+        param = network_template['Parameters']['ApiOriginSecretRevision']
+        assert param['Type'] == 'String'
+        assert param['Default'] == ''
+
+    def test_parameter_allowed_pattern_and_max_length(self, network_template):
+        """Pattern permits 0-32 letters, digits, dots, dashes; MaxLength is 32. R3.1"""
+        param = network_template['Parameters']['ApiOriginSecretRevision']
+        assert param['AllowedPattern'] == '^[a-zA-Z0-9.-]{0,32}$'
+        assert param['MaxLength'] == 32
+
+    def test_allowed_pattern_behavior(self, network_template):
+        """Pattern accepts expected labels and rejects invalid ones. R3.1"""
+        import re
+        pattern = network_template['Parameters']['ApiOriginSecretRevision']['AllowedPattern']
+        for valid in ['', 'r2', 'rev-1.2', 'A' * 32]:
+            assert re.match(pattern, valid), f"{valid!r} should be accepted"
+        for invalid in ['a' * 33, 'r 2', 'r_2', 'r2$']:
+            assert not re.match(pattern, invalid), f"{invalid!r} should be rejected"
+
+    def test_condition_is_not_equals_empty(self, network_template):
+        """HasApiOriginSecretRevision is Not [Equals [Ref param, ""]]. R3.2"""
+        condition = network_template['Conditions']['HasApiOriginSecretRevision']
+        assert condition == {'!Not': [{'!Equals': [{'!Ref': 'ApiOriginSecretRevision'}, '']}]}
+
+    def test_distribution_comment_uses_revision(self, network_template):
+        """Comment includes ' rev <revision>' only when a revision is set. R3.3, R3.4"""
+        comment = _get_distribution_config(network_template)['Comment']
+        assert comment == {'!If': [
+            'HasApiOriginSecretRevision',
+            {'!Sub': '${Prefix}-${ProjectId}-${StageId} rev ${ApiOriginSecretRevision}'},
+            {'!Sub': '${Prefix}-${ProjectId}-${StageId}'},
+        ]}
+
+    def test_comment_max_length_within_cloudfront_limit(self, network_template):
+        """Longest rendered Comment stays within CloudFront's 128 character limit. R3.3"""
+        comment = _get_distribution_config(network_template)['Comment']
+        template_string = comment['!If'][1]['!Sub']
+        params = network_template['Parameters']
+        rendered = template_string
+        for name in ['Prefix', 'ProjectId', 'StageId', 'ApiOriginSecretRevision']:
+            rendered = rendered.replace('${' + name + '}', 'x' * params[name]['MaxLength'])
+        assert len(rendered) <= 128

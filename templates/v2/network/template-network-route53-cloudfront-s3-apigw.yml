@@ -5,7 +5,7 @@ Description: "Serves Static Content (S3) and/or API Gateway via CloudFront with 
 # Atlantis for AWS SAM Deployments
 # Network Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v0.1.0/2026-09-26
+# Version: v0.2.0/2026-11-09
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63Klabs/atlantis-sam-templates/
@@ -91,6 +91,7 @@ Metadata:
           - CustomSubdomainCloudFront
           - PathStatic
           - AcmCertificateArnForCloudFront
+          - ViewerMinimumTlsVersion
 
       - Label:
           default: Routing for API Gateway
@@ -99,6 +100,12 @@ Metadata:
           - CustomSubdomainApiGateway
           - PathApi
           - AcmCertificateArnForApiGateway
+
+      - Label:
+          default: API Origin Protection
+        Parameters:
+          - ApiOriginProtection
+          - ApiOriginSecretRevision
 
       - Label:
           default: "API behind CloudFront Forwarding (Deprecated)"
@@ -279,14 +286,14 @@ Parameters:
 
   CloudFrontStaticFunctionOriginRequest:
     Type: String
-    Description: "CloudFront Function ARN for origin-request event on static behaviors. Leave empty to not associate a function."
+    Description: "DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-request event on static behaviors. Retained so existing stacks that pass it still update."
     Default: ""
     AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
     ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
 
   CloudFrontStaticFunctionOriginResponse:
     Type: String
-    Description: "CloudFront Function ARN for origin-response event on static behaviors. Leave empty to not associate a function."
+    Description: "DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-response event on static behaviors. Retained so existing stacks that pass it still update."
     Default: ""
     AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
     ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
@@ -310,14 +317,14 @@ Parameters:
 
   CloudFrontApiFunctionOriginRequest:
     Type: String
-    Description: "CloudFront Function ARN for origin-request event on API behaviors. Leave empty to not associate a function."
+    Description: "DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-request event on API behaviors. Retained so existing stacks that pass it still update."
     Default: ""
     AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
     ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
 
   CloudFrontApiFunctionOriginResponse:
     Type: String
-    Description: "CloudFront Function ARN for origin-response event on API behaviors. Leave empty to not associate a function."
+    Description: "DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-response event on API behaviors. Retained so existing stacks that pass it still update."
     Default: ""
     AllowedPattern: "^arn:aws:cloudfront::[0-9]{12}:function\\/[a-zA-Z0-9-_]{1,64}$|^$"
     ConstraintDescription: "Must be a valid CloudFront Function ARN (arn:aws:cloudfront::<account-id>:function/<function-name>) or empty."
@@ -445,6 +452,25 @@ Parameters:
     ConstraintDescription: Must be a valid ACM certificate ARN in us-east-1.
     Default: ''
 
+  ViewerMinimumTlsVersion:
+    Type: String
+    Description: "Minimum TLS version (CloudFront security policy) for viewers. Applies only when the
+      distribution has a custom domain and ACM certificate (DomainForCloudFront, CustomSubdomainCloudFront,
+      and AcmCertificateArnForCloudFront); the default CloudFront domain is fixed at TLSv1 by CloudFront.
+      The default TLSv1.2_2021 stops clients that cannot negotiate TLS 1.2 from connecting. Set TLSv1 to
+      keep the behavior of earlier template versions."
+    Default: TLSv1.2_2021
+    AllowedValues:
+      - TLSv1
+      - TLSv1_2016
+      - TLSv1.1_2016
+      - TLSv1.2_2018
+      - TLSv1.2_2019
+      - TLSv1.2_2021
+      - TLSv1.2_2025
+      - TLSv1.3_2025
+    ConstraintDescription: Must be a CloudFront viewer security policy name.
+
   # ---------------------------------------------------------------------------
   # Routing Configuration - API Gateway
 
@@ -487,6 +513,31 @@ Parameters:
     AllowedPattern: "^arn:aws:acm:.*$|^$"
     ConstraintDescription: "Must be a valid ACM certificate ARN in the same region as the API Gateway resource."
     Default: ''
+
+  # ---------------------------------------------------------------------------
+  # API Origin Protection
+
+  ApiOriginProtection:
+    Type: String
+    Description: "Set to 'true' to have CloudFront add the X-Atlantis-Origin-Secret header to every request
+      it sends to the API Gateway origin. The value comes from the Secrets Manager secret named
+      <Prefix>-<ProjectId>-<StageId>-OriginSecret, which must exist in this region before the stack is
+      created or updated with 'true'. The application must reject requests whose header does not match.
+      Requires an API Gateway behind CloudFront (ApiGatewayId set, DomainForApiGateway empty)."
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    ConstraintDescription: Must be 'true' or 'false'.
+
+  ApiOriginSecretRevision:
+    Type: String
+    Description: "Optional label used to roll a rotated origin secret out to the distribution.
+      Updating only the secret does not change the distribution, so CloudFormation does not read the
+      new value. After you rotate the secret, change this value (for example r2, r3) and update the stack.
+      Leave empty until the first rotation."
+    Default: ""
+    AllowedPattern: "^[a-zA-Z0-9.-]{0,32}$"
+    MaxLength: 32
+    ConstraintDescription: Up to 32 characters; letters, numbers, dots, and dashes.
 
   # ---------------------------------------------------------------------------
   # Forwarding for API Gateway behind CloudFront
@@ -609,14 +660,16 @@ Conditions:
   # Static CloudFront Function Conditions
   HasStaticFunctionViewerRequest: !Not [!Equals [!Ref CloudFrontStaticFunctionViewerRequest, '']]
   HasStaticFunctionViewerResponse: !Not [!Equals [!Ref CloudFrontStaticFunctionViewerResponse, '']]
-  HasStaticFunctionOriginRequest: !Not [!Equals [!Ref CloudFrontStaticFunctionOriginRequest, '']]
-  HasStaticFunctionOriginResponse: !Not [!Equals [!Ref CloudFrontStaticFunctionOriginResponse, '']]
 
   # API CloudFront Function Conditions
   HasApiFunctionViewerRequest: !Not [!Equals [!Ref CloudFrontApiFunctionViewerRequest, '']]
   HasApiFunctionViewerResponse: !Not [!Equals [!Ref CloudFrontApiFunctionViewerResponse, '']]
-  HasApiFunctionOriginRequest: !Not [!Equals [!Ref CloudFrontApiFunctionOriginRequest, '']]
-  HasApiFunctionOriginResponse: !Not [!Equals [!Ref CloudFrontApiFunctionOriginResponse, '']]
+
+  # API Origin Protection
+  UseApiOriginProtection: !And
+    - !Equals [!Ref ApiOriginProtection, "true"]
+    - !Condition ApiIsBehindCloudFront
+  HasApiOriginSecretRevision: !Not [!Equals [!Ref ApiOriginSecretRevision, ""]]
 
   # CloudFront Logging Conditions
   IsUsEast1: !Equals [!Ref "AWS::Region", "us-east-1"]
@@ -638,6 +691,21 @@ Conditions:
     - !Condition CreateV2Delivery
 
 # =============================================================================
+# RULES
+# -----------------------------------------------------------------------------
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
+#
+
+Rules:
+  ApiOriginProtectionRequiresApiBehindCloudFront:
+    RuleCondition: !Equals [!Ref ApiOriginProtection, "true"]
+    Assertions:
+      - Assert: !And
+          - !Not [!Equals [!Ref ApiGatewayId, ""]]
+          - !Equals [!Ref DomainForApiGateway, ""]
+        AssertDescription: "ApiOriginProtection 'true' requires ApiGatewayId to be set and DomainForApiGateway to be empty (an API Gateway behind CloudFront)."
+
+# =============================================================================
 # RESOURCES
 # -----------------------------------------------------------------------------
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html  
@@ -654,7 +722,10 @@ Resources:
     Condition: CreateDistribution
     Properties:
       DistributionConfig:
-        Comment: !Sub "${Prefix}-${ProjectId}-${StageId}"
+        Comment: !If
+          - HasApiOriginSecretRevision
+          - !Sub "${Prefix}-${ProjectId}-${StageId} rev ${ApiOriginSecretRevision}"
+          - !Sub "${Prefix}-${ProjectId}-${StageId}"
         Enabled: true
         IPV6Enabled: true
         HttpVersion: http2
@@ -708,6 +779,11 @@ Resources:
                 OriginProtocolPolicy: https-only
                 OriginSSLProtocols:
                   - TLSv1.2
+              OriginCustomHeaders: !If
+                - UseApiOriginProtection
+                - - HeaderName: X-Atlantis-Origin-Secret
+                    HeaderValue: !Sub '{{resolve:secretsmanager:${Prefix}-${ProjectId}-${StageId}-OriginSecret}}'
+                - !Ref AWS::NoValue
             - !Ref AWS::NoValue
 
         # >! Cache Policy Selection
@@ -763,16 +839,6 @@ Resources:
                   - EventType: viewer-response
                     FunctionARN: !Ref CloudFrontStaticFunctionViewerResponse
                   - !Ref AWS::NoValue
-                - !If
-                  - HasStaticFunctionOriginRequest
-                  - EventType: origin-request
-                    FunctionARN: !Ref CloudFrontStaticFunctionOriginRequest
-                  - !Ref AWS::NoValue
-                - !If
-                  - HasStaticFunctionOriginResponse
-                  - EventType: origin-response
-                    FunctionARN: !Ref CloudFrontStaticFunctionOriginResponse
-                  - !Ref AWS::NoValue
               # API function associations
               - - !If
                   - HasApiFunctionViewerRequest
@@ -783,16 +849,6 @@ Resources:
                   - HasApiFunctionViewerResponse
                   - EventType: viewer-response
                     FunctionARN: !Ref CloudFrontApiFunctionViewerResponse
-                  - !Ref AWS::NoValue
-                - !If
-                  - HasApiFunctionOriginRequest
-                  - EventType: origin-request
-                    FunctionARN: !Ref CloudFrontApiFunctionOriginRequest
-                  - !Ref AWS::NoValue
-                - !If
-                  - HasApiFunctionOriginResponse
-                  - EventType: origin-response
-                    FunctionARN: !Ref CloudFrontApiFunctionOriginResponse
                   - !Ref AWS::NoValue
 
         CacheBehaviors:
@@ -827,16 +883,6 @@ Resources:
                   - EventType: viewer-response
                     FunctionARN: !Ref CloudFrontStaticFunctionViewerResponse
                   - !Ref AWS::NoValue
-                - !If
-                  - HasStaticFunctionOriginRequest
-                  - EventType: origin-request
-                    FunctionARN: !Ref CloudFrontStaticFunctionOriginRequest
-                  - !Ref AWS::NoValue
-                - !If
-                  - HasStaticFunctionOriginResponse
-                  - EventType: origin-response
-                    FunctionARN: !Ref CloudFrontStaticFunctionOriginResponse
-                  - !Ref AWS::NoValue
             - Ref: AWS::NoValue
           - !If 
             - HasRouteForApiInCloudFront
@@ -867,16 +913,6 @@ Resources:
                   - EventType: viewer-response
                     FunctionARN: !Ref CloudFrontApiFunctionViewerResponse
                   - !Ref AWS::NoValue
-                - !If
-                  - HasApiFunctionOriginRequest
-                  - EventType: origin-request
-                    FunctionARN: !Ref CloudFrontApiFunctionOriginRequest
-                  - !Ref AWS::NoValue
-                - !If
-                  - HasApiFunctionOriginResponse
-                  - EventType: origin-response
-                    FunctionARN: !Ref CloudFrontApiFunctionOriginResponse
-                  - !Ref AWS::NoValue
             - Ref: AWS::NoValue
 
         CustomErrorResponses: 
@@ -903,6 +939,7 @@ Resources:
         ViewerCertificate:
           CloudFrontDefaultCertificate: !If [ CreateDnsRecordForCloudFront, !Ref AWS::NoValue, true]
           AcmCertificateArn: !If [ CreateDnsRecordForCloudFront, !Ref AcmCertificateArnForCloudFront, !Ref AWS::NoValue ] 
+          MinimumProtocolVersion: !If [ CreateDnsRecordForCloudFront, !Ref ViewerMinimumTlsVersion, !Ref AWS::NoValue ]
           SslSupportMethod: !If [ CreateDnsRecordForCloudFront, 'sni-only', !Ref AWS::NoValue ]
       Tags:
         # Required Tags for permissions since the distribution arn is randomly generated

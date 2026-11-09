@@ -16,6 +16,10 @@
 # --
 # This is the "developer" policy — it does NOT include Route53 permissions.
 # --
+# It also lets the service role read the origin secret
+# (secretsmanager:GetSecretValue on ${Prefix}-*-OriginSecret-??????) so the
+# network template can resolve it when ApiOriginProtection is enabled.
+# --
 
 Type: AWS::IAM::ManagedPolicy
 Properties:
@@ -231,6 +235,22 @@ Properties:
           - acm:GetCertificate
           - acm:ListTagsForCertificate
         Resource: "*"
+
+      # ------------------------------------------------------------------
+      # Origin Secret Read (for ApiOriginProtection)
+      # ------------------------------------------------------------------
+      # With ApiOriginProtection='true' the network template sets an origin
+      # header from {{resolve:secretsmanager:<Prefix>-<ProjectId>-<StageId>-OriginSecret}}.
+      # CloudFormation resolves it with THIS role's identity at stack create/update,
+      # so the role needs GetSecretValue on the convention-named secret.
+      # Secrets Manager appends a six-character suffix to the secret ARN.
+
+      - Sid: SecretsManagerOriginSecretRead
+        Effect: Allow
+        Action:
+          - secretsmanager:GetSecretValue
+        Resource:
+          - Fn::Sub: "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Prefix}-*-OriginSecret-??????"
 
       # ------------------------------------------------------------------
       # S3 Artifacts Bucket Read (for managed stacks)

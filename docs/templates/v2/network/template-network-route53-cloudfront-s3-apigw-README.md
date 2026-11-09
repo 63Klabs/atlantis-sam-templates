@@ -2,7 +2,7 @@
 
 Serves Static Content (S3) and/or API Gateway via CloudFront with custom domain (Route53) - Deployed using SAM
 
-**Version:** v0.1.0/2026-09-26  
+**Version:** v0.2.0/2026-11-09  
 **Template:** [templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml](../../../../templates/v2/network/template-network-route53-cloudfront-s3-apigw.yml)
 
 ## Overview
@@ -16,6 +16,7 @@ This template creates a complete network infrastructure for serving static conte
 - Combine static content and API on the same domain with path-based routing
 - Set up CloudFront distributions with Origin Access Control (OAC) for S3
 - Configure multi-stage deployments (dev, test, prod) with environment-specific settings
+- Require that requests to an API Gateway reach it through the distribution, using an origin secret header (see [API Origin Protection](#api-origin-protection-v020))
 
 ### Prerequisites
 
@@ -25,6 +26,7 @@ This template creates a complete network infrastructure for serving static conte
 - ACM certificate in us-east-1 (for CloudFront) and/or regional certificate (for API Gateway)
 - CloudFormation Service Role with appropriate permissions
 - (Optional) S3 bucket for CloudFront access logs with appropriate bucket policy allowing CloudFront to write logs
+- (Only with `ApiOriginProtection="true"`) A Secrets Manager secret named `<Prefix>-<ProjectId>-<StageId>-OriginSecret` in the stack's region, created by the application stack, and a network service role that holds the `SecretsManagerOriginSecretRead` statement
 
 ### Important Notes
 
@@ -33,6 +35,65 @@ This template creates a complete network infrastructure for serving static conte
 - The template uses Origin Access Control (OAC) for S3, not the legacy Origin Access Identity (OAI)
 - Non-production stages automatically append the stage ID to subdomain names
 - DEV and TEST environments use PriceClass_100 regardless of the CloudFrontPriceClass parameter
+- **v0.2.0 changes the default viewer TLS policy** for distributions with a custom domain from the implicit `TLSv1` to `TLSv1.2_2021` (see [ViewerMinimumTlsVersion](#viewerminimumtlsversion)). Set `ViewerMinimumTlsVersion="TLSv1"` to keep the previous behavior.
+- For the API behind CloudFront pattern, see the [API Ingress Standard](../../../end-user/api-ingress-standard.md) (recommended API type, client IP handling, origin secret enforcement and rotation)
+
+## API Origin Protection (v0.2.0)
+
+The distribution reaches an API Gateway through its default `execute-api` endpoint, and that endpoint stays reachable by anyone. A request that skips the distribution also skips its caching and any web ACL attached to it. With `ApiOriginProtection="true"`, CloudFront adds the custom origin header `X-Atlantis-Origin-Secret` to every request it sends to the API origin. CloudFront overwrites any viewer-sent header of the same name. The value comes from a Secrets Manager secret that the **application stack** creates; this template never creates the secret and has no parameter for its name or the header name.
+
+```text
+Viewer --> CloudFront --(adds X-Atlantis-Origin-Secret)--> API Gateway --> application checks the header
+                                                           ^
+Direct caller (no header or wrong value) -------------------+--> application rejects
+```
+
+- **Secret name (convention):** `${Prefix}-${ProjectId}-${StageId}-OriginSecret`, in the same region as the network stack.
+- **Reference:** `{{resolve:secretsmanager:${Prefix}-${ProjectId}-${StageId}-OriginSecret}}` (versionless). CloudFormation resolves it with the identity of the stack's **service role** at stack create and update, which is why the network service role needs `secretsmanager:GetSecretValue` on the secret.
+- **Where the value appears:** in the CloudFront distribution configuration. Any principal with `cloudfront:GetDistribution` or `cloudfront:GetDistributionConfig` can read it. It does not appear in `describe-stacks`, stack events, stack resources, or the template. It is never placed in an output.
+- **Enforcement is the application's job.** The template only sends the header. The application must reject requests whose header is missing or does not match (see the [API Ingress Standard](../../../end-user/api-ingress-standard.md)).
+- **Regional or edge-optimized APIs:** the header is replaced on both, but Regional is the recommended pattern. See the [API Ingress Standard](../../../end-user/api-ingress-standard.md).
+
+### Service Role Permissions
+
+The network CloudFormation service roles (`${PrefixUpper}-CloudFormation-Service-Role-Network-CloudFront-Mgmt` and `...-Network-Full-Mgmt`) get their permissions from the managed policy built from `templates/v2/modules/management-roles/network-cloudfront-mgmt-policy.yml`. Two statements in that policy matter to this template's optional features:
+
+| Statement (`Sid`) | Purpose |
+|-------------------|---------|
+| `SecretsManagerOriginSecretRead` | `secretsmanager:GetSecretValue` on `arn:aws:secretsmanager:<region>:<account>:secret:<Prefix>-*-OriginSecret-??????` so CloudFormation can resolve the origin secret when `ApiOriginProtection="true"`. The trailing `??????` matches the six-character suffix Secrets Manager appends to a secret ARN. |
+| `S3BucketAclForCloudFrontLegacyLogging` | `s3:GetBucketAcl` and `s3:PutBucketAcl` on the legacy CloudFront log bucket for `CloudFrontLoggingVersion="v1"` (see the [v0.0.44 notes](#v0044-changes-cloudfront-logging-v1v2)). |
+
+The role is **not** granted any origin request policy create, update, or delete action; `CloudFrontOriginRequestPolicyRead` is unchanged.
+
+Services that include the module pick up the new statement at their next update: `prefix-based-infrastructure.yml`, `template-service-role-network-cloudfront.yml`, and `template-service-role-network-full.yml`. Redeploy whichever created your role **before** updating the network stack with `ApiOriginProtection="true"`.
+
+> **Important:** The pipeline CloudFormation role used by the *application* stack (which creates the secret) needs separate statements, `SecretsManagerCRUDThisDeploymentOnly` and `SecretsManagerGetRandomPassword`. Those arrive with the pipeline stack, so update the pipeline stack to a template version that includes them (`template-pipeline.yml` v2.0.24+, `template-pipeline-github.yml` v2.0.6+, or `template-pipeline-s3-source.yml` v2.0.1+). That role intentionally cannot read secret values.
+
+### Deployment Order
+
+Follow this order when adopting origin protection for a deployment:
+
+1. **Redeploy the network service role** (`prefix-based-infrastructure`, `template-service-role-network-cloudfront`, or `template-service-role-network-full`) so it holds `SecretsManagerOriginSecretRead`.
+2. **Update the pipeline stack** to pick up the Secrets Manager statements on the pipeline CloudFormation role.
+3. **Create the secret in the application stack.** Create an `AWS::SecretsManager::Secret` named `${Prefix}-${ProjectId}-${StageId}-OriginSecret` (for example with `GenerateSecretString`) and deploy it through the pipeline. The secret must exist in the stack's region before step 4.
+4. **Update the network stack** with `ApiOriginProtection="true"`. CloudFront now sends the header to the API origin. Wait for the distribution to reach `Deployed`.
+5. **Enable enforcement in the application**, so it rejects requests without a matching header.
+
+Turn enforcement on only after step 4 completes, otherwise the application rejects legitimate traffic that has not yet received the header.
+
+### Rotating the Secret
+
+Updating only the secret value does **not** update the distribution, so CloudFormation does not re-read it. Use `ApiOriginSecretRevision` to roll a rotated value out:
+
+1. **Application accepts old and new values.** Deploy the application change so it accepts both the current and the next value.
+2. **Put the new value** in the secret (for example `aws secretsmanager put-secret-value`).
+3. **Update the network stack with a changed `ApiOriginSecretRevision`** (for example `r1`, then `r2`). The revision is part of the distribution `Comment`, so the change modifies the distribution and CloudFormation re-resolves the secret.
+4. **Wait for the distribution to reach `Deployed`**, plus a margin, so every edge location sends the new value.
+5. **Remove the old value** from the application's accepted values.
+
+### Rollback
+
+Set `ApiOriginProtection="false"` and update the network stack to remove the header. Stop enforcement in the application **first**, otherwise it rejects requests once the header disappears. Returning to template v0.1.0 also reverts the viewer TLS default. The new IAM statements can stay; removing them is safe once no stack uses protection.
 
 ## v0.0.44 Changes (CloudFront logging v1/v2)
 
@@ -101,6 +162,8 @@ Configure cache policies for CloudFront distribution origins. Choose between AWS
 
 Associate existing CloudFront Functions with static content cache behaviors. CloudFront Functions are lightweight JavaScript functions that run at edge locations for request/response manipulation. The functions must be created separately; these parameters associate them with the static content behaviors.
 
+> **Deprecated (v0.2.0):** `CloudFrontStaticFunctionOriginRequest` and `CloudFrontStaticFunctionOriginResponse` are deprecated and ignored. CloudFront Functions run only on viewer-request and viewer-response events, so the template no longer creates `origin-request` or `origin-response` associations. Only the viewer parameters are applied.
+
 - [CloudFrontStaticFunctionViewerRequest](#cloudfrontstaticfunctionviewerrequest)
 - [CloudFrontStaticFunctionViewerResponse](#cloudfrontstaticfunctionviewerresponse)
 - [CloudFrontStaticFunctionOriginRequest](#cloudfrontstaticfunctionoriginrequest)
@@ -109,6 +172,8 @@ Associate existing CloudFront Functions with static content cache behaviors. Clo
 ### API CloudFront Function Associations
 
 Associate existing CloudFront Functions with API origin cache behaviors. CloudFront Functions are lightweight JavaScript functions that run at edge locations for request/response manipulation. The functions must be created separately; these parameters associate them with the API origin behaviors.
+
+> **Deprecated (v0.2.0):** `CloudFrontApiFunctionOriginRequest` and `CloudFrontApiFunctionOriginResponse` are deprecated and ignored. CloudFront Functions run only on viewer-request and viewer-response events, so the template no longer creates `origin-request` or `origin-response` associations. Only the viewer parameters are applied.
 
 - [CloudFrontApiFunctionViewerRequest](#cloudfrontapifunctionviewerrequest)
 - [CloudFrontApiFunctionViewerResponse](#cloudfrontapifunctionviewerresponse)
@@ -131,6 +196,7 @@ Configure custom domain routing for CloudFront distribution serving static conte
 - [CustomSubdomainCloudFront](#customsubdomaincloudfront)
 - [PathStatic](#pathstatic)
 - [AcmCertificateArnForCloudFront](#acmcertificatearnforcloudfront)
+- [ViewerMinimumTlsVersion](#viewerminimumtlsversion)
 
 ### Routing for API Gateway
 
@@ -140,6 +206,13 @@ Configure custom domain routing for standalone API Gateway (not behind CloudFron
 - [CustomSubdomainApiGateway](#customsubdomainapigateway)
 - [PathApi](#pathapi)
 - [AcmCertificateArnForApiGateway](#acmcertificatearnforapigateway)
+
+### API Origin Protection
+
+Have CloudFront add a shared secret header (`X-Atlantis-Origin-Secret`) to every request it sends to an API Gateway behind the distribution, so the application can reject requests that did not pass through CloudFront. Requires an API Gateway behind CloudFront. See [API Origin Protection (v0.2.0)](#api-origin-protection-v020) for the mechanism, deployment order, and rotation steps.
+
+- [ApiOriginProtection](#apioriginprotection)
+- [ApiOriginSecretRevision](#apioriginsecretrevision)
 
 ### API behind CloudFront Forwarding (Deprecated)
 
@@ -376,7 +449,7 @@ CloudFront Function ARN for viewer-response event on static behaviors. Leave emp
 
 #### CloudFrontStaticFunctionOriginRequest
 
-CloudFront Function ARN for origin-request event on static behaviors. Leave empty to not associate a function.
+> **Deprecated:** DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-request event on static behaviors. Retained so existing stacks that pass it still update. As of v0.2.0 the template no longer creates `origin-request` associations; a value set here is accepted and has no effect.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -387,7 +460,7 @@ CloudFront Function ARN for origin-request event on static behaviors. Leave empt
 
 #### CloudFrontStaticFunctionOriginResponse
 
-CloudFront Function ARN for origin-response event on static behaviors. Leave empty to not associate a function.
+> **Deprecated:** DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-response event on static behaviors. Retained so existing stacks that pass it still update. As of v0.2.0 the template no longer creates `origin-response` associations; a value set here is accepted and has no effect.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -422,7 +495,7 @@ CloudFront Function ARN for viewer-response event on API behaviors. Leave empty 
 
 #### CloudFrontApiFunctionOriginRequest
 
-CloudFront Function ARN for origin-request event on API behaviors. Leave empty to not associate a function.
+> **Deprecated:** DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-request event on API behaviors. Retained so existing stacks that pass it still update. As of v0.2.0 the template no longer creates `origin-request` associations; a value set here is accepted and has no effect.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -433,7 +506,7 @@ CloudFront Function ARN for origin-request event on API behaviors. Leave empty t
 
 #### CloudFrontApiFunctionOriginResponse
 
-CloudFront Function ARN for origin-response event on API behaviors. Leave empty to not associate a function.
+> **Deprecated:** DEPRECATED - ignored. CloudFront Functions run only on viewer-request and viewer-response events, so a function cannot be associated with the origin-response event on API behaviors. Retained so existing stacks that pass it still update. As of v0.2.0 the template no longer creates `origin-response` associations; a value set here is accepted and has no effect.
 
 | Attribute | Setting |
 |-----------|---------|
@@ -540,6 +613,21 @@ The Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
 
 **Security Note:** CloudFront requires certificates to be in the us-east-1 region regardless of where your other resources are deployed.
 
+#### ViewerMinimumTlsVersion
+
+Minimum TLS version (CloudFront security policy) for viewers. Applies only when the distribution has a custom domain and ACM certificate (`DomainForCloudFront`, `CustomSubdomainCloudFront`, and `AcmCertificateArnForCloudFront`); the default CloudFront domain is fixed at `TLSv1` by CloudFront. The default `TLSv1.2_2021` stops clients that cannot negotiate TLS 1.2 from connecting. Set `TLSv1` to keep the behavior of earlier template versions.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | TLSv1.2_2021 |
+| Allowed Values | TLSv1, TLSv1_2016, TLSv1.1_2016, TLSv1.2_2018, TLSv1.2_2019, TLSv1.2_2021, TLSv1.2_2025, TLSv1.3_2025 |
+| Constraint Description | Must be a CloudFront viewer security policy name. |
+
+> **Breaking change in v0.2.0:** earlier versions set no value, so CloudFront applied `TLSv1` to custom-domain distributions. Updating to v0.2.0 with the default changes `MinimumProtocolVersion` to `TLSv1.2_2021`. This is an in-place update with no interruption, but clients that cannot negotiate TLS 1.2 stop connecting. To keep the previous behavior, set `ViewerMinimumTlsVersion` to `TLSv1` (a deliberate opt-out; prefer raising the minimum when your clients allow it).
+
+> **Default CloudFront domain:** when no custom domain and certificate are configured, the template does not set `MinimumProtocolVersion` at all, because CloudFront fixes the policy at `TLSv1` for the default certificate. This parameter then has no effect.
+
 #### DomainForApiGateway
 
 The DNS name of an existing Amazon Route 53 hosted zone with corresponding * certificate in ACM. If you plan on placing your API Gateway behind CloudFront, leave this blank as DomainForCloudFront will be used instead. DomainForApiGateway is used for a stand-alone API Gateway. If you are not deploying an API Gateway, then leave this and the rest of the fields in this section blank. Example: example-apis.com
@@ -583,6 +671,35 @@ The Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
 | Default | "" (empty) |
 | Allowed Pattern | `^arn:aws:acm:.*$\|^$` |
 | Constraint Description | Must be a valid ACM certificate ARN in the same region as the API Gateway resource. |
+
+#### ApiOriginProtection
+
+Set to `true` to have CloudFront add the `X-Atlantis-Origin-Secret` header to every request it sends to the API Gateway origin. The value comes from the Secrets Manager secret named `<Prefix>-<ProjectId>-<StageId>-OriginSecret`, which must exist in this region before the stack is created or updated with `true`. The application must reject requests whose header does not match. Requires an API Gateway behind CloudFront (`ApiGatewayId` set, `DomainForApiGateway` empty).
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "false" |
+| Allowed Values | "true", "false" |
+| Constraint Description | Must be 'true' or 'false'. |
+
+> **Important:** The secret must exist before you set this to `true`. If it does not, the stack create or update fails with a resolution error at the distribution (see [Troubleshooting](#secret-not-found-when-enabling-apioriginprotection)). The template does not create the secret; the application stack does.
+
+> **Rule:** With `true`, the [ApiOriginProtectionRequiresApiBehindCloudFront](#rules) rule fails the stack before any resource change unless `ApiGatewayId` is set and `DomainForApiGateway` is empty. A standalone API Gateway (custom domain without CloudFront) cannot use this feature.
+
+#### ApiOriginSecretRevision
+
+Optional label used to roll a rotated origin secret out to the distribution. Updating only the secret does not change the distribution, so CloudFormation does not read the new value. After you rotate the secret, change this value (for example `r2`, `r3`) and update the stack. Leave empty until the first rotation.
+
+| Attribute | Setting |
+|-----------|---------|
+| Type | String |
+| Default | "" (empty) |
+| Allowed Pattern | `^[a-zA-Z0-9.-]{0,32}$` |
+| Max Length | 32 |
+| Constraint Description | Up to 32 characters; letters, numbers, dots, and dashes. |
+
+When empty, the distribution `Comment` is `<Prefix>-<ProjectId>-<StageId>` (unchanged from earlier versions). When set, the `Comment` becomes `<Prefix>-<ProjectId>-<StageId> rev <ApiOriginSecretRevision>`, so changing the revision modifies the distribution and makes CloudFormation re-resolve the secret. See [Rotating the Secret](#rotating-the-secret).
 
 #### HeadersToForwardToApi
 
@@ -628,7 +745,33 @@ For more information about AWS managed cache policies, see [AWS Managed Cache Po
 
 **Origin Request Policy:**
 
-API cache behaviors (both the default behavior when API is root and the path-based API behavior) use the AWS managed AllViewerExceptHostHeader origin request policy (`b689b0a8-53d0-40ab-baf2-68738e2966ac`). This policy forwards all viewer headers, cookies, and query strings to the API Gateway origin except the Host header, which must remain set to the API Gateway domain for proper routing. Static content behaviors do not use an origin request policy.
+API cache behaviors (both the default behavior when API is root and the path-based API behavior) use the AWS managed AllViewerExceptHostHeader origin request policy (`b689b0a8-53d0-40ab-baf2-68738e2966ac`). This policy forwards all viewer headers, cookies, and query strings to the API Gateway origin except the Host header, which must remain set to the API Gateway domain for proper routing. Static content behaviors do not use an origin request policy. The template does not create an `AWS::CloudFront::OriginRequestPolicy` resource.
+
+**Origin Custom Headers (`OriginCustomHeaders`):**
+
+When `UseApiOriginProtection` is true (`ApiOriginProtection="true"` and an API behind CloudFront), the `ApiGatewayOrigin` entry sets one custom header:
+
+```yaml
+OriginCustomHeaders:
+  - HeaderName: X-Atlantis-Origin-Secret
+    HeaderValue: '{{resolve:secretsmanager:<Prefix>-<ProjectId>-<StageId>-OriginSecret}}'
+```
+
+The dynamic reference is versionless, so it always reads the current secret value at stack create or update. CloudFront overwrites any viewer-sent header of the same name. When `UseApiOriginProtection` is false the property resolves to `AWS::NoValue`, so a stack with `ApiOriginProtection="false"` shows no change. Only the API origin carries the header; the S3 origin does not. See [API Origin Protection (v0.2.0)](#api-origin-protection-v020).
+
+**Comment and Rotation:**
+
+The distribution `Comment` is `<Prefix>-<ProjectId>-<StageId>`. When `ApiOriginSecretRevision` is set, it becomes `<Prefix>-<ProjectId>-<StageId> rev <ApiOriginSecretRevision>`. Changing the revision modifies the distribution, which is what makes CloudFormation re-resolve a rotated secret.
+
+**Viewer Certificate:**
+
+With a custom domain (`CreateDnsRecordForCloudFront`), `ViewerCertificate.MinimumProtocolVersion` is set to `ViewerMinimumTlsVersion` (default `TLSv1.2_2021`). Without one, the property is omitted because CloudFront fixes the default certificate at `TLSv1`.
+
+**Function Associations:**
+
+Only `viewer-request` and `viewer-response` associations are created for the static and API behaviors. The four origin-event parameters (`CloudFrontStaticFunctionOriginRequest`, `CloudFrontStaticFunctionOriginResponse`, `CloudFrontApiFunctionOriginRequest`, `CloudFrontApiFunctionOriginResponse`) are deprecated and ignored; the previous `origin-request` and `origin-response` associations were removed because CloudFront Functions cannot run on origin events.
+
+> **Distribution-wide 403/404 rewrite:** when a static origin exists (`HasStaticOrigin`), the distribution's `CustomErrorResponses` rewrite every 403 and 404 response to `/index.html` with status 200 for the **whole distribution**, including responses from the API behaviors. An API that returns 403 or 404 behind a combined static and API distribution therefore reaches the client as a 200 with the HTML page. See [Troubleshooting](#api-returns-200-with-html-instead-of-403-or-404).
 
 **Key Properties:**
 - Supports both S3 (with OAC) and API Gateway origins
@@ -640,10 +783,14 @@ API cache behaviors (both the default behavior when API is root and the path-bas
 - Optional v1 access logging to S3 under `cloudfront/<Prefix>-<ProjectId>-<StageId>/` (resolves to `AWS::NoValue` when no v1 destination is available)
 - Flexible cache policy selection (managed, custom default, or custom ARN)
 - AllViewerExceptHostHeader origin request policy on API behaviors for header forwarding
+- Optional origin secret header (`X-Atlantis-Origin-Secret`) on the API origin, enabled by `ApiOriginProtection`
+- Minimum viewer TLS version set by `ViewerMinimumTlsVersion` for custom-domain distributions
+
+**Update Behavior:** With `ApiOriginProtection="false"`, an empty `ApiOriginSecretRevision`, and no origin-event function ARNs, the only change from v0.1.0 is `MinimumProtocolVersion` on custom-domain distributions (`TLSv1` to the new default; none with `ViewerMinimumTlsVersion="TLSv1"`). Enabling protection or changing the revision is an in-place distribution update (no replacement).
 
 **Cost Consideration:** CloudFront distributions incur costs based on data transfer and requests. Price class affects the number of edge locations used.
 
-**Dependencies:** Requires CloudFrontOriginAccessControl (for S3), and optionally CloudFrontCachePolicyStatic and/or CloudFrontCachePolicyApi (when using CustomDefault)
+**Dependencies:** Requires CloudFrontOriginAccessControl (for S3), and optionally CloudFrontCachePolicyStatic and/or CloudFrontCachePolicyApi (when using CustomDefault). With `ApiOriginProtection="true"`, the Secrets Manager secret `<Prefix>-<ProjectId>-<StageId>-OriginSecret` must already exist (created outside this stack).
 
 ### CloudFrontDeliverySource
 
@@ -961,12 +1108,18 @@ The template uses several conditions to control resource creation:
 - **CreateCustomApiCachePolicy**: True when environment is PROD and CloudFrontApiCachePolicy is CustomDefault
 - **HasStaticFunctionViewerRequest**: True when CloudFrontStaticFunctionViewerRequest is provided (non-empty)
 - **HasStaticFunctionViewerResponse**: True when CloudFrontStaticFunctionViewerResponse is provided (non-empty)
-- **HasStaticFunctionOriginRequest**: True when CloudFrontStaticFunctionOriginRequest is provided (non-empty)
-- **HasStaticFunctionOriginResponse**: True when CloudFrontStaticFunctionOriginResponse is provided (non-empty)
 - **HasApiFunctionViewerRequest**: True when CloudFrontApiFunctionViewerRequest is provided (non-empty)
 - **HasApiFunctionViewerResponse**: True when CloudFrontApiFunctionViewerResponse is provided (non-empty)
-- **HasApiFunctionOriginRequest**: True when CloudFrontApiFunctionOriginRequest is provided (non-empty)
-- **HasApiFunctionOriginResponse**: True when CloudFrontApiFunctionOriginResponse is provided (non-empty)
+- **StaticOriginPathIsEmpty** / **StaticOriginPathIsRoot**: True when `StaticOriginPath` is empty / is `/`
+- **UseDefaultStaticOriginPath**, **UseRootStaticOriginPath**, **UseCustomStaticOriginPath**: Select the static origin path: the default path (`StaticOriginPath` empty), the root (`/`), or the custom value (any other non-empty value)
+- **ApiOriginPathIsEmpty** / **ApiOriginPathIsRoot**: True when `ApiOriginPath` is empty / is `/`
+- **UseDefaultApiOriginPath**, **UseRootApiOriginPath**, **UseCustomApiOriginPath**: Select the API origin path: the default path (`ApiOriginPath` empty), the root (`/`), or the custom value (any other non-empty value)
+- **StaticCachePolicyIsCustomDefault** / **StaticCachePolicyIsCustomArn**: True when `CloudFrontStaticCachePolicy` is `CustomDefault` / `CustomArn`
+- **ApiCachePolicyIsCustomDefault** / **ApiCachePolicyIsCustomArn**: True when `CloudFrontApiCachePolicy` is `CustomDefault` / `CustomArn`
+- **UseApiOriginProtection**: True when `ApiOriginProtection` is `"true"` **and** `ApiIsBehindCloudFront` is true. Gates the `OriginCustomHeaders` property on the `ApiGatewayOrigin` entry; when false the property resolves to `AWS::NoValue`. It repeats the check made by the [Rules](#rules) section so the header is never emitted when no API origin exists, even if the Rule is bypassed.
+- **HasApiOriginSecretRevision**: True when `ApiOriginSecretRevision` is not empty. Selects the distribution `Comment` that includes the revision.
+
+> **Removed in v0.2.0:** the conditions `HasStaticFunctionOriginRequest`, `HasStaticFunctionOriginResponse`, `HasApiFunctionOriginRequest`, and `HasApiFunctionOriginResponse` no longer exist. Nothing references them now that the origin-event associations were removed (the four parameters are deprecated and ignored).
 
 ### CloudFront Logging Conditions
 
@@ -982,6 +1135,18 @@ These conditions resolve the logging mode, the destination, and which logging re
 - **HasCloudFrontLogging**: True when `HasV1Destination` **or** `CreateV2Delivery` — that is, whenever CloudFront logging is effectively active in either mode. Gates the [CloudFrontLogPrefix](#cloudfrontlogprefix) output.
 
 > **Note:** the `CfLogV2Requested` / `CfLogV2` split exists so the [CloudFrontLoggingMode](#cloudfrontloggingmode) output can distinguish "v2 requested but disabled by region or missing distribution" from "v2 requested but no destination resolved". Neither case fails the deployment.
+
+## Rules
+
+The template has a `Rules` section (new in v0.2.0). Rules validate parameter values before any resource is created or changed, so a failure leaves the stack untouched.
+
+### ApiOriginProtectionRequiresApiBehindCloudFront
+
+- **Rule condition:** `ApiOriginProtection` is `"true"`
+- **Assertion:** `ApiGatewayId` is not empty **and** `DomainForApiGateway` is empty (an API Gateway behind CloudFront)
+- **Assert description:** `ApiOriginProtection 'true' requires ApiGatewayId to be set and DomainForApiGateway to be empty (an API Gateway behind CloudFront).`
+
+If the assertion fails, the create or update stops at parameter validation with that message. Fix it by setting `ApiGatewayId` and leaving `DomainForApiGateway` empty, or by setting `ApiOriginProtection` back to `"false"`. Rules can only reference parameter values, which is why the `UseApiOriginProtection` condition repeats the check.
 
 ## AWS Managed Cache Policies
 
@@ -1384,6 +1549,47 @@ CloudFront standard logging v1 is ACL-based: when logging is enabled, CloudFront
 
 > **Tip:** if logs stop arriving later, check whether the `awslogsdelivery` ACL grant was removed from the bucket. Disabling and re-enabling logging on the distribution restores it.
 
+### Access Denied on secretsmanager:GetSecretValue
+
+Stack create or update with `ApiOriginProtection="true"` fails at `CloudFrontDistribution` with an `AccessDeniedException` that names the network service role and the secret, for example:
+
+```text
+... is not authorized to perform: secretsmanager:GetSecretValue on resource:
+arn:aws:secretsmanager:<region>:<account>:secret:<Prefix>-<ProjectId>-<StageId>-OriginSecret-AbCdEf
+```
+
+CloudFormation resolves `{{resolve:secretsmanager:...}}` with the **service role's** identity, not yours. Work through these in order:
+
+1. **Redeploy the network service role.** The permission comes from the `SecretsManagerOriginSecretRead` statement in `network-cloudfront-mgmt-policy.yml`. Update `prefix-based-infrastructure.yml`, `template-service-role-network-cloudfront.yml`, or `template-service-role-network-full.yml` (whichever created your role), then retry. Self-hosted module buckets must be re-synced first.
+2. **Check the secret name.** The statement only matches `<Prefix>-*-OriginSecret-??????`. A secret that does not end in `-OriginSecret` is denied.
+3. **Check the KMS key.** If the secret uses a customer-managed KMS key, the service role also needs `kms:Decrypt` on that key (and the key policy must allow it). The statement does not grant this.
+
+### Secret Not Found When Enabling ApiOriginProtection
+
+The stack fails at `CloudFrontDistribution` with a "secret not found" or "can't find the specified secret" resolution error.
+
+- Confirm the application stack that creates `<Prefix>-<ProjectId>-<StageId>-OriginSecret` has been deployed (step 3 of the [Deployment Order](#deployment-order)).
+- Confirm the secret is in the **same region and account** as the network stack. For a CloudFront distribution the stack can be deployed in any region, but the secret is read from the stack's own region.
+- Confirm the name matches exactly, including the `Prefix`, `ProjectId`, and `StageId` values passed to the network stack.
+- A secret scheduled for deletion cannot be read; restore it first.
+- If a failed update left the stack in `UPDATE_ROLLBACK_COMPLETE`, the distribution keeps its previous configuration. Fix the cause and update again.
+
+### Rotation Not Applied
+
+You put a new value into the secret, but the API still sees the old value, or requests from CloudFront are rejected.
+
+- Updating only the secret does not modify the distribution, so CloudFormation does not re-read it. Change `ApiOriginSecretRevision` (for example `r1` to `r2`) and update the network stack. See [Rotating the Secret](#rotating-the-secret).
+- A stack update with an unchanged revision and unchanged template shows no change set, so nothing is re-resolved.
+- After the stack update, wait for the distribution to reach `Deployed` before removing the old value from the application, so every edge location sends the new value.
+- If the application rejects CloudFront's own requests during rotation, it accepted only one value. The application must accept both the old and new values until the rollout completes.
+
+### API Returns 200 with HTML Instead of 403 or 404
+
+When a static origin exists (`S3OriginDomainName` set), the distribution rewrites every 403 and 404 response to `/index.html` with status 200 for **all** behaviors, including the API path. An API that answers 403 or 404 reaches clients as a 200 with the HTML page, which can hide authorization failures and hide the origin-secret mismatch.
+
+- Do not use 403 or 404 to signal a mismatch of the origin secret header; use another status (for example 401) so the response is not rewritten. The [API Ingress Standard](../../../end-user/api-ingress-standard.md) covers this.
+- If clients need real 403/404 responses from the API, serve the API from a distribution without a static origin (leave `S3OriginDomainName` empty), or return other status codes for those cases.
+
 ### Custom Domain Not Resolving
 
 - Verify the Route53 hosted zone exists and matches the domain parameter
@@ -1410,6 +1616,40 @@ Non-production stages (StageId != "prod") automatically append the stage ID to s
 - Custom cache policies are only created when `CloudFrontStaticCachePolicy` or `CloudFrontApiCachePolicy` is set to `CustomDefault`
 - Custom cache policies are not created in DEV/TEST environments (CachingDisabled is used instead)
 - Verify the `DeployEnvironment` parameter is set to `PROD` if you expect custom policies to be created
+
+## Version History
+
+### v0.2.0 (2026-11-09)
+
+**Added**
+- `ApiOriginProtection` and `ApiOriginSecretRevision` parameters in a new `API Origin Protection` parameter group. With `ApiOriginProtection="true"`, CloudFront adds `X-Atlantis-Origin-Secret` to API origin requests using `{{resolve:secretsmanager:<Prefix>-<ProjectId>-<StageId>-OriginSecret}}`.
+- `Rules` section with `ApiOriginProtectionRequiresApiBehindCloudFront`.
+- Conditions `UseApiOriginProtection` and `HasApiOriginSecretRevision`.
+- `ViewerMinimumTlsVersion` parameter (default `TLSv1.2_2021`) in the `Routing for CloudFront` group.
+- Supporting changes outside this template: the `SecretsManagerOriginSecretRead` statement in `network-cloudfront-mgmt-policy.yml`, and the `SecretsManagerCRUDThisDeploymentOnly` and `SecretsManagerGetRandomPassword` statements in the pipeline CloudFormation role module.
+- [API Ingress Standard](../../../end-user/api-ingress-standard.md) documentation page.
+
+**Changed**
+- The distribution `Comment` includes ` rev <ApiOriginSecretRevision>` when a revision is set; unchanged when empty.
+- Documented the distribution-wide 403/404 `CustomErrorResponses` rewrite when a static origin exists.
+
+**Deprecated**
+- `CloudFrontStaticFunctionOriginRequest`, `CloudFrontStaticFunctionOriginResponse`, `CloudFrontApiFunctionOriginRequest`, and `CloudFrontApiFunctionOriginResponse` are ignored. The `origin-request` and `origin-response` function associations were removed, and so were the four conditions that gated them (`HasStaticFunctionOriginRequest`, `HasStaticFunctionOriginResponse`, `HasApiFunctionOriginRequest`, `HasApiFunctionOriginResponse`).
+
+**Breaking Changes**
+- **TLS default for custom-domain distributions.** `MinimumProtocolVersion` was previously unset (CloudFront applied `TLSv1`) and is now `TLSv1.2_2021` by default. Clients that cannot negotiate TLS 1.2 stop connecting. Set `ViewerMinimumTlsVersion="TLSv1"` to keep the previous behavior. The update is in place and does not interrupt the distribution.
+
+**Update notes**
+- With `ApiOriginProtection="false"`, an empty `ApiOriginSecretRevision`, and `ViewerMinimumTlsVersion="TLSv1"`, a stack update from v0.1.0 shows no resource change.
+- Redeploy the network service role (`prefix-based-infrastructure`, `template-service-role-network-cloudfront`, or `template-service-role-network-full`) before updating the network stack with `ApiOriginProtection="true"`. The pipeline role change reaches an application at its next pipeline stack update.
+
+### v0.1.0 (2026-09-26)
+
+CloudFront logging selected through `CloudFrontLoggingVersion` (`none`, `v1`, `v2`), `OrgPrefix` import of the account-wide log buckets, and log objects under `cloudfront/<Prefix>-<ProjectId>-<StageId>/`. See [v0.0.44 Changes](#v0044-changes-cloudfront-logging-v1v2).
+
+## Related Documentation
+
+- [API Ingress Standard](../../../end-user/api-ingress-standard.md): recommended API pattern, client IP handling, origin secret enforcement and rotation, and the 403/404 rewrite.
 
 ## Related Templates
 

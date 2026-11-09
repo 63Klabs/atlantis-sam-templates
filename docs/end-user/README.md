@@ -34,6 +34,10 @@ By default the source is the `atlantis` namespace in the public `63klabs` bucket
 
 If additional sources exist and are configured for an organization's internal use, they will be displayed when the end-user runs the `config` script.
 
+## Standards and Guides
+
+- [API Ingress Standard](./api-ingress-standard.md) - Putting an API Gateway behind the CloudFront distribution: client IP behavior, the origin secret, and rotation
+
 ## Installing
 
 The end-user does not need to perform any installation. The templates are available automatically from the `config` and `deploy` scripts.
