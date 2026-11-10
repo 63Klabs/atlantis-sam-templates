@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.46 (unreleased)
+## v0.0.46 (2026-11-09)
 
 ### Added
 - **API Origin Protection (Origin Secret Header)** [Spec: 0-0-46-network-template-apioriginprotection-origin](.kiro/specs/0-0-46-network-template-apioriginprotection-origin/) - Added opt-in protection for an API Gateway origin behind CloudFront. When enabled, CloudFront adds the `X-Atlantis-Origin-Secret` header to every origin request to the API, overwriting any viewer-sent header of the same name. The value comes from the Secrets Manager secret `<Prefix>-<ProjectId>-<StageId>-OriginSecret`, which the application stack creates; the application accepts requests only when the header matches. Default behavior is unchanged (`ApiOriginProtection="false"`).
