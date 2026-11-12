@@ -14,6 +14,20 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
+## v0.0.47 (unreleased)
+
+### Added
+- **Secrets Manager Read Managed Policies (Tag-Matched)** [Spec: 0-0-47-secrets-read-managed-policy](.kiro/specs/0-0-47-secrets-read-managed-policy/) - Added three account-wide, read-only IAM managed policies that let a pipeline role read only the Secrets Manager secrets whose tag matches the same tag on the calling role (attribute-based access control). Attach an exported policy ARN to the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` parameter of a pipeline stack. Each policy contains a single statement that allows exactly `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret`, guarded by a tag-match condition (`aws:ResourceTag/<key>` equals `${aws:PrincipalTag/<key>}`) and a tag-presence condition (`Null` is `"false"` for both the principal tag and the resource tag, so untagged roles and secrets get no access). `secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` are not granted.
+  - Account: account-wide-infrastructure.yml v2.1.0 - Added three `AWS::Include` managed policy resources, three exported policy ARN outputs, and three policy name outputs (no exports). No parameters were added, and no existing parameter, resource, output, or export changed
+  - Modules: pipeline-policies/secrets-read-deployment.yml - Managed policy `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadDeployment`, matched on the `atlantis:ApplicationDeploymentId` tag (one deployment); export `${OrgPrefix}-ProjectPipeline-SecretsReadDeployment-Arn`
+  - Modules: pipeline-policies/secrets-read-application.yml - Managed policy `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadApplication`, matched on the `atlantis:Application` tag (all stages of one application); export `${OrgPrefix}-ProjectPipeline-SecretsReadApplication-Arn`
+  - Modules: pipeline-policies/secrets-read-prefix.yml - Managed policy `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadPrefix`, matched on the `atlantis:Prefix` tag (all applications under one prefix); export `${OrgPrefix}-ProjectPipeline-SecretsReadPrefix-Arn`
+
+### Update-Time Notes
+- **Secrets read managed policies require matching `atlantis:*` tags** [Spec: 0-0-47-secrets-read-managed-policy](.kiro/specs/0-0-47-secrets-read-managed-policy/)
+  - No pipeline template changed. The policies take effect only when an exported ARN is passed to a pipeline stack's `*SvcRoleIncludeManagedPolicyArns` parameter
+  - Both the role and the secret must carry the matching tag, or access is denied. `atlantis:ApplicationDeploymentId` = `<Prefix>-<ProjectId>-<StageId>`, `atlantis:Application` = `<Prefix>-<ProjectId>`, and `atlantis:Prefix` = `<Prefix>`
+
 ## v0.0.46 (2026-11-09)
 
 ### Added

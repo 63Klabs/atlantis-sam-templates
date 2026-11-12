@@ -2,16 +2,17 @@
 
 Account-wide resources: ABAC-scoped managed policies, shared connections, optional S3 artifacts bucket, and optional shared S3 access log bucket — Assembled from reusable modules.
 
-**Version:** v2.1.0/2026-09-23  
+**Version:** v2.1.0/2026-11-12  
 **Template:** [templates/v2/account/account-wide-infrastructure.yml](../../../../templates/v2/account/account-wide-infrastructure.yml)
 
 ## Overview
 
-This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, shared GitHub connections, optional API Gateway CloudWatch logging, optional Bedrock model invocation logging, an optional shared S3 artifacts bucket, and an optional shared S3 access log bucket.
+This template creates account-wide infrastructure for the Atlantis DevOps Platform. It assembles shared resources from reusable module snippets stored in S3 using `AWS::Include` transforms. Resources include ABAC-scoped managed policies for CloudFormation service roles, three read-only Secrets Manager managed policies (deployment, application, and prefix level) for pipeline stage roles, shared GitHub connections, optional API Gateway CloudWatch logging, optional Bedrock model invocation logging, an optional shared S3 artifacts bucket, and an optional shared S3 access log bucket.
 
 ### Use Cases
 
 - Deploy ABAC-scoped managed policies (CodeBuild CRUD, Cognito CRUD) for CloudFormation service roles
+- Let pipeline stage roles (CloudFormation, CodeBuild, PostDeploy) read Secrets Manager secrets that carry a matching `atlantis:*` tag, at deployment, application, or prefix level (see [Secrets Manager Read Policies](#secrets-manager-read-policies))
 - Create a shared GitHub connection for all pipeline templates in the account
 - Enable account-level API Gateway CloudWatch logging (one-time per-region setup)
 - Enable Bedrock model invocation logging prerequisites (one-time per-region setup)
@@ -376,6 +377,9 @@ Namespace prefix within the S3 module bucket. This is the path prefix where modu
 
 - [CloudFormationCodeBuildPolicy](#cloudformationcodebuildpolicy) - AWS::IAM::ManagedPolicy (via AWS::Include)
 - [CloudFormationCognitoPolicy](#cloudformationcognitopolicy) - AWS::IAM::ManagedPolicy (via AWS::Include)
+- [SecretsReadDeploymentPolicy](#secretsreaddeploymentpolicy) - AWS::IAM::ManagedPolicy (via AWS::Include)
+- [SecretsReadApplicationPolicy](#secretsreadapplicationpolicy) - AWS::IAM::ManagedPolicy (via AWS::Include)
+- [SecretsReadPrefixPolicy](#secretsreadprefixpolicy) - AWS::IAM::ManagedPolicy (via AWS::Include)
 - [GitHubConnection](#githubconnection) - AWS::CodeStarConnections::Connection (Conditional: HasGitHubOrg, via AWS::Include)
 - [ApiGatewayCloudWatchLogsRole](#apigatewaycloudwatchlogsrole) - AWS::IAM::Role (Conditional: EnableApiGatewayLogging, via AWS::Include)
 - [ApiGatewayAccount](#apigatewayaccount) - AWS::ApiGateway::Account (Conditional: EnableApiGatewayLogging, via AWS::Include)
@@ -401,6 +405,88 @@ Type: AWS::IAM::ManagedPolicy (via AWS::Include)
 ABAC-scoped managed policy granting Cognito User Pool CRUD permissions. Scoped via the `atlantis:ApplicationDeploymentId` tag on the principal. Attach this policy to CloudFormation service roles that need to manage Cognito User Pools.
 
 **Module Source:** `templates/v2/modules/pipeline-policies/cognito-crud.yml`
+
+### SecretsReadDeploymentPolicy
+
+Type: AWS::IAM::ManagedPolicy (via AWS::Include)
+
+Read-only managed policy that lets a pipeline stage role read Secrets Manager secrets of **one deployment** (one stage of one application). Access is granted only when the secret's `atlantis:ApplicationDeploymentId` tag equals the same tag on the calling role. The resource is created unconditionally. Attach it by passing its exported ARN to a `*SvcRoleIncludeManagedPolicyArns` parameter (see [Secrets Manager Read Policies](#secrets-manager-read-policies)).
+
+**Key Configuration:**
+- **Managed Policy Name:** `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadDeployment`
+- **Path:** The `RolePath` parameter
+- **Scope Tag Key:** `atlantis:ApplicationDeploymentId`
+- **Tag Value Format:** `<Prefix>-<ProjectId>-<StageId>`
+
+**Policy Statement (one statement, `Sid: SecretsReadDeploymentReadSecretTagMatch`):**
+
+| Element | Setting |
+|---------|---------|
+| Effect | Allow |
+| Actions | `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` (exactly these two, in the same statement) |
+| Resource | `arn:{Partition}:secretsmanager:*:{AccountId}:secret:*` (any Region, this account only) |
+| `StringEquals` (tag match) | `aws:ResourceTag/atlantis:ApplicationDeploymentId` = `${aws:PrincipalTag/atlantis:ApplicationDeploymentId}` |
+| `Null` (tag presence) | `aws:PrincipalTag/atlantis:ApplicationDeploymentId` = `false` and `aws:ResourceTag/atlantis:ApplicationDeploymentId` = `false` |
+
+`secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` are **not** granted. Neither action supports the tag conditions, so neither can be allowed without removing the tag guard. Call `GetSecretValue` once per secret instead.
+
+**Module Source:** `templates/v2/modules/pipeline-policies/secrets-read-deployment.yml`
+
+### SecretsReadApplicationPolicy
+
+Type: AWS::IAM::ManagedPolicy (via AWS::Include)
+
+Read-only managed policy that lets a pipeline stage role read Secrets Manager secrets of **one application across all of its stages**. Access is granted only when the secret's `atlantis:Application` tag equals the same tag on the calling role. The resource is created unconditionally.
+
+**Key Configuration:**
+- **Managed Policy Name:** `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadApplication`
+- **Path:** The `RolePath` parameter
+- **Scope Tag Key:** `atlantis:Application`
+- **Tag Value Format:** `<Prefix>-<ProjectId>`
+
+**Policy Statement (one statement, `Sid: SecretsReadApplicationReadSecretTagMatch`):**
+
+| Element | Setting |
+|---------|---------|
+| Effect | Allow |
+| Actions | `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` (exactly these two, in the same statement) |
+| Resource | `arn:{Partition}:secretsmanager:*:{AccountId}:secret:*` (any Region, this account only) |
+| `StringEquals` (tag match) | `aws:ResourceTag/atlantis:Application` = `${aws:PrincipalTag/atlantis:Application}` |
+| `Null` (tag presence) | `aws:PrincipalTag/atlantis:Application` = `false` and `aws:ResourceTag/atlantis:Application` = `false` |
+
+`secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` are **not** granted.
+
+**Module Source:** `templates/v2/modules/pipeline-policies/secrets-read-application.yml`
+
+> **Note:** This policy reaches every stage (test, beta, prod) of the application, so a test-stage role carrying it can read production secrets that have the same `atlantis:Application` value. Prefer the deployment-level policy unless the role really needs every stage.
+
+### SecretsReadPrefixPolicy
+
+Type: AWS::IAM::ManagedPolicy (via AWS::Include)
+
+Read-only managed policy that lets a pipeline stage role read Secrets Manager secrets of **all applications under one prefix**. Access is granted only when the secret's `atlantis:Prefix` tag equals the same tag on the calling role. The resource is created unconditionally.
+
+**Key Configuration:**
+- **Managed Policy Name:** `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadPrefix`
+- **Path:** The `RolePath` parameter
+- **Scope Tag Key:** `atlantis:Prefix`
+- **Tag Value Format:** `<Prefix>`
+
+**Policy Statement (one statement, `Sid: SecretsReadPrefixReadSecretTagMatch`):**
+
+| Element | Setting |
+|---------|---------|
+| Effect | Allow |
+| Actions | `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` (exactly these two, in the same statement) |
+| Resource | `arn:{Partition}:secretsmanager:*:{AccountId}:secret:*` (any Region, this account only) |
+| `StringEquals` (tag match) | `aws:ResourceTag/atlantis:Prefix` = `${aws:PrincipalTag/atlantis:Prefix}` |
+| `Null` (tag presence) | `aws:PrincipalTag/atlantis:Prefix` = `false` and `aws:ResourceTag/atlantis:Prefix` = `false` |
+
+`secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` are **not** granted.
+
+**Module Source:** `templates/v2/modules/pipeline-policies/secrets-read-prefix.yml`
+
+> **Warning:** This is the broadest of the three policies. A role carrying it can read every secret in the account that has the same `atlantis:Prefix` value, across all applications and stages under that prefix. Attach it only to roles that need that reach.
 
 ### GitHubConnection
 
@@ -590,6 +676,64 @@ Name of the Cognito CRUD managed policy.
 |-----------|-------|
 | Example Value | `ACME-ProjectPipeline-CognitoCrud` |
 
+### SecretsReadDeploymentPolicyArn
+
+ARN of the deployment-level Secrets Manager read managed policy (`atlantis:ApplicationDeploymentId` tag match). Pass this to pipeline templates via the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` parameters.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-ProjectPipeline-SecretsReadDeployment-Arn` |
+| Example Value | `arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadDeployment` |
+
+> **Note:** When `RolePath` is not `/`, the path appears in the ARN (for example `arn:aws:iam::123456789012:policy/service-roles/ACME-ManagedPolicyForPipeline-SecretsReadDeployment`). Copy the value from the output or export instead of building it by hand.
+
+### SecretsReadDeploymentPolicyName
+
+Name of the deployment-level Secrets Manager read managed policy.
+
+| Attribute | Value |
+|-----------|-------|
+| Export | None (not exported) |
+| Example Value | `ACME-ManagedPolicyForPipeline-SecretsReadDeployment` |
+
+> **Note:** Unlike the existing `CodeBuildCrudPolicyName` and `CognitoCrudPolicyName` outputs, which report a `ProjectPipeline-` value, the three `SecretsRead*PolicyName` outputs report the real managed policy name (`ManagedPolicyForPipeline-`).
+
+### SecretsReadApplicationPolicyArn
+
+ARN of the application-level Secrets Manager read managed policy (`atlantis:Application` tag match). Pass this to pipeline templates via the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` parameters.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-ProjectPipeline-SecretsReadApplication-Arn` |
+| Example Value | `arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadApplication` |
+
+### SecretsReadApplicationPolicyName
+
+Name of the application-level Secrets Manager read managed policy.
+
+| Attribute | Value |
+|-----------|-------|
+| Export | None (not exported) |
+| Example Value | `ACME-ManagedPolicyForPipeline-SecretsReadApplication` |
+
+### SecretsReadPrefixPolicyArn
+
+ARN of the prefix-level Secrets Manager read managed policy (`atlantis:Prefix` tag match). Pass this to pipeline templates via the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` parameters.
+
+| Attribute | Value |
+|-----------|-------|
+| Export Name | `{OrgPrefix}-ProjectPipeline-SecretsReadPrefix-Arn` |
+| Example Value | `arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadPrefix` |
+
+### SecretsReadPrefixPolicyName
+
+Name of the prefix-level Secrets Manager read managed policy.
+
+| Attribute | Value |
+|-----------|-------|
+| Export | None (not exported) |
+| Example Value | `ACME-ManagedPolicyForPipeline-SecretsReadPrefix` |
+
 ### GitHubConnectionArn
 
 Condition: HasGitHubOrg
@@ -761,6 +905,101 @@ IAM Policies console link for quick access to view created policies.
 |-----------|-------|
 | Example Value | `https://console.aws.amazon.com/iam/home#/policies` |
 
+## Secrets Manager Read Policies
+
+Pipeline stage roles (the CloudFormation, CodeBuild, and PostDeploy service roles created by the pipeline templates) sometimes need to read Secrets Manager secrets, for example to resolve `{{resolve:secretsmanager:...}}` dynamic references during a deployment or to fetch a token during a build or post-deployment step. This template provides three account-wide, read-only managed policies for that purpose: `SecretsReadDeploymentPolicy`, `SecretsReadApplicationPolicy`, and `SecretsReadPrefixPolicy`.
+
+Each policy compares a tag on the secret with the same tag on the calling role (`aws:ResourceTag/atlantis:<Key>` equals `${aws:PrincipalTag/atlantis:<Key>}`). The three policies differ only in which tag key they compare, which sets the breadth of access:
+
+| Level | Managed policy | Tag key | Tag value format | Reach |
+|-------|----------------|---------|------------------|-------|
+| Deployment | `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadDeployment` | `atlantis:ApplicationDeploymentId` | `<Prefix>-<ProjectId>-<StageId>` | One deployment (one stage of one application) |
+| Application | `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadApplication` | `atlantis:Application` | `<Prefix>-<ProjectId>` | All stages of one application |
+| Prefix | `{OrgPrefix}-ManagedPolicyForPipeline-SecretsReadPrefix` | `atlantis:Prefix` | `<Prefix>` | All applications under one prefix |
+
+Tag values are case-sensitive. Write them identically on the role and on the secret. For example, with Prefix `acme`, ProjectId `orders`, and StageId `prod`, the values are `acme-orders-prod`, `acme-orders`, and `acme`.
+
+> **Important:** No pipeline template changed, and `templates/v2/modules/pipeline/cloudformation-svc-role.yml` did not change. The policies are available to attach through the existing `*SvcRoleIncludeManagedPolicyArns` parameters. Existing deployments are unaffected until an administrator attaches a policy.
+
+### Can scoping be offered at all three levels and stay least privilege?
+
+Yes. Each level is a separate opt-in managed policy. An administrator attaches only the narrowest policy a given pipeline role needs, and no policy grants more than read access to secrets whose tag value equals the calling role's own tag value. A role that needs broader access is given a second policy. A first policy is never widened.
+
+### Trade-off against name-pattern ARN scoping
+
+The alternative is to scope by secret name, for example `secret:<Prefix>-<ProjectId>-<StageId>-*`. Name-pattern scoping is not the control used here.
+
+- Tag matching lets one shared account-wide policy serve every deployment, because the value to match comes from the calling role (`${aws:PrincipalTag/...}`) and is not hard-coded in the policy. Name patterns need a policy per deployment or a broad wildcard.
+- Tag matching does not depend on the secret name, so it works with secrets whose names do not follow the `Prefix-ProjectId-StageId-Resource` convention. It also avoids ambiguity between hyphenated names (a pattern such as `acme-pay-*` also matches `acme-pay-ments-prod-*`) and the random six-character suffix that Secrets Manager appends to secret ARNs.
+- Name patterns cannot be changed by re-tagging. Tag matching is only as strong as control over who can set `atlantis:*` tags on secrets and on roles. The policies therefore require both tags to be present (fail closed), and tag-write permission must be restricted (see [Security Considerations](#security-considerations)).
+- Tag matching requires secrets and roles to be tagged. Untagged secrets and untagged roles get no access, which is the intended failure mode.
+
+### Granted and Not Granted
+
+Each policy has one statement that allows exactly `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret`, only when the `StringEquals` tag match and both `Null` tag-presence conditions hold. Nothing else is granted.
+
+| Not granted | Reason |
+|-------------|--------|
+| `secretsmanager:ListSecrets` | The action does not support resource-level conditions |
+| `secretsmanager:BatchGetSecretValue` | The action supports no resource types or condition keys, so it cannot carry the tag guard. Call `GetSecretValue` once per secret |
+| Create, update, delete, rotate, restore, replicate, tag, untag, or resource-policy actions | The policies are read-only |
+| `kms:Decrypt` | See [Security Considerations](#security-considerations) |
+
+### How Roles and Secrets Get the Tags
+
+For access to be granted, both sides must carry the policy's tag key with equal values.
+
+| Subject | How it obtains the tag |
+|---------|------------------------|
+| Pipeline stage role | CloudFormation propagates the tags of the pipeline stack to the roles it creates, so set the `atlantis:*` tags as stack tags when the pipeline stack is deployed. The pipeline templates in this repository do not set these tags themselves (see [Prerequisites to Verify](#prerequisites-to-verify-before-relying-on-these-policies)). |
+| Secret | Set the tag on the secret, either through the `Tags` property of the `AWS::SecretsManager::Secret` resource or through the application stack's tags, which CloudFormation propagates to the secret. |
+
+### Attaching a Policy to a Pipeline Role
+
+Pass the exported policy ARN to the pipeline template parameter for the role that needs it:
+
+| Role that needs to read the secret | Pipeline template parameter |
+|------------------------------------|-----------------------------|
+| CloudFormation service role (for `{{resolve:secretsmanager:...}}` during deployment) | `CloudFormationSvcRoleIncludeManagedPolicyArns` |
+| CodeBuild service role (build step) | `CodeBuildSvcRoleIncludeManagedPolicyArns` |
+| PostDeploy service role (post-deployment step) | `PostDeploySvcRoleIncludeManagedPolicyArns` |
+
+Look up the ARN from the export:
+
+```bash
+aws cloudformation list-exports \
+  --query "Exports[?Name=='ACME-ProjectPipeline-SecretsReadDeployment-Arn'].Value" \
+  --output text
+```
+
+Example pipeline stack parameters that let the CloudFormation service role and the PostDeploy service role read secrets of one deployment, and let the CodeBuild service role read secrets of the whole application:
+
+```
+CloudFormationSvcRoleIncludeManagedPolicyArns: arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadDeployment
+PostDeploySvcRoleIncludeManagedPolicyArns: arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadDeployment
+CodeBuildSvcRoleIncludeManagedPolicyArns: arn:aws:iam::123456789012:policy/ACME-ManagedPolicyForPipeline-SecretsReadApplication
+```
+
+The pipeline stack must also carry the matching tags (`atlantis:ApplicationDeploymentId=acme-orders-prod` and `atlantis:Application=acme-orders` in this example), and the secrets must carry the same tags and values. If the role already has other managed policies, append the ARN to the comma-delimited list.
+
+### Security Considerations
+
+> **Important:** Tag matching is only as strong as control over who can set `atlantis:*` tags. Anyone who can add or change an `atlantis:*` tag on a secret or on a role can change what that role can read. Restrict tag-write permission on secrets (`secretsmanager:TagResource`, `secretsmanager:UntagResource`, and `secretsmanager:CreateSecret` with tags) and on roles (`iam:TagRole`, `iam:UntagRole`, and `iam:CreateRole` with tags) to trusted administrators and the pipeline management roles, for example with a service control policy. This repository does not deploy such a control.
+
+- **Fail closed:** An untagged role gets no access. An untagged secret gets no access. A role or secret whose tag value differs, even by case, gets no access.
+- **Customer managed KMS keys:** A secret encrypted with a customer managed KMS key also requires `kms:Decrypt` on that key. These policies grant no KMS permission, so grant it separately through a customer managed policy or the key policy. Secrets that use the AWS managed key `aws/secretsmanager` need nothing extra.
+- **Permissions boundaries still apply:** If a role has a permissions boundary, the boundary must also allow `secretsmanager:GetSecretValue`. The effective permission is the intersection of the policy and the boundary.
+- **Same account only:** The `Resource` element covers secrets in the account that owns this stack, in any Region. A secret in another account never matches.
+- **Eventual consistency:** A change to a tag on a role or secret can take a short time to take effect.
+- **Managed policy quota:** IAM limits the number of managed policies attached to a role (default 10). Attach only the narrowest policy the role needs.
+
+### Prerequisites to Verify Before Relying on These Policies
+
+> **Important:** The following two assumptions are not demonstrated by the contents of this repository. Verify them in a test account before attaching a policy to a production pipeline.
+
+1. **Pipeline role tags come from outside this repository.** The pipeline role modules set no `Tags` property on the roles they create. The existing `codebuild-crud.yml` and `cognito-crud.yml` policies already depend on `aws:PrincipalTag/atlantis:ApplicationDeploymentId`, so stack-level tags applied at deploy time are the presumed source. This repository does not show `atlantis:Application` or `atlantis:Prefix` being set on pipeline roles. Before attaching the application-level or prefix-level policy, confirm that the pipeline roles actually carry those tags (for example with `aws iam list-role-tags --role-name <role-name>`), and add them as stack tags on the pipeline stack if they do not.
+2. **CloudFormation's identity and tag evaluation for `{{resolve:secretsmanager:...}}` needs a one-time manual check.** AWS documents that resolving a Secrets Manager dynamic reference requires permission to call `GetSecretValue` on the secret, but it does not state which principal tags are evaluated. Before release or first use, deploy a stack that resolves a tagged secret using a tagged CloudFormation service role in a test account and confirm that the resolution succeeds. Until you have done this, do not assume that attaching a policy to the CloudFormation service role is sufficient for dynamic references.
+
 ## Conditions
 
 | Condition | Logic | Purpose |
@@ -889,6 +1128,15 @@ This grants the `111122223333` account's `*-PromoteServiceRole` roles write/read
 
 - AWS accounts have a default limit of 1500 managed policies
 - If you hit this limit, request an increase via AWS Support
+
+### AccessDenied When Reading a Secret With a Secrets Read Policy
+
+- Confirm the role carries the policy's tag key (`atlantis:ApplicationDeploymentId`, `atlantis:Application`, or `atlantis:Prefix`) and the secret carries the same key with an identical, case-sensitive value
+- If the secret uses a customer managed KMS key, grant `kms:Decrypt` on that key separately; the policies grant none
+- If the role has a permissions boundary, confirm the boundary allows `secretsmanager:GetSecretValue`
+- If the call is `ListSecrets` or `BatchGetSecretValue`, it is not granted by these policies
+- After changing a tag, wait a few minutes and retry
+- See [Secrets Manager Read Policies](#secrets-manager-read-policies)
 
 ### Stack Deletion with Retained Resources
 

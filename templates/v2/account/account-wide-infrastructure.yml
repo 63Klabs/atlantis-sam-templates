@@ -4,7 +4,7 @@ Description: "Account-wide resources: ABAC-scoped managed policies and shared co
 # 63Klabs Atlantis DevOps Platform for AWS SAM Deployments
 # Account-Wide Infrastructure Template
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.1.0/2026-09-23
+# Version: v2.1.0/2026-11-12
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
 # https://github.com/63klabs/atlantis-sam-templates/
@@ -15,9 +15,13 @@ Description: "Account-wide resources: ABAC-scoped managed policies and shared co
 #   - Shared connections (e.g., GitHub via CodeConnections)
 #   - API Gateway CloudWatch logging prerequisites (account-level IAM role)
 #   - Bedrock model invocation logging prerequisites (log group + IAM role)
+#   - Secrets Manager read managed policies (deployment, application, prefix level; ABAC-scoped)
 #
 # Managed policies are scoped via ABAC using the
-# atlantis:ApplicationDeploymentId tag on the principal. The resulting
+# atlantis:ApplicationDeploymentId tag on the principal. The Secrets Manager
+# read policies compare the same tag on the calling role and the secret at
+# the deployment level, and the atlantis:Application and atlantis:Prefix tags
+# at the application and prefix levels. The resulting
 # managed policy ARNs are exported so that pipeline templates can attach
 # them to their CloudFormation service roles.
 #
@@ -396,6 +400,27 @@ Resources:
       Parameters:
         Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline-policies/cognito-crud.yml"
 
+  # -- Secrets Manager Read Policy, Deployment Level (ABAC-Scoped, atlantis:ApplicationDeploymentId) --
+  SecretsReadDeploymentPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline-policies/secrets-read-deployment.yml"
+
+  # -- Secrets Manager Read Policy, Application Level (ABAC-Scoped, atlantis:Application) --
+  SecretsReadApplicationPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline-policies/secrets-read-application.yml"
+
+  # -- Secrets Manager Read Policy, Prefix Level (ABAC-Scoped, atlantis:Prefix) --
+  SecretsReadPrefixPolicy:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub "s3://${S3ModuleLocation}/${S3ModuleNamespace}/templates/v2/modules/pipeline-policies/secrets-read-prefix.yml"
+
   # -- GitHub Connection (Conditional) --
   GitHubConnection:
     Fn::Transform:
@@ -518,6 +543,39 @@ Outputs:
   CognitoCrudPolicyName:
     Description: "Name of the Cognito CRUD managed policy"
     Value: !Sub "${OrgPrefix}-ProjectPipeline-CognitoCrud"
+
+  # ---------------------------------------------------------------------------
+  # Secrets Manager Read Policies (ABAC-Scoped, read-only)
+
+  SecretsReadDeploymentPolicyArn:
+    Description: "ARN of the Secrets Manager read managed policy scoped to one deployment (atlantis:ApplicationDeploymentId tag match). Pass this to pipeline templates via the CloudFormationSvcRoleIncludeManagedPolicyArns, CodeBuildSvcRoleIncludeManagedPolicyArns, or PostDeploySvcRoleIncludeManagedPolicyArns parameters."
+    Value: !Ref SecretsReadDeploymentPolicy
+    Export:
+      Name: !Sub "${OrgPrefix}-ProjectPipeline-SecretsReadDeployment-Arn"
+
+  SecretsReadDeploymentPolicyName:
+    Description: "Name of the deployment-level Secrets Manager read managed policy"
+    Value: !Sub "${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadDeployment"
+
+  SecretsReadApplicationPolicyArn:
+    Description: "ARN of the Secrets Manager read managed policy scoped to one application across all stages (atlantis:Application tag match). Pass this to pipeline templates via the CloudFormationSvcRoleIncludeManagedPolicyArns, CodeBuildSvcRoleIncludeManagedPolicyArns, or PostDeploySvcRoleIncludeManagedPolicyArns parameters."
+    Value: !Ref SecretsReadApplicationPolicy
+    Export:
+      Name: !Sub "${OrgPrefix}-ProjectPipeline-SecretsReadApplication-Arn"
+
+  SecretsReadApplicationPolicyName:
+    Description: "Name of the application-level Secrets Manager read managed policy"
+    Value: !Sub "${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadApplication"
+
+  SecretsReadPrefixPolicyArn:
+    Description: "ARN of the Secrets Manager read managed policy scoped to all applications under one prefix (atlantis:Prefix tag match). Pass this to pipeline templates via the CloudFormationSvcRoleIncludeManagedPolicyArns, CodeBuildSvcRoleIncludeManagedPolicyArns, or PostDeploySvcRoleIncludeManagedPolicyArns parameters."
+    Value: !Ref SecretsReadPrefixPolicy
+    Export:
+      Name: !Sub "${OrgPrefix}-ProjectPipeline-SecretsReadPrefix-Arn"
+
+  SecretsReadPrefixPolicyName:
+    Description: "Name of the prefix-level Secrets Manager read managed policy"
+    Value: !Sub "${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadPrefix"
 
   # ---------------------------------------------------------------------------
   # GitHub Connection

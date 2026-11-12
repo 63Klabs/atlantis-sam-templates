@@ -16,6 +16,7 @@ Account-wide resources: ABAC-scoped managed policies, shared connections, option
 
 **Use Cases:**
 - ABAC-scoped managed policies for CloudFormation service roles (CodeBuild CRUD, Cognito CRUD)
+- Read-only Secrets Manager managed policies at deployment, application, and prefix level, matched by resource tag
 - Shared GitHub connections via AWS CodeConnections
 - Account-level API Gateway CloudWatch logging configuration
 - Shared S3 artifacts bucket for all pipeline roles in the account
@@ -25,6 +26,7 @@ Account-wide resources: ABAC-scoped managed policies, shared connections, option
 - Modular architecture using `AWS::Include` transforms for flexible resource assembly
 - Conditional resource creation — enable only what you need
 - ABAC-scoped policies using `atlantis:ApplicationDeploymentId` tag
+- Three secrets read managed policies scoped by the `atlantis:ApplicationDeploymentId`, `atlantis:Application`, or `atlantis:Prefix` tag (see [Secrets Read Managed Policies](#secrets-read-managed-policies))
 - Exported outputs for cross-stack references (managed policy ARNs, connection ARNs, bucket names)
 - Optional organization prefix for S3 bucket naming
 
@@ -58,6 +60,20 @@ Combined prefix-based CloudFormation service roles and managed policies for pipe
 
 Deploy ABAC-scoped managed policies that can be attached to CloudFormation service roles across all projects. This provides consistent permissions for CodeBuild and Cognito operations without duplicating policies per project.
 
+### Secrets Read Managed Policies
+
+The account-wide template creates three managed policies that let a pipeline role read Secrets Manager secrets without naming each secret. They differ only in how broad the match is:
+
+| Level | Policy name | Tag that must match |
+|-------|-------------|---------------------|
+| Deployment | `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadDeployment` | `atlantis:ApplicationDeploymentId` (`<Prefix>-<ProjectId>-<StageId>`) |
+| Application | `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadApplication` | `atlantis:Application` (`<Prefix>-<ProjectId>`) |
+| Prefix | `${OrgPrefix}-ManagedPolicyForPipeline-SecretsReadPrefix` | `atlantis:Prefix` (`<Prefix>`) |
+
+Each policy is read-only: it allows `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret` only. Access is granted when the tag on the secret equals the same tag on the calling role (attribute-based access control). The policies fail closed: a role or secret without the tag gets no access.
+
+Policy ARNs are exported as `${OrgPrefix}-ProjectPipeline-SecretsRead<Level>-Arn` and can be passed to the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` pipeline parameters. No pipeline template changes. For resources, outputs, and security considerations, see the [account-wide-infrastructure template README](./account-wide-infrastructure-README.md).
+
 ### GitHub Integration
 
 Create a shared AWS CodeConnections GitHub connection that all pipeline templates can reference. The connection only needs to be authorized once in the AWS Console.
@@ -76,7 +92,10 @@ Provision a shared S3 artifacts bucket accessible by all pipeline roles (CodePip
 account-wide-infrastructure.yml
 ├── modules/pipeline-policies/
 │   ├── codebuild-crud.yml (ABAC-scoped managed policy)
-│   └── cognito-crud.yml (ABAC-scoped managed policy)
+│   ├── cognito-crud.yml (ABAC-scoped managed policy)
+│   ├── secrets-read-deployment.yml (ABAC-scoped, read-only, atlantis:ApplicationDeploymentId)
+│   ├── secrets-read-application.yml (ABAC-scoped, read-only, atlantis:Application)
+│   └── secrets-read-prefix.yml (ABAC-scoped, read-only, atlantis:Prefix)
 ├── modules/account-wide/
 │   ├── codeconnections-github.yml (Conditional: HasGitHubOrg)
 │   ├── apigw-cloudwatch-role.yml (Conditional: EnableApiGatewayLogging)

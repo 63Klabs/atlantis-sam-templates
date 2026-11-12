@@ -1,0 +1,220 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `templates/v2/modules/pipeline-policies/secrets-read-deployment.yml`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498351866
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498359022
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498397618
+      }
+    ],
+    "1.2 Create `templates/v2/modules/pipeline-policies/secrets-read-application.yml`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498352268
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498359832
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498398993
+      }
+    ],
+    "1.3 Create `templates/v2/modules/pipeline-policies/secrets-read-prefix.yml`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498352529
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498360282
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498399282
+      }
+    ],
+    "2.1 Add resources and outputs to `templates/v2/account/account-wide-infrastructure.yml`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498352772
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498402194
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498703365
+      }
+    ],
+    "2.2 Update the template header comment and version line": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498353034
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498706724
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498736684
+      }
+    ],
+    "3.1 Create `tests/test_secrets_read_managed_policy_unit.py` with module tests": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498353283
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498402627
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498704171
+      }
+    ],
+    "3.2 Add template wiring tests to `tests/test_secrets_read_managed_policy_unit.py`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498353582
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498737313
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498780949
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498353772
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498789973
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498995719
+      }
+    ],
+    "5.1 Update `CHANGELOG.md`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498354050
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498790265
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498996568
+      }
+    ],
+    "5.2 Update `docs/templates/v2/account/account-wide-infrastructure-README.md`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498354336
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498790523
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498997264
+      }
+    ],
+    "5.3 Update `docs/templates/v2/account/README.md`": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498354583
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498791193
+      },
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498997822
+      }
+    ],
+    "1. Create the three Secrets Read modules": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498399523
+      }
+    ],
+    "2. Wire the modules into the account-wide template": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498736939
+      }
+    ],
+    "3. Add fast unit tests": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498781251
+      }
+    ],
+    "5. Update documentation and CHANGELOG (required, final task)": [
+      {
+        "executionId": "d5bc3d4e-7e1a-4ebb-ad3c-5c91288b059f",
+        "chatSessionId": "sess_e7a27460-1716-4edf-9fe4-79f4348695f4",
+        "timestamp": 1794498998118
+      }
+    ]
+  }
+}
