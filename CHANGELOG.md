@@ -14,7 +14,7 @@ When deploying to other regions you may need to [self-host under certain deploym
 
 The Atlantis Templates Repository is free and open source. Templates and build/deploy scripts for both CodePipeline and GitHub Pipeline are available from the [Atlantis SAM Templates repository on GitHub](https://github.com/63Klabs/atlantis-sam-templates).
 
-## v0.0.47 (unreleased)
+## v0.0.47 (2026-11-12)
 
 ### Added
 - **Secrets Manager Read Managed Policies (Tag-Matched)** [Spec: 0-0-47-secrets-read-managed-policy](.kiro/specs/0-0-47-secrets-read-managed-policy/) - Added three account-wide, read-only IAM managed policies that let a pipeline role read only the Secrets Manager secrets whose tag matches the same tag on the calling role (attribute-based access control). Attach an exported policy ARN to the `CloudFormationSvcRoleIncludeManagedPolicyArns`, `CodeBuildSvcRoleIncludeManagedPolicyArns`, or `PostDeploySvcRoleIncludeManagedPolicyArns` parameter of a pipeline stack. Each policy contains a single statement that allows exactly `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret`, guarded by a tag-match condition (`aws:ResourceTag/<key>` equals `${aws:PrincipalTag/<key>}`) and a tag-presence condition (`Null` is `"false"` for both the principal tag and the resource tag, so untagged roles and secrets get no access). `secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` are not granted.
